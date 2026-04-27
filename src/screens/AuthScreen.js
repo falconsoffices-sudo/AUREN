@@ -21,6 +21,14 @@ function makePassword(phone) {
   return `Auren_${digits}_2024!`;
 }
 
+// Formata dígitos como (305) 555-0100 — máximo 10 dígitos US
+function formatPhone(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function ToggleGroup({ options, value, onChange }) {
   return (
     <View style={styles.toggleRow}>
@@ -66,13 +74,15 @@ export default function AuthScreen({ navigation }) {
       if (error) throw error;
 
       if (data.user) {
-        await supabase.from('profiles').upsert({
-          id:       data.user.id,
-          nome:     nome.trim(),
-          telefone: fullPhone,
-          idioma,
-          genero,
-        });
+        await supabase
+          .from('profiles')
+          .update({
+            nome:     nome.trim(),
+            telefone: fullPhone,
+            idioma,
+            genero,
+          })
+          .eq('id', data.user.id);
       }
 
       navigation.replace('Main');
@@ -142,7 +152,7 @@ export default function AuthScreen({ navigation }) {
               placeholder="(305) 555-0100"
               placeholderTextColor="#6B4A58"
               value={telefone}
-              onChangeText={setTelefone}
+              onChangeText={raw => setTelefone(formatPhone(raw))}
               keyboardType="phone-pad"
               returnKeyType="done"
             />

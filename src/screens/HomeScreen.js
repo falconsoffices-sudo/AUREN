@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import theme from '../constants/theme';
+import { supabase } from '../lib/supabase';
 
 const c  = theme.colors;
 const sh = theme.shadows;
@@ -29,6 +30,21 @@ function StatColumn({ label, value, meta }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const [primeiroNome, setPrimeiroNome] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('nome')
+        .eq('id', userData.user.id)
+        .single();
+      if (data?.nome) setPrimeiroNome(data.nome.trim().split(' ')[0]);
+    })();
+  }, []);
+
   const today = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
@@ -46,7 +62,7 @@ export default function HomeScreen() {
               style={styles.logoImage}
             />
         </View>
-        <Text style={styles.greeting}>Olá, Maria</Text>
+        <Text style={styles.greeting}>Olá, {primeiroNome || 'Maria'}</Text>
         <Text style={styles.date}>{today}</Text>
       </View>
 
