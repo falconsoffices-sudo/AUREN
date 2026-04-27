@@ -1,0 +1,323 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../lib/supabase';
+import colors from '../constants/colors';
+
+// ─── Add Servico Modal ────────────────────────────────────────────────────────
+
+function AddServicoModal({ visible, onClose, onSaved }) {
+  const [nome,     setNome]     = useState('');
+  const [valor,    setValor]    = useState('');
+  const [duracao,  setDuracao]  = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [saving,   setSaving]   = useState(false);
+
+  const reset = () => { setNome(''); setValor(''); setDuracao(''); setDescricao(''); };
+  const handleClose = () => { reset(); onClose(); };
+
+  const handleSave = async () => {
+    if (!nome.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe o nome do serviço.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) throw new Error('Usuário não autenticado.');
+
+      const { error } = await supabase.from('servicos').insert({
+        profissional_id:  userId,
+        nome:             nome.trim(),
+        valor:            valor   ? parseFloat(valor.replace(/[^0-9.]/g, ''))   : null,
+        duracao_minutos:  duracao ? parseInt(duracao.replace(/\D/g, ''), 10)    : null,
+        descricao:        descricao.trim() || null,
+      });
+      if (error) throw error;
+
+      reset();
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao salvar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Novo serviço</Text>
+
+            <TextInput
+              style={modal.input}
+              placeholder="Nome do serviço *"
+              placeholderTextColor="#6B4A58"
+              value={nome}
+              onChangeText={setNome}
+              autoCapitalize="words"
+              returnKeyType="next"
+            />
+
+            <View style={modal.row}>
+              <TextInput
+                style={[modal.input, modal.halfInput]}
+                placeholder="Valor ($)"
+                placeholderTextColor="#6B4A58"
+                value={valor}
+                onChangeText={setValor}
+                keyboardType="decimal-pad"
+                returnKeyType="next"
+              />
+              <TextInput
+                style={[modal.input, modal.halfInput, { marginRight: 0 }]}
+                placeholder="Duração (min)"
+                placeholderTextColor="#6B4A58"
+                value={duracao}
+                onChangeText={t => setDuracao(t.replace(/\D/g, ''))}
+                keyboardType="number-pad"
+                returnKeyType="next"
+              />
+            </View>
+
+            <TextInput
+              style={[modal.input, modal.inputMulti]}
+              placeholder="Descrição (opcional)"
+              placeholderTextColor="#6B4A58"
+              value={descricao}
+              onChangeText={setDescricao}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+              onPress={handleSave}
+              disabled={saving}
+              activeOpacity={0.85}
+            >
+              {saving
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={modal.saveBtnText}>Salvar</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Servico Card ─────────────────────────────────────────────────────────────
+
+function ServicoCard({ nome, valor, duracao_minutos, descricao }) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTop}>
+        <Text style={styles.cardName} numberOfLines={1}>{nome}</Text>
+        {valor != null && (
+          <Text style={styles.cardPrice}>${parseFloat(valor).toFixed(2)}</Text>
+        )}
+      </View>
+      {duracao_minutos != null && (
+        <Text style={styles.cardMeta}>{duracao_minutos} min</Text>
+      )}
+      {descricao ? (
+        <Text style={styles.cardDesc} numberOfLines={2}>{descricao}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
+export default function ServicosScreen({ navigation }) {
+  const [servicos,      setServicos]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [modalVisible,  setModalVisible]  = useState(false);
+  const [userId,        setUserId]        = useState(null);
+
+  const fetchServicos = useCallback(async (uid) => {
+    const id = uid ?? userId;
+    if (!id) return;
+    const { data, error } = await supabase
+      .from('servicos')
+      .select('*')
+      .eq('profissional_id', id)
+      .order('nome');
+    if (!error && data) setServicos(data);
+  }, [userId]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+      if (uid) {
+        setUserId(uid);
+        await fetchServicos(uid);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+          <Text style={styles.backArrow}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Meus Serviços</Text>
+        <View style={styles.headerRight} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
+        ) : servicos.length > 0 ? (
+          servicos.map(s => <ServicoCard key={s.id} {...s} />)
+        ) : (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>Nenhum serviço cadastrado ainda.</Text>
+            <Text style={styles.emptyHint}>Toque no + para adicionar.</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => setModalVisible(true)}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      <AddServicoModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSaved={() => {
+          setModalVisible(false);
+          fetchServicos();
+        }}
+      />
+
+    </SafeAreaView>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const CARD_BG  = '#222222';
+const INPUT_BG = '#2D1020';
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    marginBottom: 20,
+  },
+  backBtn: { width: 32, alignItems: 'center' },
+  backArrow: { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
+  headerRight: { width: 32 },
+
+  scroll: { paddingHorizontal: 20, paddingBottom: 110 },
+
+  card: {
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  cardName:  { fontSize: 16, fontWeight: '700', color: colors.white, flex: 1, marginRight: 8 },
+  cardPrice: { fontSize: 18, fontWeight: '800', color: colors.cream },
+  cardMeta:  { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 4 },
+  cardDesc:  { fontSize: 13, fontWeight: '400', color: '#555555', marginTop: 4 },
+
+  empty: { alignItems: 'center', paddingTop: 80 },
+  emptyText: { fontSize: 15, fontWeight: '500', color: colors.gray, marginBottom: 6 },
+  emptyHint: { fontSize: 13, fontWeight: '400', color: '#444444' },
+
+  fab: {
+    position: 'absolute', bottom: 24, right: 20,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
+  },
+  fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
+});
+
+// ─── Modal styles ─────────────────────────────────────────────────────────────
+
+const modal = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#1A0A14',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: '#3D1020',
+    alignSelf: 'center', marginBottom: 20,
+  },
+  title: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
+  input: {
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, fontWeight: '400', color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  halfInput: { flex: 1, marginBottom: 0 },
+  inputMulti: { height: 80, paddingTop: 14 },
+  saveBtn: {
+    height: 52, borderRadius: 14, backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center', marginTop: 8,
+  },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+});

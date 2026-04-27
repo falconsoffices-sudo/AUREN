@@ -11,7 +11,7 @@ import HomeScreen     from './src/screens/HomeScreen';
 import AgendaScreen   from './src/screens/AgendaScreen';
 import ClientesScreen from './src/screens/ClientesScreen';
 import CaixaScreen    from './src/screens/CaixaScreen';
-import PerfilScreen   from './src/screens/PerfilScreen';
+import PerfilStack    from './src/navigation/PerfilStack';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
@@ -30,7 +30,7 @@ function MainTabs() {
       <Tab.Screen name="Agenda"   component={AgendaScreen}   />
       <Tab.Screen name="Clientes" component={ClientesScreen} />
       <Tab.Screen name="Caixa"    component={CaixaScreen}    />
-      <Tab.Screen name="Perfil"   component={PerfilScreen}   />
+      <Tab.Screen name="Perfil"   component={PerfilStack}    />
     </Tab.Navigator>
   );
 }

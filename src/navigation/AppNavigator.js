@@ -6,7 +6,7 @@ import HomeScreen    from '../screens/HomeScreen';
 import AgendaScreen  from '../screens/AgendaScreen';
 import ClientesScreen from '../screens/ClientesScreen';
 import CaixaScreen   from '../screens/CaixaScreen';
-import PerfilScreen  from '../screens/PerfilScreen';
+import PerfilStack   from './PerfilStack';
 
 const Tab = createBottomTabNavigator();
 
@@ -51,7 +51,7 @@ export default function AppNavigator() {
       <Tab.Screen name="Agenda"   component={AgendaScreen}   />
       <Tab.Screen name="Clientes" component={ClientesScreen} />
       <Tab.Screen name="Caixa"    component={CaixaScreen}    />
-      <Tab.Screen name="Perfil"   component={PerfilScreen}   />
+      <Tab.Screen name="Perfil"   component={PerfilStack}    />
     </Tab.Navigator>
   );
 }

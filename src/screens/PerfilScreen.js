@@ -83,11 +83,12 @@ function PlanCard({ name, price, popular, items }) {
   );
 }
 
-function MenuItem({ label, danger, last }) {
+function MenuItem({ label, danger, last, onPress }) {
   return (
     <TouchableOpacity
       style={[styles.menuItem, !last && styles.menuItemBorder]}
       activeOpacity={0.65}
+      onPress={onPress}
     >
       <Text style={[styles.menuLabel, danger && styles.menuLabelDanger]}>
         {label}
@@ -99,7 +100,7 @@ function MenuItem({ label, danger, last }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function PerfilScreen() {
+export default function PerfilScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -144,6 +145,7 @@ export default function PerfilScreen() {
               key={item.id}
               {...item}
               last={i === MENU.length - 1}
+              onPress={item.label === 'Meus Serviços' ? () => navigation.navigate('Servicos') : undefined}
             />
           ))}
         </View>
