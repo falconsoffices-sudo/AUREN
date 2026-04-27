@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -16,17 +23,16 @@ const DAYS_LONG  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sáb
 const MONTHS     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-const STATUS_MAP = {
-  Finalizado: { bg: '#0D2B14', color: '#4ade80' },
-  Próxima:    { bg: '#3B0A1E', color: colors.primary },
-  Confirmada: { bg: '#2C2000', color: '#FACC15' },
+const STATUS_DISPLAY = {
+  confirmado: { label: 'Confirmada', bg: '#2C2000', color: '#FACC15' },
+  finalizado: { label: 'Finalizado', bg: '#0D2B14', color: '#4ade80' },
+  cancelado:  { label: 'Cancelado',  bg: '#2B0A0A', color: '#F87171' },
 };
 
-const APPOINTMENTS = [
-  { id: 1, time: '10:00 AM', name: 'Larissa Pereira', service: 'Esmaltação em gel',  duration: '1h',    value: '$110', status: 'Finalizado' },
-  { id: 2, time: '11:30 AM', name: 'Camila Torres',   service: 'Gel + nail art',      duration: '1h30',  value: '$140', status: 'Finalizado' },
-  { id: 3, time: '2:30 PM',  name: 'Mariana Souza',   service: 'Manutenção em gel',   duration: '45min', value: '$90',  status: 'Próxima'    },
-  { id: 4, time: '4:00 PM',  name: 'Dona Rita',       service: 'Pé + mão',            duration: '1h30',  value: '$80',  status: 'Confirmada', vip: true },
+const TIPO_OPTIONS = [
+  { label: 'Comercial',   value: 'comercial'   },
+  { label: 'Residencial', value: 'residencial' },
+  { label: 'A domicílio', value: 'domicilio'   },
 ];
 
 const TODAY = new Date();
@@ -53,22 +59,299 @@ function getWeekDays(baseDate, weekOffset) {
   });
 }
 
-function getInitials(name) {
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+function getInitials(name = '') {
+  return name.trim().split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function formatTimeDisplay(isoStr) {
+  const d = new Date(isoStr);
+  const h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12  = (h % 12) || 12;
+  return `${h12}:${m} ${ampm}`;
+}
 
-function AppointmentCard({ time, name, service, duration, value, status, vip }) {
-  const s = STATUS_MAP[status];
-  const isNext = status === 'Próxima';
+function formatDuration(mins) {
+  if (!mins) return '';
+  if (mins < 60) return `${mins}min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h${m}min` : `${h}h`;
+}
+
+function formatTimeInput(text) {
+  const digits = text.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function buildDataHora(date, timeStr) {
+  const [hh, mm] = timeStr.split(':');
+  const d = new Date(date);
+  d.setHours(parseInt(hh || '0', 10), parseInt(mm || '0', 10), 0, 0);
+  return d.toISOString();
+}
+
+function normalize(str = '') {
+  return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// ─── Add Agendamento Modal ────────────────────────────────────────────────────
+
+function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }) {
+  const [clienteSearch,   setClienteSearch]   = useState('');
+  const [clientes,        setClientes]        = useState([]);
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+
+  const [servicos,        setServicos]        = useState([]);
+  const [selectedServico, setSelectedServico] = useState(null);
+  const [loadingServicos, setLoadingServicos] = useState(false);
+
+  const [time,            setTime]            = useState('');
+  const [tipoEndereco,    setTipoEndereco]    = useState('comercial');
+  const [observacoes,     setObservacoes]     = useState('');
+  const [saving,          setSaving]          = useState(false);
+
+  const reset = () => {
+    setClienteSearch(''); setClientes([]); setSelectedCliente(null);
+    setServicos([]);      setSelectedServico(null);
+    setTime('');          setTipoEndereco('Comercial'); setObservacoes('');
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  useEffect(() => {
+    if (!visible || !userId) return;
+    setLoadingClientes(true);
+    setLoadingServicos(true);
+    Promise.all([
+      supabase.from('clientes').select('id, nome').eq('profissional_id', userId).order('nome'),
+      supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', userId).order('nome'),
+    ]).then(([clientesRes, servicosRes]) => {
+      if (clientesRes.data) setClientes(clientesRes.data);
+      if (servicosRes.data) setServicos(servicosRes.data);
+      setLoadingClientes(false);
+      setLoadingServicos(false);
+    });
+  }, [visible, userId]);
+
+  const filteredClientes = useMemo(() => {
+    if (!clienteSearch.trim()) return clientes;
+    const q = normalize(clienteSearch);
+    return clientes.filter(c => normalize(c.nome).includes(q));
+  }, [clientes, clienteSearch]);
+
+  const handleSave = async () => {
+    if (!selectedCliente) {
+      Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return;
+    }
+    if (!selectedServico) {
+      Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return;
+    }
+    if (!time || time.length < 3) {
+      Alert.alert('Campo obrigatório', 'Informe o horário no formato HH:MM.'); return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('agendamentos').insert({
+        profissional_id: userId,
+        cliente_id:      selectedCliente.id,
+        servico_id:      selectedServico.id,
+        data_hora:       buildDataHora(selectedDate, time),
+        status:          'confirmado',
+        valor:           selectedServico.valor ?? null,
+        tipo_endereco:   tipoEndereco,
+        observacoes:     observacoes.trim() || null,
+      });
+      if (error) throw error;
+      reset();
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao salvar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dateLabel = `${DAYS_LONG[selectedDate.getDay()]}, ${selectedDate.getDate()} de ${MONTHS[selectedDate.getMonth()]}`;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Novo Agendamento</Text>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* ── Cliente ── */}
+              <Text style={modal.sectionLabel}>CLIENTE</Text>
+              {selectedCliente ? (
+                <View style={modal.selectedRow}>
+                  <View style={modal.selectedAvatar}>
+                    <Text style={modal.selectedAvatarText}>{getInitials(selectedCliente.nome)}</Text>
+                  </View>
+                  <Text style={modal.selectedText} numberOfLines={1}>{selectedCliente.nome}</Text>
+                  <TouchableOpacity
+                    onPress={() => { setSelectedCliente(null); setClienteSearch(''); }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={modal.clearBtn}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    style={modal.input}
+                    placeholder="Buscar cliente..."
+                    placeholderTextColor="#6B4A58"
+                    value={clienteSearch}
+                    onChangeText={setClienteSearch}
+                    autoCapitalize="words"
+                  />
+                  {loadingClientes ? (
+                    <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} />
+                  ) : filteredClientes.length > 0 ? (
+                    <View style={modal.listBox}>
+                      {filteredClientes.slice(0, 5).map((c, idx) => (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[
+                            modal.listItem,
+                            idx < Math.min(filteredClientes.length, 5) - 1 && modal.listItemBorder,
+                          ]}
+                          onPress={() => { setSelectedCliente(c); setClienteSearch(''); }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={modal.listItemText}>{c.nome}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : clienteSearch.trim() ? (
+                    <Text style={modal.emptyHint}>Nenhuma cliente encontrada.</Text>
+                  ) : null}
+                </>
+              )}
+
+              {/* ── Serviço ── */}
+              <Text style={modal.sectionLabel}>SERVIÇO</Text>
+              {loadingServicos ? (
+                <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} />
+              ) : servicos.length === 0 ? (
+                <Text style={modal.emptyHint}>Nenhum serviço cadastrado ainda.</Text>
+              ) : servicos.map(s => {
+                const sel = selectedServico?.id === s.id;
+                return (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[modal.servicoRow, sel && modal.servicoRowSelected]}
+                    onPress={() => setSelectedServico(sel ? null : s)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[modal.servicoNome, sel && modal.servicoNomeSel]}>{s.nome}</Text>
+                      {s.duracao_minutos ? (
+                        <Text style={modal.servicoMeta}>{formatDuration(s.duracao_minutos)}</Text>
+                      ) : null}
+                    </View>
+                    {s.valor != null && (
+                      <Text style={[modal.servicoValor, sel && modal.servicoValorSel]}>
+                        ${parseFloat(s.valor).toFixed(2)}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* ── Data e Hora ── */}
+              <Text style={modal.sectionLabel}>DATA E HORA</Text>
+              <View style={modal.dateBox}>
+                <Text style={modal.dateText}>{dateLabel}</Text>
+              </View>
+              <TextInput
+                style={modal.input}
+                placeholder="Horário — HH:MM (ex: 14:30)"
+                placeholderTextColor="#6B4A58"
+                value={time}
+                onChangeText={t => setTime(formatTimeInput(t))}
+                keyboardType="numeric"
+                maxLength={5}
+              />
+
+              {/* ── Local ── */}
+              <Text style={modal.sectionLabel}>LOCAL</Text>
+              <View style={modal.tipoRow}>
+                {TIPO_OPTIONS.map(opt => {
+                  const active = tipoEndereco === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[modal.tipoBtn, active && modal.tipoBtnActive]}
+                      onPress={() => setTipoEndereco(opt.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[modal.tipoBtnText, active && modal.tipoBtnTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* ── Observações ── */}
+              <Text style={modal.sectionLabel}>OBSERVAÇÕES</Text>
+              <TextInput
+                style={[modal.input, modal.inputMulti]}
+                placeholder="Opcional"
+                placeholderTextColor="#6B4A58"
+                value={observacoes}
+                onChangeText={setObservacoes}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={modal.saveBtnText}>Agendar</Text>
+                }
+              </TouchableOpacity>
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Appointment Card ─────────────────────────────────────────────────────────
+
+function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor }) {
+  const s      = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.confirmado;
+  const isNext = status === 'confirmado';
+  const name   = cliente?.nome ?? '—';
 
   return (
     <View style={[styles.apptCard, isNext && styles.apptCardHighlight]}>
       <View style={styles.apptTopRow}>
-        <Text style={styles.apptTime}>{time}</Text>
+        <Text style={styles.apptTime}>{formatTimeDisplay(data_hora)}</Text>
         <View style={[styles.statusBadge, { backgroundColor: s.bg }]}>
-          <Text style={[styles.statusText, { color: s.color }]}>{status}</Text>
+          <Text style={[styles.statusText, { color: s.color }]}>{s.label}</Text>
         </View>
       </View>
 
@@ -79,17 +362,22 @@ function AppointmentCard({ time, name, service, duration, value, status, vip }) 
         <View style={styles.apptInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.clientName} numberOfLines={1}>{name}</Text>
-            {vip && (
+            {cliente?.vip && (
               <View style={styles.vipBadge}>
                 <Text style={styles.vipText}>VIP</Text>
               </View>
             )}
           </View>
-          <Text style={styles.serviceText}>{service} · {duration}</Text>
+          <Text style={styles.serviceText}>
+            {servico?.nome ?? '—'}
+            {servico?.duracao_minutos ? ` · ${formatDuration(servico.duracao_minutos)}` : ''}
+          </Text>
         </View>
-        <Text style={[styles.apptValue, isNext && { color: colors.primary }]}>
-          {value}
-        </Text>
+        {valor != null && (
+          <Text style={[styles.apptValue, isNext && { color: colors.primary }]}>
+            ${parseFloat(valor).toFixed(2)}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -98,14 +386,50 @@ function AppointmentCard({ time, name, service, duration, value, status, vip }) 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function AgendaScreen() {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [selected, setSelected]     = useState(TODAY);
+  const [weekOffset,   setWeekOffset]   = useState(0);
+  const [selected,     setSelected]     = useState(TODAY);
+  const [agendamentos, setAgendamentos] = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [userId,       setUserId]       = useState(null);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
-  const monthLabel = `${MONTHS[TODAY.getMonth()]} ${TODAY.getFullYear()}`;
-  const isToday    = isSameDay(selected, TODAY);
-  const apptCount  = isToday ? APPOINTMENTS.length : 0;
+  const monthLabel = `${MONTHS[selected.getMonth()]} ${selected.getFullYear()}`;
   const dayLabel   = `${DAYS_LONG[selected.getDay()]}, ${selected.getDate()} de ${MONTHS[selected.getMonth()]}`;
+
+  const fetchAgendamentos = useCallback(async (uid, date) => {
+    if (!uid) return;
+    setLoading(true);
+    const start = new Date(date); start.setHours(0,  0,  0,   0);
+    const end   = new Date(date); end.setHours(23, 59, 59, 999);
+    const { data, error } = await supabase
+      .from('agendamentos')
+      .select(`
+        id, data_hora, status, valor, tipo_endereco, observacoes,
+        clientes(id, nome, vip),
+        servicos(id, nome, duracao_minutos)
+      `)
+      .eq('profissional_id', uid)
+      .gte('data_hora', start.toISOString())
+      .lte('data_hora', end.toISOString())
+      .order('data_hora');
+    if (!error && data) setAgendamentos(data);
+    setLoading(false);
+  }, []);
+
+  // Get userId on mount
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const uid = data?.user?.id;
+      if (uid) setUserId(uid);
+    })();
+  }, []);
+
+  // Fetch whenever userId or selected date changes
+  useEffect(() => {
+    if (userId) fetchAgendamentos(userId, selected);
+  }, [userId, selected]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -156,7 +480,10 @@ export default function AgendaScreen() {
 
       {/* ── Day title ── */}
       <Text style={styles.dayTitle}>
-        {dayLabel}{apptCount > 0 ? `  ·  ${apptCount} Agendamentos` : ''}
+        {dayLabel}
+        {agendamentos.length > 0
+          ? `  ·  ${agendamentos.length} Agendamento${agendamentos.length !== 1 ? 's' : ''}`
+          : ''}
       </Text>
 
       {/* ── Appointment list ── */}
@@ -164,8 +491,10 @@ export default function AgendaScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {isToday ? (
-          APPOINTMENTS.map(a => <AppointmentCard key={a.id} {...a} />)
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+        ) : agendamentos.length > 0 ? (
+          agendamentos.map(a => <AppointmentCard key={a.id} {...a} />)
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Nenhum agendamento para este dia.</Text>
@@ -174,9 +503,24 @@ export default function AgendaScreen() {
       </ScrollView>
 
       {/* ── FAB ── */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => setModalVisible(true)}
+      >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      <AddAgendamentoModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSaved={() => {
+          setModalVisible(false);
+          fetchAgendamentos(userId, selected);
+        }}
+        selectedDate={selected}
+        userId={userId}
+      />
 
     </SafeAreaView>
   );
@@ -197,175 +541,175 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     marginBottom: 24,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  headerMonth: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.gray,
-    paddingBottom: 3,
-  },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.white },
+  headerMonth: { fontSize: 14, fontWeight: '400', color: colors.gray, paddingBottom: 3 },
 
   weekRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    marginBottom: 20,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, marginBottom: 20,
   },
-  navBtn: {
-    width: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navBtnText: {
-    fontSize: 26,
-    fontWeight: '400',
-    color: colors.gray,
-    lineHeight: 30,
-  },
-  dayItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 12,
-  },
+  navBtn:     { width: 28, alignItems: 'center', justifyContent: 'center' },
+  navBtnText: { fontSize: 26, fontWeight: '400', color: colors.gray, lineHeight: 30 },
+  dayItem:       { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 12 },
   dayItemActive: { backgroundColor: colors.primary },
   dayShort: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.gray,
-    marginBottom: 5,
-    letterSpacing: 0.3,
+    fontSize: 10, fontWeight: '600', color: colors.gray, marginBottom: 5, letterSpacing: 0.3,
   },
-  dayNum: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.gray,
-  },
-  dayTextActive: { color: colors.white },
+  dayNum:       { fontSize: 15, fontWeight: '700', color: colors.gray },
+  dayTextActive:{ color: colors.white },
 
   dayTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.white,
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    fontSize: 14, fontWeight: '600', color: colors.white,
+    paddingHorizontal: 20, marginBottom: 16,
   },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 110 },
 
-  apptCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-  },
-  apptCardHighlight: {
-    borderWidth: 1,
-    borderColor: 'rgba(168,35,90,0.45)',
-  },
+  apptCard: { backgroundColor: CARD_BG, borderRadius: 16, padding: 16, marginBottom: 10 },
+  apptCardHighlight: { borderWidth: 1, borderColor: 'rgba(168,35,90,0.45)' },
   apptTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 12,
   },
-  apptTime: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.gray,
-    letterSpacing: 0.3,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  apptTime: { fontSize: 12, fontWeight: '600', color: colors.gray, letterSpacing: 0.3 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  statusText:  { fontSize: 11, fontWeight: '700' },
+
   apptClientRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#2E2E2E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.cream,
-  },
-  apptInfo: { flex: 1 },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 3,
-  },
-  clientName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.white,
-  },
+  avatarText: { fontSize: 14, fontWeight: '700', color: colors.cream },
+  apptInfo:   { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
+  clientName: { fontSize: 15, fontWeight: '700', color: colors.white },
   vipBadge: {
     backgroundColor: 'rgba(232,196,160,0.15)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(232,196,160,0.3)',
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(232,196,160,0.3)',
   },
-  vipText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.cream,
-    letterSpacing: 0.8,
-  },
-  serviceText: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-  },
-  apptValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.white,
-    marginLeft: 8,
-  },
+  vipText:     { fontSize: 9, fontWeight: '800', color: colors.cream, letterSpacing: 0.8 },
+  serviceText: { fontSize: 12, fontWeight: '400', color: colors.gray },
+  apptValue:   { fontSize: 16, fontWeight: '700', color: colors.white, marginLeft: 8 },
 
   emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.gray,
-  },
+  emptyText:  { fontSize: 14, fontWeight: '400', color: colors.gray },
 
   fab: {
-    position: 'absolute',
-    bottom: 24, right: 20,
-    width: 56, height: 56,
-    borderRadius: 28,
+    position: 'absolute', bottom: 24, right: 20,
+    width: 56, height: 56, borderRadius: 28,
     backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
   },
-  fabText: {
-    fontSize: 30,
-    fontWeight: '400',
-    color: colors.white,
-    lineHeight: 34,
+  fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
+});
+
+// ─── Modal styles ─────────────────────────────────────────────────────────────
+
+const INPUT_BG = '#2D1020';
+const SUBTLE   = '#3D1020';
+
+const modal = StyleSheet.create({
+  backdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
   },
+  sheet: {
+    backgroundColor: '#1A0A14',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 24, paddingTop: 12,
+    maxHeight: '92%',
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20,
+  },
+  title: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
+
+  sectionLabel: {
+    fontSize: 10, fontWeight: '700', color: '#6B4A58',
+    letterSpacing: 1.2, marginBottom: 8, marginTop: 4,
+  },
+
+  input: {
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, fontWeight: '400', color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  inputMulti: { height: 80, paddingTop: 14 },
+
+  // Cliente selected chip
+  selectedRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    marginBottom: 12, gap: 10,
+  },
+  selectedAvatar: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#4A1028',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  selectedAvatarText: { fontSize: 11, fontWeight: '700', color: colors.cream },
+  selectedText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  clearBtn:     { fontSize: 16, color: '#6B4A58', fontWeight: '600' },
+
+  // Cliente list dropdown
+  listBox: {
+    backgroundColor: INPUT_BG, borderRadius: 12, marginBottom: 12, overflow: 'hidden',
+  },
+  listItem: { paddingHorizontal: 16, paddingVertical: 13 },
+  listItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
+  listItemText: { fontSize: 14, fontWeight: '500', color: '#FFFFFF' },
+
+  emptyHint: {
+    fontSize: 13, fontWeight: '400', color: '#6B4A58',
+    marginBottom: 12, paddingLeft: 4,
+  },
+
+  // Servico rows
+  servicoRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 13,
+    marginBottom: 8,
+  },
+  servicoRowSelected: {
+    backgroundColor: 'rgba(168,35,90,0.18)',
+    borderWidth: 1, borderColor: 'rgba(168,35,90,0.5)',
+  },
+  servicoNome:    { fontSize: 14, fontWeight: '600', color: '#CCCCCC' },
+  servicoNomeSel: { color: '#FFFFFF' },
+  servicoMeta:    { fontSize: 11, fontWeight: '400', color: '#6B4A58', marginTop: 2 },
+  servicoValor:    { fontSize: 16, fontWeight: '700', color: '#AAAAAA', marginLeft: 8 },
+  servicoValorSel: { color: colors.cream },
+
+  // Date box
+  dateBox: {
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 8,
+  },
+  dateText: { fontSize: 14, fontWeight: '500', color: '#CCCCCC' },
+
+  // Tipo de endereço
+  tipoRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  tipoBtn: {
+    flex: 1, paddingVertical: 11, borderRadius: 10,
+    alignItems: 'center', backgroundColor: INPUT_BG,
+  },
+  tipoBtnActive: { backgroundColor: colors.primary },
+  tipoBtnText:   { fontSize: 12, fontWeight: '600', color: '#6B4A58' },
+  tipoBtnTextActive: { color: '#FFFFFF' },
+
+  saveBtn: {
+    height: 52, borderRadius: 14, backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center', marginTop: 8,
+  },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 });
