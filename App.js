@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import WelcomeScreen  from './src/screens/WelcomeScreen';
+import AuthScreen     from './src/screens/AuthScreen';
+import LoginScreen    from './src/screens/LoginScreen';
 import HomeScreen     from './src/screens/HomeScreen';
 import AgendaScreen   from './src/screens/AgendaScreen';
 import ClientesScreen from './src/screens/ClientesScreen';
@@ -48,9 +50,6 @@ export default function App() {
           source={require('./assets/images/logo.png')}
           style={styles.logo}
         />
-        <TouchableOpacity onPress={() => setShowSplash(false)} style={styles.debugBtn}>
-          <Text style={styles.debugText}>ENTRAR</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -60,7 +59,9 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          <Stack.Screen name="Main"    component={MainTabs} />
+          <Stack.Screen name="Auth"    component={AuthScreen}    />
+          <Stack.Screen name="Login"   component={LoginScreen}   />
+          <Stack.Screen name="Main"    component={MainTabs}      />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
@@ -78,14 +79,5 @@ const styles = StyleSheet.create({
     width: 200,
     height: 100,
     resizeMode: 'contain',
-  },
-  debugBtn: {
-    marginTop: 48,
-    padding: 16,
-  },
-  debugText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

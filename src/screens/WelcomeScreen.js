@@ -44,7 +44,7 @@ export default function WelcomeScreen({ navigation }) {
           <TouchableOpacity
             style={styles.btnInner}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('Main')}
+            onPress={() => navigation.navigate('Auth')}
           >
             <Text style={styles.gradientBtnText}>Criar conta</Text>
           </TouchableOpacity>
@@ -53,7 +53,7 @@ export default function WelcomeScreen({ navigation }) {
         <TouchableOpacity
           style={styles.outlineBtn}
           activeOpacity={0.75}
-          onPress={() => navigation.navigate('Main')}
+          onPress={() => navigation.navigate('Login')}
         >
           <Text style={styles.outlineBtnText}>Já tenho conta</Text>
         </TouchableOpacity>
