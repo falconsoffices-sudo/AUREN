@@ -1,22 +1,26 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import PerfilScreen     from '../screens/PerfilScreen';
-import ServicosScreen   from '../screens/ServicosScreen';
-import MeusDadosScreen  from '../screens/MeusDadosScreen';
-import EnderecosScreen  from '../screens/EnderecosScreen';
-import DespesasScreen   from '../screens/DespesasScreen';
+import PerfilScreen          from '../screens/PerfilScreen';
+import ServicosScreen        from '../screens/ServicosScreen';
+import MeusDadosScreen       from '../screens/MeusDadosScreen';
+import EnderecosScreen       from '../screens/EnderecosScreen';
+import DespesasScreen        from '../screens/DespesasScreen';
+import ConfiguracoesScreen   from '../screens/ConfiguracoesScreen';
+import TemplatesSMSScreen    from '../screens/TemplatesSMSScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function PerfilStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="PerfilHome"  component={PerfilScreen}    />
-      <Stack.Screen name="Servicos"    component={ServicosScreen}  />
-      <Stack.Screen name="MeusDados"   component={MeusDadosScreen} />
-      <Stack.Screen name="Enderecos"   component={EnderecosScreen} />
-      <Stack.Screen name="Despesas"    component={DespesasScreen}  />
+      <Stack.Screen name="PerfilHome"    component={PerfilScreen}        />
+      <Stack.Screen name="Servicos"      component={ServicosScreen}      />
+      <Stack.Screen name="MeusDados"     component={MeusDadosScreen}     />
+      <Stack.Screen name="Enderecos"     component={EnderecosScreen}     />
+      <Stack.Screen name="Despesas"      component={DespesasScreen}      />
+      <Stack.Screen name="Configuracoes" component={ConfiguracoesScreen} />
+      <Stack.Screen name="TemplatesSMS"  component={TemplatesSMSScreen}  />
     </Stack.Navigator>
   );
 }

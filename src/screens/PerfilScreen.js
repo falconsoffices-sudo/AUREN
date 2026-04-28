@@ -151,7 +151,9 @@ export default function PerfilScreen({ navigation }) {
                 item.label === 'Meus Serviços' ? () => navigation.navigate('Servicos')  :
                 item.label === 'Meus Dados'    ? () => navigation.navigate('MeusDados') :
                 item.label === 'Endereços'     ? () => navigation.navigate('Enderecos') :
-                item.label === 'Despesas'      ? () => navigation.navigate('Despesas')  :
+                item.label === 'Despesas'        ? () => navigation.navigate('Despesas')      :
+                item.label === 'Configurações'  ? () => navigation.navigate('Configuracoes') :
+                item.label === 'Templates de SMS' ? () => navigation.navigate('TemplatesSMS') :
                 item.label === 'Sair'          ? () => Alert.alert(
                     'Sair',
                     'Tem certeza que deseja sair?',
