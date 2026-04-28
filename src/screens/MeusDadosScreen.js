@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Modal,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -16,14 +17,78 @@ import colors from '../constants/colors';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ESTADOS = ['FL', 'TX', 'CA', 'NY', 'Outro'];
-const IDIOMAS  = [
+
+const IDIOMAS = [
   { label: 'PT-BR',    value: 'pt' },
   { label: 'ES-LATAM', value: 'es' },
 ];
-const GENEROS  = [
+const GENEROS = [
   { label: 'Feminino',  value: 'feminino'  },
   { label: 'Masculino', value: 'masculino' },
 ];
+
+const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
+
+const US_STATES = [
+  { sigla: 'AL', nome: 'Alabama' },
+  { sigla: 'AK', nome: 'Alaska' },
+  { sigla: 'AZ', nome: 'Arizona' },
+  { sigla: 'AR', nome: 'Arkansas' },
+  { sigla: 'CA', nome: 'California' },
+  { sigla: 'CO', nome: 'Colorado' },
+  { sigla: 'CT', nome: 'Connecticut' },
+  { sigla: 'DE', nome: 'Delaware' },
+  { sigla: 'FL', nome: 'Florida' },
+  { sigla: 'GA', nome: 'Georgia' },
+  { sigla: 'HI', nome: 'Hawaii' },
+  { sigla: 'ID', nome: 'Idaho' },
+  { sigla: 'IL', nome: 'Illinois' },
+  { sigla: 'IN', nome: 'Indiana' },
+  { sigla: 'IA', nome: 'Iowa' },
+  { sigla: 'KS', nome: 'Kansas' },
+  { sigla: 'KY', nome: 'Kentucky' },
+  { sigla: 'LA', nome: 'Louisiana' },
+  { sigla: 'ME', nome: 'Maine' },
+  { sigla: 'MD', nome: 'Maryland' },
+  { sigla: 'MA', nome: 'Massachusetts' },
+  { sigla: 'MI', nome: 'Michigan' },
+  { sigla: 'MN', nome: 'Minnesota' },
+  { sigla: 'MS', nome: 'Mississippi' },
+  { sigla: 'MO', nome: 'Missouri' },
+  { sigla: 'MT', nome: 'Montana' },
+  { sigla: 'NE', nome: 'Nebraska' },
+  { sigla: 'NV', nome: 'Nevada' },
+  { sigla: 'NH', nome: 'New Hampshire' },
+  { sigla: 'NJ', nome: 'New Jersey' },
+  { sigla: 'NM', nome: 'New Mexico' },
+  { sigla: 'NY', nome: 'New York' },
+  { sigla: 'NC', nome: 'North Carolina' },
+  { sigla: 'ND', nome: 'North Dakota' },
+  { sigla: 'OH', nome: 'Ohio' },
+  { sigla: 'OK', nome: 'Oklahoma' },
+  { sigla: 'OR', nome: 'Oregon' },
+  { sigla: 'PA', nome: 'Pennsylvania' },
+  { sigla: 'RI', nome: 'Rhode Island' },
+  { sigla: 'SC', nome: 'South Carolina' },
+  { sigla: 'SD', nome: 'South Dakota' },
+  { sigla: 'TN', nome: 'Tennessee' },
+  { sigla: 'TX', nome: 'Texas' },
+  { sigla: 'UT', nome: 'Utah' },
+  { sigla: 'VT', nome: 'Vermont' },
+  { sigla: 'VA', nome: 'Virginia' },
+  { sigla: 'WA', nome: 'Washington' },
+  { sigla: 'WV', nome: 'West Virginia' },
+  { sigla: 'WI', nome: 'Wisconsin' },
+  { sigla: 'WY', nome: 'Wyoming' },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatExpiracao(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -97,19 +162,96 @@ function EstadoDropdown({ value, onChange }) {
   );
 }
 
+function LicencaTipoDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View>
+      <TouchableOpacity
+        style={[styles.input, styles.dropdownTrigger]}
+        onPress={() => setOpen(o => !o)}
+        activeOpacity={0.8}
+      >
+        <Text style={value ? styles.inputText : styles.inputPlaceholder}>
+          {value || 'Selecione o tipo'}
+        </Text>
+        <Text style={styles.dropdownArrow}>{open ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.dropdownList}>
+          {LICENCA_TIPOS.map((tipo, idx) => (
+            <TouchableOpacity
+              key={tipo}
+              style={[
+                styles.dropdownItem,
+                idx < LICENCA_TIPOS.length - 1 && styles.dropdownItemBorder,
+                value === tipo && styles.dropdownItemActive,
+              ]}
+              onPress={() => { onChange(tipo); setOpen(false); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownItemText, value === tipo && styles.dropdownItemTextActive]}>
+                {tipo}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function EstadoLicencaModal({ visible, value, onSelect, onClose }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.estadoModalBackdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={styles.estadoModalSheet}>
+          <View style={styles.estadoModalHandle} />
+          <Text style={styles.estadoModalTitle}>Estado da licença</Text>
+          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ marginBottom: 32 }}>
+            {US_STATES.map((st, idx) => (
+              <TouchableOpacity
+                key={st.sigla}
+                style={[
+                  styles.estadoModalItem,
+                  idx < US_STATES.length - 1 && styles.estadoModalItemBorder,
+                  value === st.sigla && styles.estadoModalItemActive,
+                ]}
+                onPress={() => { onSelect(st.sigla); onClose(); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.estadoModalItemText, value === st.sigla && styles.estadoModalItemTextActive]}>
+                  {st.sigla} — {st.nome}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function MeusDadosScreen({ navigation }) {
-  const [loading,   setLoading]   = useState(true);
-  const [saving,    setSaving]    = useState(false);
-  const [userId,    setUserId]    = useState(null);
+  const [loading,           setLoading]           = useState(true);
+  const [saving,            setSaving]            = useState(false);
+  const [userId,            setUserId]            = useState(null);
 
-  const [nome,      setNome]      = useState('');
-  const [telefone,  setTelefone]  = useState('');
-  const [cidade,    setCidade]    = useState('');
-  const [estado,    setEstado]    = useState('');
-  const [idioma,    setIdioma]    = useState('pt');
-  const [genero,    setGenero]    = useState('feminino');
+  const [nome,              setNome]              = useState('');
+  const [telefone,          setTelefone]          = useState('');
+  const [cidade,            setCidade]            = useState('');
+  const [estado,            setEstado]            = useState('');
+  const [idioma,            setIdioma]            = useState('pt');
+  const [genero,            setGenero]            = useState('feminino');
+
+  const [licencaNumero,     setLicencaNumero]     = useState('');
+  const [licencaTipo,       setLicencaTipo]       = useState('');
+  const [licencaEstado,     setLicencaEstado]     = useState('');
+  const [licencaExpiracao,  setLicencaExpiracao]  = useState('');
+  const [estadoModalVisible, setEstadoModalVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -125,14 +267,17 @@ export default function MeusDadosScreen({ navigation }) {
         .single();
 
       if (data) {
-        setNome(data.nome      ?? '');
-        setTelefone(data.telefone ?? '');
-        setCidade(data.cidade  ?? '');
-        setEstado(data.estado  ?? '');
-        setIdioma(data.idioma  ?? 'pt');
-        setGenero(data.genero  ?? 'feminino');
+        setNome(data.nome              ?? '');
+        setTelefone(data.telefone      ?? '');
+        setCidade(data.cidade          ?? '');
+        setEstado(data.estado          ?? '');
+        setIdioma(data.idioma          ?? 'pt');
+        setGenero(data.genero          ?? 'feminino');
+        setLicencaNumero(data.licenca_numero    ?? '');
+        setLicencaTipo(data.licenca_tipo        ?? '');
+        setLicencaEstado(data.licenca_estado    ?? '');
+        setLicencaExpiracao(data.licenca_expiracao ?? '');
       } else if (error && error.code !== 'PGRST116') {
-        // PGRST116 = row not found (profile ainda não existe)
         Alert.alert('Erro ao carregar', error.message);
       }
       setLoading(false);
@@ -149,12 +294,16 @@ export default function MeusDadosScreen({ navigation }) {
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          id:       userId,
-          nome:     nome.trim(),
-          telefone: telefone.trim() || null,
-          cidade:   cidade.trim()   || null,
+          id:                userId,
+          nome:              nome.trim(),
+          telefone:          telefone.trim()          || null,
+          cidade:            cidade.trim()            || null,
           idioma,
           genero,
+          licenca_numero:    licencaNumero.trim()     || null,
+          licenca_tipo:      licencaTipo              || null,
+          licenca_estado:    licencaEstado            || null,
+          licenca_expiracao: licencaExpiracao.trim()  || null,
         });
       if (error) throw error;
       Alert.alert('Salvo!', 'Seus dados foram atualizados.');
@@ -164,6 +313,10 @@ export default function MeusDadosScreen({ navigation }) {
       setSaving(false);
     }
   };
+
+  const estadoLabel = licencaEstado
+    ? `${licencaEstado} — ${US_STATES.find(s => s.sigla === licencaEstado)?.nome ?? ''}`
+    : '';
 
   if (loading) {
     return (
@@ -178,7 +331,6 @@ export default function MeusDadosScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
-      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={styles.backArrow}>‹</Text>
@@ -241,6 +393,48 @@ export default function MeusDadosScreen({ navigation }) {
           <Toggle options={GENEROS} value={genero} onChange={setGenero} />
         </Field>
 
+        {/* ── Licença ── */}
+        <Field label="Número da licença">
+          <TextInput
+            style={[styles.input, styles.inputText]}
+            placeholder="Ex: 0123456"
+            placeholderTextColor={colors.gray}
+            value={licencaNumero}
+            onChangeText={setLicencaNumero}
+            autoCapitalize="characters"
+            returnKeyType="next"
+          />
+        </Field>
+
+        <Field label="Tipo de licença">
+          <LicencaTipoDropdown value={licencaTipo} onChange={setLicencaTipo} />
+        </Field>
+
+        <Field label="Estado da licença">
+          <TouchableOpacity
+            style={[styles.input, styles.dropdownTrigger]}
+            onPress={() => setEstadoModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={licencaEstado ? styles.inputText : styles.inputPlaceholder}>
+              {estadoLabel || 'Selecione o estado'}
+            </Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </TouchableOpacity>
+        </Field>
+
+        <Field label="Data de expiração">
+          <TextInput
+            style={[styles.input, styles.inputText]}
+            placeholder="MM/YYYY"
+            placeholderTextColor={colors.gray}
+            value={licencaExpiracao}
+            onChangeText={raw => setLicencaExpiracao(formatExpiracao(raw))}
+            keyboardType="numeric"
+            returnKeyType="done"
+          />
+        </Field>
+
         <TouchableOpacity
           style={[styles.saveBtn, saving && { opacity: 0.7 }]}
           onPress={handleSave}
@@ -254,6 +448,13 @@ export default function MeusDadosScreen({ navigation }) {
         </TouchableOpacity>
 
       </ScrollView>
+
+      <EstadoLicencaModal
+        visible={estadoModalVisible}
+        value={licencaEstado}
+        onSelect={setLicencaEstado}
+        onClose={() => setEstadoModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -324,6 +525,31 @@ const styles = StyleSheet.create({
   toggleBtnActive: { backgroundColor: colors.primary },
   toggleText:       { fontSize: 14, fontWeight: '600', color: colors.gray },
   toggleTextActive: { color: colors.white },
+
+  // Estado licença modal
+  estadoModalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
+  },
+  estadoModalSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    maxHeight: '75%',
+  },
+  estadoModalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 16,
+  },
+  estadoModalTitle: {
+    fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 16,
+  },
+  estadoModalItem: { paddingVertical: 14 },
+  estadoModalItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
+  estadoModalItemActive: { backgroundColor: 'rgba(168,35,90,0.08)' },
+  estadoModalItemText: { fontSize: 15, fontWeight: '400', color: colors.white },
+  estadoModalItemTextActive: { fontWeight: '700', color: colors.primary },
 
   saveBtn: {
     height: 54, borderRadius: 14, backgroundColor: colors.primary,

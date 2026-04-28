@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  Modal,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -15,19 +16,84 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
-// Gera senha determinística a partir do telefone
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
+
+const US_STATES = [
+  { sigla: 'AL', nome: 'Alabama' },
+  { sigla: 'AK', nome: 'Alaska' },
+  { sigla: 'AZ', nome: 'Arizona' },
+  { sigla: 'AR', nome: 'Arkansas' },
+  { sigla: 'CA', nome: 'California' },
+  { sigla: 'CO', nome: 'Colorado' },
+  { sigla: 'CT', nome: 'Connecticut' },
+  { sigla: 'DE', nome: 'Delaware' },
+  { sigla: 'FL', nome: 'Florida' },
+  { sigla: 'GA', nome: 'Georgia' },
+  { sigla: 'HI', nome: 'Hawaii' },
+  { sigla: 'ID', nome: 'Idaho' },
+  { sigla: 'IL', nome: 'Illinois' },
+  { sigla: 'IN', nome: 'Indiana' },
+  { sigla: 'IA', nome: 'Iowa' },
+  { sigla: 'KS', nome: 'Kansas' },
+  { sigla: 'KY', nome: 'Kentucky' },
+  { sigla: 'LA', nome: 'Louisiana' },
+  { sigla: 'ME', nome: 'Maine' },
+  { sigla: 'MD', nome: 'Maryland' },
+  { sigla: 'MA', nome: 'Massachusetts' },
+  { sigla: 'MI', nome: 'Michigan' },
+  { sigla: 'MN', nome: 'Minnesota' },
+  { sigla: 'MS', nome: 'Mississippi' },
+  { sigla: 'MO', nome: 'Missouri' },
+  { sigla: 'MT', nome: 'Montana' },
+  { sigla: 'NE', nome: 'Nebraska' },
+  { sigla: 'NV', nome: 'Nevada' },
+  { sigla: 'NH', nome: 'New Hampshire' },
+  { sigla: 'NJ', nome: 'New Jersey' },
+  { sigla: 'NM', nome: 'New Mexico' },
+  { sigla: 'NY', nome: 'New York' },
+  { sigla: 'NC', nome: 'North Carolina' },
+  { sigla: 'ND', nome: 'North Dakota' },
+  { sigla: 'OH', nome: 'Ohio' },
+  { sigla: 'OK', nome: 'Oklahoma' },
+  { sigla: 'OR', nome: 'Oregon' },
+  { sigla: 'PA', nome: 'Pennsylvania' },
+  { sigla: 'RI', nome: 'Rhode Island' },
+  { sigla: 'SC', nome: 'South Carolina' },
+  { sigla: 'SD', nome: 'South Dakota' },
+  { sigla: 'TN', nome: 'Tennessee' },
+  { sigla: 'TX', nome: 'Texas' },
+  { sigla: 'UT', nome: 'Utah' },
+  { sigla: 'VT', nome: 'Vermont' },
+  { sigla: 'VA', nome: 'Virginia' },
+  { sigla: 'WA', nome: 'Washington' },
+  { sigla: 'WV', nome: 'West Virginia' },
+  { sigla: 'WI', nome: 'Wisconsin' },
+  { sigla: 'WY', nome: 'Wyoming' },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function makePassword(phone) {
   const digits = phone.replace(/\D/g, '');
   return `Auren_${digits}_2024!`;
 }
 
-// Formata dígitos como (305) 555-0100 — máximo 10 dígitos US
 function formatPhone(raw) {
   const digits = raw.replace(/\D/g, '').slice(0, 10);
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
+
+function formatExpiracao(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ToggleGroup({ options, value, onChange }) {
   return (
@@ -51,16 +117,100 @@ function ToggleGroup({ options, value, onChange }) {
   );
 }
 
+function LicencaTipoDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ marginBottom: 18 }}>
+      <TouchableOpacity
+        style={[styles.input, styles.dropdownTrigger, { marginBottom: 0 }]}
+        onPress={() => setOpen(o => !o)}
+        activeOpacity={0.8}
+      >
+        <Text style={value ? styles.dropdownValueText : styles.dropdownPlaceholderText}>
+          {value || 'Selecione o tipo *'}
+        </Text>
+        <Text style={styles.dropdownArrow}>{open ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {open && (
+        <View style={styles.dropdownList}>
+          {LICENCA_TIPOS.map((tipo, idx) => (
+            <TouchableOpacity
+              key={tipo}
+              style={[
+                styles.dropdownItem,
+                idx < LICENCA_TIPOS.length - 1 && styles.dropdownItemBorder,
+                value === tipo && styles.dropdownItemActive,
+              ]}
+              onPress={() => { onChange(tipo); setOpen(false); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownItemText, value === tipo && styles.dropdownItemTextActive]}>
+                {tipo}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function EstadoLicencaModal({ visible, value, onSelect, onClose }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.estadoModalBackdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={styles.estadoModalSheet}>
+          <View style={styles.estadoModalHandle} />
+          <Text style={styles.estadoModalTitle}>Estado da licença</Text>
+          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ marginBottom: 32 }}>
+            {US_STATES.map((st, idx) => (
+              <TouchableOpacity
+                key={st.sigla}
+                style={[
+                  styles.estadoModalItem,
+                  idx < US_STATES.length - 1 && styles.estadoModalItemBorder,
+                  value === st.sigla && styles.estadoModalItemActive,
+                ]}
+                onPress={() => { onSelect(st.sigla); onClose(); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.estadoModalItemText, value === st.sigla && styles.estadoModalItemTextActive]}>
+                  {st.sigla} — {st.nome}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
 export default function AuthScreen({ navigation }) {
-  const [nome,     setNome]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [telefone, setTelefone] = useState('');
-  const [idioma,   setIdioma]   = useState('pt');
-  const [genero,   setGenero]   = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [nome,              setNome]              = useState('');
+  const [email,             setEmail]             = useState('');
+  const [telefone,          setTelefone]          = useState('');
+  const [idioma,            setIdioma]            = useState('pt');
+  const [genero,            setGenero]            = useState('');
+  const [licencaNumero,     setLicencaNumero]     = useState('');
+  const [licencaTipo,       setLicencaTipo]       = useState('');
+  const [licencaEstado,     setLicencaEstado]     = useState('');
+  const [licencaExpiracao,  setLicencaExpiracao]  = useState('');
+  const [estadoModalVisible, setEstadoModalVisible] = useState(false);
+  const [loading,           setLoading]           = useState(false);
+
+  const estadoLabel = licencaEstado
+    ? `${licencaEstado} — ${US_STATES.find(s => s.sigla === licencaEstado)?.nome ?? ''}`
+    : '';
 
   const handleSignUp = async () => {
-    if (!nome.trim() || !email.trim() || !telefone.trim() || !genero) {
+    if (
+      !nome.trim() || !email.trim() || !telefone.trim() || !genero ||
+      !licencaNumero.trim() || !licencaTipo || !licencaEstado || !licencaExpiracao.trim()
+    ) {
       Alert.alert('Campos obrigatórios', 'Preencha todos os campos para continuar.');
       return;
     }
@@ -77,10 +227,14 @@ export default function AuthScreen({ navigation }) {
         await supabase
           .from('profiles')
           .update({
-            nome:     nome.trim(),
-            telefone: fullPhone,
+            nome:               nome.trim(),
+            telefone:           fullPhone,
             idioma,
             genero,
+            licenca_numero:     licencaNumero.trim(),
+            licenca_tipo:       licencaTipo,
+            licenca_estado:     licencaEstado,
+            licenca_expiracao:  licencaExpiracao.trim(),
           })
           .eq('id', data.user.id);
       }
@@ -105,17 +259,14 @@ export default function AuthScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
         >
 
-          {/* Logo */}
           <Image
             source={require('../../assets/images/logo.png')}
             style={styles.logo}
           />
 
-          {/* Título */}
           <Text style={styles.title}>Criar conta</Text>
           <Text style={styles.subtitle}>Comece sua jornada com o AUREN</Text>
 
-          {/* Nome */}
           <Text style={styles.label}>Nome completo</Text>
           <TextInput
             style={styles.input}
@@ -127,7 +278,6 @@ export default function AuthScreen({ navigation }) {
             returnKeyType="next"
           />
 
-          {/* E-mail */}
           <Text style={styles.label}>E-mail</Text>
           <TextInput
             style={styles.input}
@@ -141,7 +291,6 @@ export default function AuthScreen({ navigation }) {
             returnKeyType="next"
           />
 
-          {/* Telefone */}
           <Text style={styles.label}>Telefone</Text>
           <View style={styles.phoneRow}>
             <View style={styles.phonePrefix}>
@@ -158,7 +307,6 @@ export default function AuthScreen({ navigation }) {
             />
           </View>
 
-          {/* Idioma */}
           <Text style={styles.label}>Idioma</Text>
           <ToggleGroup
             value={idioma}
@@ -169,7 +317,6 @@ export default function AuthScreen({ navigation }) {
             ]}
           />
 
-          {/* Gênero */}
           <Text style={styles.label}>Gênero</Text>
           <ToggleGroup
             value={genero}
@@ -180,7 +327,44 @@ export default function AuthScreen({ navigation }) {
             ]}
           />
 
-          {/* Botão principal */}
+          {/* ── Licença ── */}
+          <Text style={styles.label}>Número da licença</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: 0123456 *"
+            placeholderTextColor="#6B4A58"
+            value={licencaNumero}
+            onChangeText={setLicencaNumero}
+            autoCapitalize="characters"
+            returnKeyType="next"
+          />
+
+          <Text style={styles.label}>Tipo de licença</Text>
+          <LicencaTipoDropdown value={licencaTipo} onChange={setLicencaTipo} />
+
+          <Text style={styles.label}>Estado da licença</Text>
+          <TouchableOpacity
+            style={[styles.input, styles.dropdownTrigger, { marginBottom: 18 }]}
+            onPress={() => setEstadoModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={licencaEstado ? styles.dropdownValueText : styles.dropdownPlaceholderText}>
+              {estadoLabel || 'Selecione o estado *'}
+            </Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.label}>Data de expiração</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="MM/YYYY *"
+            placeholderTextColor="#6B4A58"
+            value={licencaExpiracao}
+            onChangeText={raw => setLicencaExpiracao(formatExpiracao(raw))}
+            keyboardType="numeric"
+            returnKeyType="done"
+          />
+
           <TouchableOpacity
             style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
             onPress={handleSignUp}
@@ -193,7 +377,6 @@ export default function AuthScreen({ navigation }) {
             }
           </TouchableOpacity>
 
-          {/* Link login */}
           <TouchableOpacity
             style={styles.loginLink}
             onPress={() => navigation.navigate('Login')}
@@ -203,9 +386,18 @@ export default function AuthScreen({ navigation }) {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <EstadoLicencaModal
+        visible={estadoModalVisible}
+        value={licencaEstado}
+        onSelect={setLicencaEstado}
+        onClose={() => setEstadoModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const INPUT_BG = '#2D1020';
 
@@ -305,6 +497,51 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: '#FFFFFF',
   },
+
+  // Dropdown inline (LicencaTipo)
+  dropdownTrigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  dropdownArrow: { fontSize: 11, color: '#6B4A58' },
+  dropdownValueText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownPlaceholderText: { fontSize: 15, fontWeight: '400', color: '#6B4A58' },
+  dropdownList: {
+    backgroundColor: '#200C18',
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  dropdownItem: { paddingHorizontal: 16, paddingVertical: 13 },
+  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#3D1020' },
+  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
+  dropdownItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },
+
+  // Estado licença modal
+  estadoModalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
+  },
+  estadoModalSheet: {
+    backgroundColor: '#1A0A14',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    maxHeight: '75%',
+  },
+  estadoModalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: '#3D1020', alignSelf: 'center', marginBottom: 16,
+  },
+  estadoModalTitle: {
+    fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 16,
+  },
+  estadoModalItem: { paddingVertical: 14 },
+  estadoModalItemBorder: { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  estadoModalItemActive: { backgroundColor: 'rgba(168,35,90,0.08)' },
+  estadoModalItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  estadoModalItemTextActive: { fontWeight: '700', color: '#A8235A' },
 
   primaryBtn: {
     height: 52,

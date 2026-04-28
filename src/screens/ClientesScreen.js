@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,33 +6,45 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const CLIENTS = [
-  { id: 1, name: 'Carla Mendes',   badge: 'VIP',  lastService: 'Gel',                lastTime: 'há 4 dias',    phone: '(305) 555-0142', visits: 18 },
-  { id: 2, name: 'Mariana Souza',  badge: null,   lastService: 'Manutenção',          lastTime: 'há 2 dias',    phone: '(305) 555-0187', visits: 12 },
-  { id: 3, name: 'Camila Torres',  badge: null,   lastService: 'Nail art',            lastTime: 'há 1 semana',  phone: '(786) 555-0331', visits: 9  },
-  { id: 4, name: 'Dona Rita',      badge: 'VIP',  lastService: 'Pé + mão',            lastTime: 'há 3 semanas', phone: '(305) 555-0209', visits: 24 },
-  { id: 5, name: 'Sofia Mendez',   badge: 'NOVA', lastService: 'Primeira vez quinta', lastTime: null,           phone: '(786) 555-0478', visits: 1  },
+const SERVICOS_OPCOES = [
+  'Manicure Básica',
+  'Gel Manicure',
+  'Acrylic Nails',
+  'Dip Powder',
+  'Nail Art',
+  'Pedicure',
+  'Spa/Deluxe Manicure & Pedicure',
+  'Remoção e Manutenção',
+  'Outro',
 ];
-
-const BADGE_STYLE = {
-  VIP:  { bg: 'rgba(232,196,160,0.14)', color: colors.cream,  border: 'rgba(232,196,160,0.28)' },
-  NOVA: { bg: 'rgba(74,222,128,0.12)',  color: '#4ade80',     border: 'rgba(74,222,128,0.28)'  },
-};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getInitials(name) {
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+function getInitials(name = '') {
+  return name.trim().split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
 
-function normalize(str) {
+function normalize(str = '') {
   return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function formatPhone(raw = '') {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -46,49 +58,266 @@ function SummaryCard({ value, label }) {
   );
 }
 
-function Badge({ type }) {
-  const s = BADGE_STYLE[type];
-  if (!s) return null;
-  return (
-    <View style={[styles.badge, { backgroundColor: s.bg, borderColor: s.border }]}>
-      <Text style={[styles.badgeText, { color: s.color }]}>{type}</Text>
-    </View>
-  );
-}
-
-function ClientCard({ name, badge, lastService, lastTime, phone, visits }) {
-  const serviceLine = lastTime ? `${lastService} · ${lastTime}` : lastService;
+function ClientCard({ nome, vip, servico_favorito, telefone, total_visitas }) {
   return (
     <TouchableOpacity style={styles.clientCard} activeOpacity={0.72}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{getInitials(name)}</Text>
+        <Text style={styles.avatarText}>{getInitials(nome)}</Text>
       </View>
+
       <View style={styles.clientInfo}>
         <View style={styles.nameRow}>
-          <Text style={styles.clientName} numberOfLines={1}>{name}</Text>
-          {badge && <Badge type={badge} />}
+          <Text style={styles.clientName} numberOfLines={1}>{nome}</Text>
+          {vip && (
+            <View style={styles.vipBadge}>
+              <Text style={styles.vipBadgeText}>VIP</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.serviceText} numberOfLines={1}>{serviceLine}</Text>
-        <Text style={styles.phoneText}>{phone}</Text>
+        {servico_favorito ? (
+          <Text style={styles.serviceText} numberOfLines={1}>{servico_favorito}</Text>
+        ) : null}
+        {telefone ? (
+          <Text style={styles.phoneText}>{telefone}</Text>
+        ) : null}
       </View>
+
       <View style={styles.visitsCol}>
-        <Text style={styles.visitsCount}>{visits}</Text>
+        <Text style={styles.visitsCount}>{total_visitas ?? 0}</Text>
         <Text style={styles.visitsLabel}>visitas</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
+// ─── Add Client Modal ─────────────────────────────────────────────────────────
+
+function AddClientModal({ visible, onClose, onSaved }) {
+  const [nome,            setNome]            = useState('');
+  const [telefone,        setTelefone]        = useState('');
+  const [servicoOpcao,    setServicoOpcao]    = useState('');
+  const [servicoAberto,   setServicoAberto]   = useState(false);
+  const [servicoOutro,    setServicoOutro]    = useState('');
+  const [observacoes,     setObservacoes]     = useState('');
+  const [saving,          setSaving]          = useState(false);
+
+  const reset = () => {
+    setNome(''); setTelefone('');
+    setServicoOpcao(''); setServicoAberto(false); setServicoOutro('');
+    setObservacoes('');
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  const handleSave = async () => {
+    if (!nome.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe o nome da cliente.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data: userData, error: authError } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      console.log('[AddCliente] auth.getUser =>', { userId, authError });
+      if (!userId) throw new Error('Usuário não autenticado.');
+
+      const { data: teste, error: testeError } = await supabase
+        .from('clientes')
+        .select('id')
+        .limit(1);
+      console.log('TESTE SELECT:', { teste, testeError });
+
+      const servicoFinal = servicoOpcao === 'Outro' ? servicoOutro.trim() : servicoOpcao;
+
+      const payload = {
+        profissional_id:  userId,
+        nome:             nome.trim(),
+        telefone:         telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
+        servico_favorito: servicoFinal || null,
+        observacoes:      observacoes.trim() || null,
+      };
+      console.log('[AddCliente] insert payload =>', payload);
+
+      const { error } = await supabase.from('clientes').insert(payload);
+      if (error) throw error;
+
+      reset();
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao salvar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <View style={modal.handle} />
+              <Text style={modal.title}>Nova cliente</Text>
+
+              <TextInput
+                style={modal.input}
+                placeholder="Nome completo *"
+                placeholderTextColor="#6B4A58"
+                value={nome}
+                onChangeText={setNome}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+
+              <View style={modal.phoneRow}>
+                <View style={modal.phonePrefix}>
+                  <Text style={modal.phonePrefixText}>+1</Text>
+                </View>
+                <TextInput
+                  style={[modal.input, { flex: 1, marginBottom: 0 }]}
+                  placeholder="(305) 555-0100"
+                  placeholderTextColor="#6B4A58"
+                  value={telefone}
+                  onChangeText={raw => setTelefone(formatPhone(raw))}
+                  keyboardType="phone-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              {/* Dropdown serviço favorito */}
+              <TouchableOpacity
+                style={[modal.input, modal.dropdownTrigger]}
+                onPress={() => setServicoAberto(o => !o)}
+                activeOpacity={0.8}
+              >
+                <Text style={servicoOpcao ? modal.dropdownValueText : modal.dropdownPlaceholderText}>
+                  {servicoOpcao || 'Serviço favorito'}
+                </Text>
+                <Text style={modal.dropdownArrow}>{servicoAberto ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {servicoAberto && (
+                <View style={modal.dropdownList}>
+                  <ScrollView bounces={false} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {SERVICOS_OPCOES.map((opt, idx) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          modal.dropdownItem,
+                          idx < SERVICOS_OPCOES.length - 1 && modal.dropdownItemBorder,
+                          servicoOpcao === opt && modal.dropdownItemActive,
+                        ]}
+                        onPress={() => { setServicoOpcao(opt); setServicoAberto(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[modal.dropdownItemText, servicoOpcao === opt && modal.dropdownItemTextActive]}>
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {servicoOpcao === 'Outro' && (
+                <TextInput
+                  style={modal.input}
+                  placeholder="Nome do serviço"
+                  placeholderTextColor="#6B4A58"
+                  value={servicoOutro}
+                  onChangeText={setServicoOutro}
+                  autoCapitalize="sentences"
+                  returnKeyType="next"
+                />
+              )}
+
+              <TextInput
+                style={[modal.input, modal.inputMulti]}
+                placeholder="Observações"
+                placeholderTextColor="#6B4A58"
+                value={observacoes}
+                onChangeText={setObservacoes}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={modal.saveBtnText}>Salvar</Text>
+                }
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ClientesScreen() {
-  const [query, setQuery] = useState('');
+  const [clientes,      setClientes]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [query,         setQuery]         = useState('');
+  const [modalVisible,  setModalVisible]  = useState(false);
+  const [userId,        setUserId]        = useState(null);
+
+  const fetchClientes = useCallback(async (uid) => {
+    const id = uid ?? userId;
+    if (!id) return;
+    const { data, error } = await supabase
+      .from('clientes')
+      .select('*')
+      .eq('profissional_id', id)
+      .order('nome');
+    if (!error && data) setClientes(data);
+  }, [userId]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+      if (uid) {
+        setUserId(uid);
+        await fetchClientes(uid);
+      }
+      setLoading(false);
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return CLIENTS;
+    if (!query.trim()) return clientes;
     const q = normalize(query.trim());
-    return CLIENTS.filter(c => normalize(c.name).includes(q) || c.phone.includes(q));
-  }, [query]);
+    return clientes.filter(c =>
+      normalize(c.nome).includes(q) ||
+      (c.telefone && c.telefone.includes(q))
+    );
+  }, [query, clientes]);
+
+  const totalAtivas = clientes.filter(c => c.ativa).length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -118,8 +347,8 @@ export default function ClientesScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.summaryRow}>
-          <SummaryCard value="47" label="Total de clientes" />
-          <SummaryCard value="31" label="Ativas este mês" />
+          <SummaryCard value={String(clientes.length)} label="Total de clientes" />
+          <SummaryCard value={String(totalAtivas)}     label="Ativas" />
         </View>
 
         <Text style={styles.sectionLabel}>
@@ -128,18 +357,37 @@ export default function ClientesScreen() {
             : 'Todas as clientes'}
         </Text>
 
-        {filtered.length > 0 ? (
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+        ) : filtered.length > 0 ? (
           filtered.map(c => <ClientCard key={c.id} {...c} />)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Nenhuma cliente encontrada.</Text>
+            <Text style={styles.emptyText}>
+              {clientes.length === 0
+                ? 'Nenhuma cliente cadastrada ainda.'
+                : 'Nenhuma cliente encontrada.'}
+            </Text>
           </View>
         )}
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => setModalVisible(true)}
+      >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      <AddClientModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSaved={() => {
+          setModalVisible(false);
+          fetchClientes();
+        }}
+      />
 
     </SafeAreaView>
   );
@@ -153,129 +401,57 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
 
   header: { paddingHorizontal: 20, paddingTop: 28, marginBottom: 20 },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: 3,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.gray,
-  },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.white, marginBottom: 3 },
+  headerSubtitle: { fontSize: 13, fontWeight: '400', color: colors.gray },
 
   searchWrap: { paddingHorizontal: 20, marginBottom: 20 },
   searchInput: {
-    backgroundColor: CARD_BG,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.white,
+    backgroundColor: CARD_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 13,
+    fontSize: 14, fontWeight: '400', color: colors.white,
   },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 110 },
 
   summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   summaryCard: {
-    flex: 1,
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
+    flex: 1, backgroundColor: CARD_BG, borderRadius: 16,
+    paddingVertical: 18, paddingHorizontal: 16,
   },
-  summaryValue: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.white,
-    marginBottom: 4,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-  },
+  summaryValue: { fontSize: 32, fontWeight: '800', color: colors.white, marginBottom: 4 },
+  summaryLabel: { fontSize: 12, fontWeight: '400', color: colors.gray },
 
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.gray,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 12,
+    fontSize: 11, fontWeight: '600', color: colors.gray,
+    letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 12,
   },
 
   clientCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: CARD_BG, borderRadius: 16, padding: 16,
+    marginBottom: 10, flexDirection: 'row', alignItems: 'center',
   },
   avatar: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: '#2E2E2E',
-    alignItems: 'center', justifyContent: 'center',
-    marginRight: 13, flexShrink: 0,
+    width: 46, height: 46, borderRadius: 23, backgroundColor: '#2E2E2E',
+    alignItems: 'center', justifyContent: 'center', marginRight: 13, flexShrink: 0,
   },
-  avatarText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.cream,
-  },
+  avatarText: { fontSize: 15, fontWeight: '700', color: colors.cream },
   clientInfo: { flex: 1, marginRight: 12 },
-  nameRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 7, marginBottom: 3, flexWrap: 'wrap',
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3, flexWrap: 'wrap' },
+  clientName: { fontSize: 15, fontWeight: '700', color: colors.white },
+  vipBadge: {
+    backgroundColor: 'rgba(232,196,160,0.14)', paddingHorizontal: 7, paddingVertical: 2,
+    borderRadius: 6, borderWidth: 1, borderColor: 'rgba(232,196,160,0.28)',
   },
-  clientName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  badge: {
-    paddingHorizontal: 7, paddingVertical: 2,
-    borderRadius: 6, borderWidth: 1,
-  },
-  badgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.7,
-  },
-  serviceText: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-    marginBottom: 3,
-  },
-  phoneText: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#555555',
-  },
+  vipBadgeText: { fontSize: 9, fontWeight: '800', color: colors.cream, letterSpacing: 0.7 },
+  serviceText: { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
+  phoneText: { fontSize: 12, fontWeight: '400', color: '#555555' },
+
   visitsCol: { alignItems: 'center', flexShrink: 0 },
-  visitsCount: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.white,
-    lineHeight: 22,
-  },
-  visitsLabel: {
-    fontSize: 10,
-    fontWeight: '400',
-    color: colors.gray,
-    marginTop: 2,
-  },
+  visitsCount: { fontSize: 20, fontWeight: '800', color: colors.white, lineHeight: 22 },
+  visitsLabel: { fontSize: 10, fontWeight: '400', color: colors.gray, marginTop: 2 },
 
   emptyState: { alignItems: 'center', paddingTop: 48 },
-  emptyText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.gray,
-  },
+  emptyText: { fontSize: 14, fontWeight: '400', color: colors.gray },
 
   fab: {
     position: 'absolute', bottom: 24, right: 20,
@@ -286,10 +462,76 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
   },
-  fabText: {
-    fontSize: 30,
-    fontWeight: '400',
-    color: colors.white,
-    lineHeight: 34,
+  fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
+});
+
+// ─── Modal styles ─────────────────────────────────────────────────────────────
+
+const INPUT_BG = '#2D1020';
+
+const modal = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
   },
+  sheet: {
+    backgroundColor: '#1A0A14',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: '#3D1020',
+    alignSelf: 'center', marginBottom: 20,
+  },
+  title: {
+    fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20,
+  },
+  input: {
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, fontWeight: '400', color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  inputMulti: {
+    height: 80, paddingTop: 14,
+  },
+  phoneRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12,
+  },
+  phonePrefix: {
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 14,
+  },
+  phonePrefixText: { fontSize: 15, fontWeight: '600', color: '#C9A8B6' },
+
+  dropdownTrigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  dropdownArrow: { fontSize: 11, color: '#6B4A58' },
+  dropdownValueText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownPlaceholderText: { fontSize: 15, fontWeight: '400', color: '#6B4A58' },
+  dropdownList: {
+    backgroundColor: '#150810',
+    borderRadius: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    maxHeight: 260,
+    overflow: 'hidden',
+  },
+  dropdownItem: { paddingHorizontal: 16, paddingVertical: 13 },
+  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
+  dropdownItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },
+
+  saveBtn: {
+    height: 52, borderRadius: 14, backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center', marginTop: 8,
+  },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 });

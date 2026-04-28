@@ -16,21 +16,41 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SERVICOS_OPCOES = [
+  'Manicure Básica',
+  'Gel Manicure',
+  'Acrylic Nails',
+  'Dip Powder',
+  'Nail Art',
+  'Pedicure',
+  'Spa/Deluxe Manicure & Pedicure',
+  'Remoção e Manutenção',
+  'Outro',
+];
+
 // ─── Add Servico Modal ────────────────────────────────────────────────────────
 
 function AddServicoModal({ visible, onClose, onSaved }) {
-  const [nome,     setNome]     = useState('');
-  const [valor,    setValor]    = useState('');
-  const [duracao,  setDuracao]  = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [saving,   setSaving]   = useState(false);
+  const [nomeOpcao,   setNomeOpcao]   = useState('');
+  const [nomeOutro,   setNomeOutro]   = useState('');
+  const [opcaoAberta, setOpcaoAberta] = useState(false);
+  const [valor,       setValor]       = useState('');
+  const [duracao,     setDuracao]     = useState('');
+  const [descricao,   setDescricao]   = useState('');
+  const [saving,      setSaving]      = useState(false);
 
-  const reset = () => { setNome(''); setValor(''); setDuracao(''); setDescricao(''); };
+  const reset = () => {
+    setNomeOpcao(''); setNomeOutro(''); setOpcaoAberta(false);
+    setValor(''); setDuracao(''); setDescricao('');
+  };
   const handleClose = () => { reset(); onClose(); };
 
   const handleSave = async () => {
-    if (!nome.trim()) {
-      Alert.alert('Campo obrigatório', 'Informe o nome do serviço.');
+    const nomeFinal = nomeOpcao === 'Outro' ? nomeOutro.trim() : nomeOpcao;
+    if (!nomeFinal) {
+      Alert.alert('Campo obrigatório', 'Selecione ou informe o nome do serviço.');
       return;
     }
     setSaving(true);
@@ -41,7 +61,7 @@ function AddServicoModal({ visible, onClose, onSaved }) {
 
       const { error } = await supabase.from('servicos').insert({
         profissional_id:  userId,
-        nome:             nome.trim(),
+        nome:             nomeFinal,
         valor:            valor   ? parseFloat(valor.replace(/[^0-9.]/g, ''))   : null,
         duracao_minutos:  duracao ? parseInt(duracao.replace(/\D/g, ''), 10)    : null,
         descricao:        descricao.trim() || null,
@@ -63,63 +83,106 @@ function AddServicoModal({ visible, onClose, onSaved }) {
         <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={modal.sheet}>
-            <View style={modal.handle} />
-            <Text style={modal.title}>Novo serviço</Text>
-
-            <TextInput
-              style={modal.input}
-              placeholder="Nome do serviço *"
-              placeholderTextColor="#6B4A58"
-              value={nome}
-              onChangeText={setNome}
-              autoCapitalize="words"
-              returnKeyType="next"
-            />
-
-            <View style={modal.row}>
-              <TextInput
-                style={[modal.input, modal.halfInput]}
-                placeholder="Valor ($)"
-                placeholderTextColor="#6B4A58"
-                value={valor}
-                onChangeText={setValor}
-                keyboardType="decimal-pad"
-                returnKeyType="next"
-              />
-              <TextInput
-                style={[modal.input, modal.halfInput, { marginRight: 0 }]}
-                placeholder="Duração (min)"
-                placeholderTextColor="#6B4A58"
-                value={duracao}
-                onChangeText={t => setDuracao(t.replace(/\D/g, ''))}
-                keyboardType="number-pad"
-                returnKeyType="next"
-              />
-            </View>
-
-            <TextInput
-              style={[modal.input, modal.inputMulti]}
-              placeholder="Descrição (opcional)"
-              placeholderTextColor="#6B4A58"
-              value={descricao}
-              onChangeText={setDescricao}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
-              onPress={handleSave}
-              disabled={saving}
-              activeOpacity={0.85}
+          <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
             >
-              {saving
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={modal.saveBtnText}>Salvar</Text>
-              }
-            </TouchableOpacity>
+              <View style={modal.handle} />
+              <Text style={modal.title}>Novo serviço</Text>
+
+              <TouchableOpacity
+                style={[modal.input, modal.dropdownTrigger]}
+                onPress={() => setOpcaoAberta(o => !o)}
+                activeOpacity={0.8}
+              >
+                <Text style={nomeOpcao ? modal.dropdownValueText : modal.dropdownPlaceholderText}>
+                  {nomeOpcao || 'Selecione o serviço *'}
+                </Text>
+                <Text style={modal.dropdownArrow}>{opcaoAberta ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {opcaoAberta && (
+                <View style={modal.dropdownList}>
+                  <ScrollView bounces={false} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {SERVICOS_OPCOES.map((opt, idx) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          modal.dropdownItem,
+                          idx < SERVICOS_OPCOES.length - 1 && modal.dropdownItemBorder,
+                          nomeOpcao === opt && modal.dropdownItemActive,
+                        ]}
+                        onPress={() => { setNomeOpcao(opt); setOpcaoAberta(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[modal.dropdownItemText, nomeOpcao === opt && modal.dropdownItemTextActive]}>
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {nomeOpcao === 'Outro' && (
+                <TextInput
+                  style={modal.input}
+                  placeholder="Nome do serviço *"
+                  placeholderTextColor="#6B4A58"
+                  value={nomeOutro}
+                  onChangeText={setNomeOutro}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              )}
+
+              <View style={modal.row}>
+                <TextInput
+                  style={[modal.input, modal.halfInput]}
+                  placeholder="Valor ($)"
+                  placeholderTextColor="#6B4A58"
+                  value={valor}
+                  onChangeText={setValor}
+                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                />
+                <TextInput
+                  style={[modal.input, modal.halfInput, { marginRight: 0 }]}
+                  placeholder="Duração (min)"
+                  placeholderTextColor="#6B4A58"
+                  value={duracao}
+                  onChangeText={t => setDuracao(t.replace(/\D/g, ''))}
+                  keyboardType="number-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <TextInput
+                style={[modal.input, modal.inputMulti]}
+                placeholder="Descrição (opcional)"
+                placeholderTextColor="#6B4A58"
+                value={descricao}
+                onChangeText={setDescricao}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={modal.saveBtnText}>Salvar</Text>
+                }
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -315,6 +378,27 @@ const modal = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   halfInput: { flex: 1, marginBottom: 0 },
   inputMulti: { height: 80, paddingTop: 14 },
+
+  dropdownTrigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  dropdownArrow: { fontSize: 11, color: '#6B4A58' },
+  dropdownValueText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownPlaceholderText: { fontSize: 15, fontWeight: '400', color: '#6B4A58' },
+  dropdownList: {
+    backgroundColor: '#150810',
+    borderRadius: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    maxHeight: 260,
+    overflow: 'hidden',
+  },
+  dropdownItem: { paddingHorizontal: 16, paddingVertical: 13 },
+  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
+  dropdownItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },
+
   saveBtn: {
     height: 52, borderRadius: 14, backgroundColor: '#A8235A',
     alignItems: 'center', justifyContent: 'center', marginTop: 8,
