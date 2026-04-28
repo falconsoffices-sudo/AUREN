@@ -1,18 +1,86 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import theme from '../constants/theme';
 import { supabase } from '../lib/supabase';
 
 const c  = theme.colors;
 const sh = theme.shadows;
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const NIVEL_LABELS = {
+  1: 'Iniciante',
+  2: 'Em Crescimento',
+  3: 'Profissional',
+  4: 'Expert',
+  5: 'Master',
+};
+
+const STATUS_COLORS = {
+  pendente:   '#F59E0B',
+  confirmado: '#10B981',
+  finalizado: '#6B7280',
+  cancelado:  '#EF4444',
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatMoeda(valor) {
+  return Number(valor || 0).toLocaleString('en-US', {
+    style: 'currency', currency: 'USD',
+  });
+}
+
+function formatHora(dataHoraStr) {
+  return new Date(dataHoraStr).toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+}
+
+// Retorna a data de hoje como string YYYY-MM-DD (data local do dispositivo)
+function getHojeStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Retorna strings YYYY-MM-DD para início da semana (segunda) e início do mês
+function getPeriodStrs() {
+  const d   = new Date();
+  const dow = d.getDay(); // 0=Dom
+  const daysFromMonday = dow === 0 ? 6 : dow - 1;
+
+  const inicioSemanaDate = new Date(d);
+  inicioSemanaDate.setDate(d.getDate() - daysFromMonday);
+
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+
+  return {
+    inicioSemanaStr: fmt(inicioSemanaDate),
+    fimSemanaStr:    fmt(d),
+    inicioMesStr:    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`,
+    fimMesStr:       fmt(d),
+  };
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }) {
   return (
     <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${progress}%` }]} />
+      <View style={[styles.progressFill, { width: `${Math.min(progress, 100)}%` }]} />
     </View>
   );
 }
@@ -27,28 +95,178 @@ function StatColumn({ label, value, meta }) {
   );
 }
 
+function AgendamentoRow({ agendamento, showDivider }) {
+  const clienteNome = agendamento.clientes?.nome ?? 'Cliente';
+  const servicoNome = agendamento.servicos?.nome ?? '—';
+  const hora        = formatHora(agendamento.data_hora);
+  const dotColor    = STATUS_COLORS[agendamento.status] ?? '#6B7280';
+
+  return (
+    <>
+      {showDivider && <View style={styles.agendDivider} />}
+      <View style={styles.agendRow}>
+        <View style={[styles.agendDot, { backgroundColor: dotColor }]} />
+        <View style={styles.agendInfo}>
+          <Text style={styles.agendNome} numberOfLines={1}>{clienteNome}</Text>
+          <Text style={styles.agendServico} numberOfLines={1}>{servicoNome}</Text>
+        </View>
+        <Text style={styles.agendHora}>{hora}</Text>
+      </View>
+    </>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const [primeiroNome, setPrimeiroNome] = useState('');
+  const [loading,           setLoading]           = useState(true);
+  const [primeiroNome,      setPrimeiroNome]      = useState('');
+  const [nivelGamificacao,  setNivelGamificacao]  = useState(1);
+  const [agendamentosHoje,  setAgendamentosHoje]  = useState([]);
+  const [faturamentoSemana, setFaturamentoSemana] = useState(0);
+  const [faturamentoMes,    setFaturamentoMes]    = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData?.user) return;
-      const { data } = await supabase
+  const carregarDados = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData?.user?.id;
+    if (!uid) { setLoading(false); return; }
+
+    const hoje = getHojeStr();
+    const { inicioSemanaStr, fimSemanaStr, inicioMesStr, fimMesStr } = getPeriodStrs();
+
+    console.log('[HomeScreen] query params:', {
+      hoje,
+      inicioSemanaStr,
+      fimSemanaStr,
+      inicioMesStr,
+      fimMesStr,
+    });
+
+    const [
+      profileRes,
+      agendRes,
+      agendSemanaRes,
+      agendMesRes,
+      finSemanaRes,
+      finMesRes,
+    ] = await Promise.all([
+      supabase
         .from('profiles')
-        .select('nome')
-        .eq('id', userData.user.id)
-        .single();
-      if (data?.nome) setPrimeiroNome(data.nome.trim().split(' ')[0]);
-    })();
+        .select('nome, nivel_gamificacao')
+        .eq('id', uid)
+        .single(),
+
+      supabase
+        .from('agendamentos')
+        .select('*, clientes(nome), servicos(nome, valor)')
+        .eq('profissional_id', uid)
+        .gte('data_hora', `${hoje}T00:00:00`)
+        .lte('data_hora', `${hoje}T23:59:59`)
+        .order('data_hora'),
+
+      // Agendamentos previstos desta semana (finalizado + confirmado + pendente)
+      supabase
+        .from('agendamentos')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', `${inicioSemanaStr}T00:00:00`)
+        .lte('data_hora', `${fimSemanaStr}T23:59:59`),
+
+      // Agendamentos previstos deste mês (finalizado + confirmado + pendente)
+      supabase
+        .from('agendamentos')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', `${inicioMesStr}T00:00:00`)
+        .lte('data_hora', `${fimMesStr}T23:59:59`),
+
+      // Receitas em financeiro desta semana
+      supabase
+        .from('financeiro')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .eq('tipo', 'receita')
+        .gte('created_at', `${inicioSemanaStr}T00:00:00`)
+        .lte('created_at', `${fimSemanaStr}T23:59:59`),
+
+      // Receitas em financeiro deste mês
+      supabase
+        .from('financeiro')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .eq('tipo', 'receita')
+        .gte('created_at', `${inicioMesStr}T00:00:00`)
+        .lte('created_at', `${fimMesStr}T23:59:59`),
+    ]);
+
+    console.log('[HomeScreen] profileRes:', profileRes.data, profileRes.error);
+    console.log('[HomeScreen] agendRes count:', agendRes.data?.length, '| error:', agendRes.error);
+    console.log('[HomeScreen] agendRes data:', JSON.stringify(agendRes.data, null, 2));
+    console.log('[HomeScreen] agendSemana finalizados:', agendSemanaRes.data?.length, '| error:', agendSemanaRes.error);
+    console.log('[HomeScreen] agendMes finalizados:', agendMesRes.data?.length, '| error:', agendMesRes.error);
+    console.log('[HomeScreen] finSemana receitas:', finSemanaRes.data?.length, '| error:', finSemanaRes.error);
+    console.log('[HomeScreen] finMes receitas:', finMesRes.data?.length, '| error:', finMesRes.error);
+
+    if (profileRes.data) {
+      if (profileRes.data.nome)
+        setPrimeiroNome(profileRes.data.nome.trim().split(' ')[0]);
+      setNivelGamificacao(profileRes.data.nivel_gamificacao ?? 1);
+    }
+
+    if (agendRes.data) setAgendamentosHoje(agendRes.data);
+
+    const soma = rows => (rows ?? []).reduce((s, r) => s + Number(r.valor || 0), 0);
+    setFaturamentoSemana(soma(agendSemanaRes.data) + soma(finSemanaRes.data));
+    setFaturamentoMes(soma(agendMesRes.data)    + soma(finMesRes.data));
+
+    setLoading(false);
   }, []);
 
+  // Recarrega sempre que a tela recebe foco
+  useFocusEffect(
+    useCallback(() => {
+      carregarDados();
+    }, [carregarDados])
+  );
+
+  // Listeners realtime — recarrega ao mudar agendamentos ou financeiro
+  useEffect(() => {
+    const chAgend = supabase
+      .channel('agendamentos_hoje')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos' },
+        () => { carregarDados(); })
+      .subscribe();
+
+    const chFin = supabase
+      .channel('financeiro_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'financeiro' },
+        () => { carregarDados(); })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(chAgend);
+      supabase.removeChannel(chFin);
+    };
+  }, [carregarDados]);
+
+  // ── Derived values ────────────────────────────────────────────
+  const ativos            = agendamentosHoje.filter(a => a.status !== 'cancelado');
+  const totalAtendimentos = ativos.length;
+  const valorPrevisto     = ativos.reduce((s, a) => s + Number(a.valor ?? a.servicos?.valor ?? 0), 0);
+
+  const proximosDois = agendamentosHoje
+    .filter(a => a.status === 'pendente' || a.status === 'confirmado')
+    .slice(0, 2);
+
+  const proximaCliente = proximosDois[0]?.clientes?.nome ?? null;
+
+  const nivelLabel    = NIVEL_LABELS[nivelGamificacao] ?? `Nível ${nivelGamificacao}`;
+  const nivelProgress = Math.min(nivelGamificacao * 20, 100);
+
   const today = new Date().toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
+    weekday: 'long', day: 'numeric', month: 'long',
   });
 
   return (
@@ -58,11 +276,11 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.logoRow}>
           <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logoImage}
-            />
+            source={require('../../assets/images/logo.png')}
+            style={styles.logoImage}
+          />
         </View>
-        <Text style={styles.greeting}>Olá, {primeiroNome || 'Maria'}</Text>
+        <Text style={styles.greeting}>Olá, {primeiroNome || '—'}</Text>
         <Text style={styles.date}>{today}</Text>
       </View>
 
@@ -72,59 +290,83 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
         >
+          {loading ? (
+            <ActivityIndicator color={c.magenta} style={{ marginTop: 56 }} />
+          ) : (
+            <>
+              {/* Card: Hoje */}
+              <View style={styles.cardToday}>
+                <Text style={styles.todayBadge}>
+                  {`HOJE · ${totalAtendimentos} ${totalAtendimentos === 1 ? 'ATENDIMENTO' : 'ATENDIMENTOS'}`}
+                </Text>
+                <Text style={styles.todayValue}>{formatMoeda(valorPrevisto)}</Text>
+                <Text style={styles.todayCaption}>
+                  {proximaCliente ? `próxima: ${proximaCliente}` : 'previsto para hoje'}
+                </Text>
+              </View>
 
-          {/* Card: Hoje */}
-          <View style={styles.cardToday}>
-            <Text style={styles.todayBadge}>HOJE · 4 ATENDIMENTOS</Text>
-            <Text style={styles.todayValue}>$420</Text>
-            <Text style={styles.todayCaption}>previsto para hoje</Text>
-          </View>
+              {/* Próximos 2 agendamentos */}
+              {proximosDois.length > 0 && (
+                <View style={styles.card}>
+                  <Text style={styles.cardLabel}>Próximos agendamentos</Text>
+                  {proximosDois.map((a, idx) => (
+                    <AgendamentoRow key={a.id} agendamento={a} showDivider={idx > 0} />
+                  ))}
+                </View>
+              )}
 
-          {/* Card: Faturamento */}
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Faturamento</Text>
-            <View style={styles.statRow}>
-              <StatColumn label="Esta semana" value="$1.840" />
-              <View style={styles.statDivider} />
-              <StatColumn label="Este mês" value="$6.290" meta="meta $7.000" />
-            </View>
-          </View>
+              {/* Card: Faturamento */}
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Faturamento</Text>
+                <View style={styles.statRow}>
+                  <StatColumn
+                    label="Esta semana"
+                    value={formatMoeda(faturamentoSemana)}
+                  />
+                  <View style={styles.statDivider} />
+                  <StatColumn
+                    label="Este mês"
+                    value={formatMoeda(faturamentoMes)}
+                  />
+                </View>
+              </View>
 
-          {/* Card: Nível de agenda */}
-          <View style={styles.card}>
-            <View style={styles.levelHeader}>
-              <Text style={styles.cardLabel}>Nível de agenda</Text>
-              <Text style={styles.levelPercent}>62%</Text>
-            </View>
-            <Text style={styles.levelTitle}>Agenda Cheia</Text>
-            <ProgressBar progress={62} />
-          </View>
+              {/* Card: Nível de gamificação */}
+              <View style={styles.card}>
+                <View style={styles.levelHeader}>
+                  <Text style={styles.cardLabel}>Nível</Text>
+                  <Text style={styles.levelPercent}>Nível {nivelGamificacao}</Text>
+                </View>
+                <Text style={styles.levelTitle}>{nivelLabel}</Text>
+                <ProgressBar progress={nivelProgress} />
+              </View>
 
-          {/* Insights */}
-          <Text style={styles.sectionTitle}>Insights de hoje</Text>
+              {/* Insights */}
+              <Text style={styles.sectionTitle}>Insights de hoje</Text>
 
-          <View style={styles.insightCard}>
-            <View style={styles.insightDot} />
-            <View style={styles.insightBody}>
-              <Text style={styles.insightTitle}>Horários vagos</Text>
-              <Text style={styles.insightText}>
-                Você tem 2 horários abertos à tarde. Considere contatar clientes
-                que costumam agendar nesse período para preenchê-los.
-              </Text>
-            </View>
-          </View>
+              <View style={styles.insightCard}>
+                <View style={styles.insightDot} />
+                <View style={styles.insightBody}>
+                  <Text style={styles.insightTitle}>Horários vagos</Text>
+                  <Text style={styles.insightText}>
+                    Você tem 2 horários abertos à tarde. Considere contatar clientes
+                    que costumam agendar nesse período para preenchê-los.
+                  </Text>
+                </View>
+              </View>
 
-          <View style={styles.insightCard}>
-            <View style={styles.insightDot} />
-            <View style={styles.insightBody}>
-              <Text style={styles.insightTitle}>Clientes inativas</Text>
-              <Text style={styles.insightText}>
-                3 clientes não retornam há mais de 45 dias. Um contato rápido
-                pode recuperar essas visitas esta semana.
-              </Text>
-            </View>
-          </View>
-
+              <View style={styles.insightCard}>
+                <View style={styles.insightDot} />
+                <View style={styles.insightBody}>
+                  <Text style={styles.insightTitle}>Clientes inativas</Text>
+                  <Text style={styles.insightText}>
+                    3 clientes não retornam há mais de 45 dias. Um contato rápido
+                    pode recuperar essas visitas esta semana.
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </ScrollView>
       </View>
 
@@ -152,13 +394,11 @@ const styles = StyleSheet.create({
     paddingBottom: 44,
   },
 
-  /* Logo image */
   logoImage: {
     height: 28,
     resizeMode: 'contain',
   },
 
-  /* Dark header */
   header: {
     backgroundColor: c.dark,
     paddingHorizontal: 20,
@@ -181,7 +421,6 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
 
-  /* Base card */
   card: {
     backgroundColor: c.white,
     borderRadius: 16,
@@ -226,6 +465,45 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: c.fg3,
     marginTop: 4,
+  },
+
+  /* Agendamento rows */
+  agendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  agendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12,
+    flexShrink: 0,
+  },
+  agendInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  agendNome: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: c.dark,
+  },
+  agendServico: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: c.fg3,
+    marginTop: 2,
+  },
+  agendHora: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: c.magenta,
+    flexShrink: 0,
+  },
+  agendDivider: {
+    height: 1,
+    backgroundColor: c.bege2,
   },
 
   /* StatColumn */
