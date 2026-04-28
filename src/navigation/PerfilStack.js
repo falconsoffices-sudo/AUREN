@@ -1,9 +1,10 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import PerfilScreen    from '../screens/PerfilScreen';
-import ServicosScreen  from '../screens/ServicosScreen';
-import MeusDadosScreen from '../screens/MeusDadosScreen';
+import PerfilScreen     from '../screens/PerfilScreen';
+import ServicosScreen   from '../screens/ServicosScreen';
+import MeusDadosScreen  from '../screens/MeusDadosScreen';
+import EnderecosScreen  from '../screens/EnderecosScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -13,6 +14,7 @@ export default function PerfilStack() {
       <Stack.Screen name="PerfilHome"  component={PerfilScreen}    />
       <Stack.Screen name="Servicos"    component={ServicosScreen}  />
       <Stack.Screen name="MeusDados"   component={MeusDadosScreen} />
+      <Stack.Screen name="Enderecos"   component={EnderecosScreen} />
     </Stack.Navigator>
   );
 }

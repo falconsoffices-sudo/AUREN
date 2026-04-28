@@ -5,8 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -148,6 +150,25 @@ export default function PerfilScreen({ navigation }) {
               onPress={
                 item.label === 'Meus Serviços' ? () => navigation.navigate('Servicos')  :
                 item.label === 'Meus Dados'    ? () => navigation.navigate('MeusDados') :
+                item.label === 'Endereços'     ? () => navigation.navigate('Enderecos') :
+                item.label === 'Sair'          ? () => Alert.alert(
+                    'Sair',
+                    'Tem certeza que deseja sair?',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Sair',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await supabase.auth.signOut();
+                          navigation.getParent()?.getParent()?.reset({
+                            index: 0,
+                            routes: [{ name: 'Welcome' }],
+                          });
+                        },
+                      },
+                    ]
+                  ) :
                 undefined
               }
             />
