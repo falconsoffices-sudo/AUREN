@@ -8,6 +8,8 @@ import EnderecosScreen       from '../screens/EnderecosScreen';
 import DespesasScreen        from '../screens/DespesasScreen';
 import ConfiguracoesScreen   from '../screens/ConfiguracoesScreen';
 import TemplatesSMSScreen    from '../screens/TemplatesSMSScreen';
+import MetasScreen           from '../screens/MetasScreen';
+import GamificacaoScreen     from '../screens/GamificacaoScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,6 +23,8 @@ export default function PerfilStack() {
       <Stack.Screen name="Despesas"      component={DespesasScreen}      />
       <Stack.Screen name="Configuracoes" component={ConfiguracoesScreen} />
       <Stack.Screen name="TemplatesSMS"  component={TemplatesSMSScreen}  />
+      <Stack.Screen name="Metas"         component={MetasScreen}         />
+      <Stack.Screen name="Gamificacao"   component={GamificacaoScreen}   />
     </Stack.Navigator>
   );
 }
