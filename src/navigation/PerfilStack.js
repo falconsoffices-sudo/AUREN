@@ -5,6 +5,7 @@ import PerfilScreen     from '../screens/PerfilScreen';
 import ServicosScreen   from '../screens/ServicosScreen';
 import MeusDadosScreen  from '../screens/MeusDadosScreen';
 import EnderecosScreen  from '../screens/EnderecosScreen';
+import DespesasScreen   from '../screens/DespesasScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -15,6 +16,7 @@ export default function PerfilStack() {
       <Stack.Screen name="Servicos"    component={ServicosScreen}  />
       <Stack.Screen name="MeusDados"   component={MeusDadosScreen} />
       <Stack.Screen name="Enderecos"   component={EnderecosScreen} />
+      <Stack.Screen name="Despesas"    component={DespesasScreen}  />
     </Stack.Navigator>
   );
 }
