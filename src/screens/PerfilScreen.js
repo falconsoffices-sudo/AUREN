@@ -145,7 +145,11 @@ export default function PerfilScreen({ navigation }) {
               key={item.id}
               {...item}
               last={i === MENU.length - 1}
-              onPress={item.label === 'Meus Serviços' ? () => navigation.navigate('Servicos') : undefined}
+              onPress={
+                item.label === 'Meus Serviços' ? () => navigation.navigate('Servicos')  :
+                item.label === 'Meus Dados'    ? () => navigation.navigate('MeusDados') :
+                undefined
+              }
             />
           ))}
         </View>
