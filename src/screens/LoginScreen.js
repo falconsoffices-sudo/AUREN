@@ -15,28 +15,83 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatPhone(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// Kept for backward-compat (accounts created before OTP migration)
 function makePassword(phone) {
   const digits = phone.replace(/\D/g, '');
   return `Auren_${digits}_2024!`;
 }
 
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
 export default function LoginScreen({ navigation }) {
+  // 'email' → email OTP entry  |  'otp' → verify code  |  'password' → legacy fallback
+  const [step,     setStep]     = useState('email');
   const [email,    setEmail]    = useState('');
-  const [telefone, setTelefone] = useState('');
+  const [otpCode,  setOtpCode]  = useState('');
+  const [telefone, setTelefone] = useState(''); // only used in password fallback
   const [loading,  setLoading]  = useState(false);
 
-  const handleLogin = async () => {
+  // ── Step 1: send email OTP ────────────────────────────────────
+  const handleSendOtp = async () => {
+    if (!email.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe seu e-mail.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: email.trim() });
+      if (error) throw error;
+      setOtpCode('');
+      setStep('otp');
+    } catch (err) {
+      Alert.alert('Erro ao enviar código', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 2: verify email OTP ──────────────────────────────────
+  const handleVerifyOtp = async () => {
+    if (otpCode.length < 8) {
+      Alert.alert('Código inválido', 'Digite os 8 dígitos recebidos por e-mail.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: otpCode,
+        type: 'email',
+      });
+      if (error) throw error;
+      navigation.replace('Main');
+    } catch (err) {
+      Alert.alert('Código incorreto', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Fallback: email + senha (contas antigas) ──────────────────
+  const handlePasswordLogin = async () => {
     if (!email.trim() || !telefone.trim()) {
       Alert.alert('Campos obrigatórios', 'Informe e-mail e telefone.');
       return;
     }
-
     setLoading(true);
     try {
-      const password = makePassword(telefone);
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
-        password,
+        password: makePassword(telefone),
       });
       if (error) throw error;
       navigation.replace('Main');
@@ -58,55 +113,160 @@ export default function LoginScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-
           <Image
             source={require('../../assets/images/logo.png')}
             style={styles.logo}
           />
 
-          <Text style={styles.title}>Bem-vinda de volta</Text>
-          <Text style={styles.subtitle}>Entre com seus dados de acesso</Text>
+          {/* ══ STEP: email ══ */}
+          {step === 'email' && (
+            <>
+              <Text style={styles.title}>Bem-vinda de volta</Text>
+              <Text style={styles.subtitle}>
+                Informe seu e-mail para receber o código de acesso
+              </Text>
 
-          <Text style={styles.label}>E-mail</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="maria@email.com"
-            placeholderTextColor="#6B4A58"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
-          />
+              <Text style={styles.label}>E-mail</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="maria@email.com"
+                placeholderTextColor="#6B4A58"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="send"
+                onSubmitEditing={handleSendOtp}
+              />
 
-          <Text style={styles.label}>Telefone</Text>
-          <View style={styles.phoneRow}>
-            <View style={styles.phonePrefix}>
-              <Text style={styles.phonePrefixText}>+1</Text>
-            </View>
-            <TextInput
-              style={[styles.input, styles.phoneInput]}
-              placeholder="(305) 555-0100"
-              placeholderTextColor="#6B4A58"
-              value={telefone}
-              onChangeText={setTelefone}
-              keyboardType="phone-pad"
-              returnKeyType="done"
-            />
-          </View>
+              <TouchableOpacity
+                style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+                onPress={handleSendOtp}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Receber código</Text>}
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryBtnText}>Entrar</Text>
-            }
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkBtn}
+                onPress={() => setStep('password')}
+              >
+                <Text style={styles.linkBtnText}>Entrar com senha</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* ══ STEP: otp ══ */}
+          {step === 'otp' && (
+            <>
+              <Text style={styles.title}>Código enviado</Text>
+              <Text style={styles.subtitle}>
+                Verifique sua caixa de entrada em{'\n'}{email}
+              </Text>
+
+              <Text style={styles.label}>Código de verificação</Text>
+              <TextInput
+                style={[styles.input, styles.otpInput]}
+                placeholder="00000000"
+                placeholderTextColor="#6B4A58"
+                value={otpCode}
+                onChangeText={t => setOtpCode(t.replace(/\D/g, '').slice(0, 8))}
+                keyboardType="numeric"
+                maxLength={8}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleVerifyOtp}
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Confirmar código</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.linkBtn}
+                onPress={handleSendOtp}
+                disabled={loading}
+              >
+                <Text style={styles.linkBtnText}>Reenviar código</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => { setOtpCode(''); setStep('email'); }}
+              >
+                <Text style={styles.backBtnText}>← Alterar e-mail</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* ══ STEP: password (fallback para contas antigas) ══ */}
+          {step === 'password' && (
+            <>
+              <Text style={styles.title}>Entrar com senha</Text>
+              <Text style={styles.subtitle}>
+                Para contas criadas antes da versão atual
+              </Text>
+
+              <Text style={styles.label}>E-mail</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="maria@email.com"
+                placeholderTextColor="#6B4A58"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+              />
+
+              <Text style={styles.label}>Telefone</Text>
+              <View style={styles.phoneRow}>
+                <View style={styles.phonePrefix}>
+                  <Text style={styles.phonePrefixText}>+1</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.phoneInput]}
+                  placeholder="(305) 555-0100"
+                  placeholderTextColor="#6B4A58"
+                  value={telefone}
+                  onChangeText={raw => setTelefone(formatPhone(raw))}
+                  keyboardType="phone-pad"
+                  returnKeyType="done"
+                  onSubmitEditing={handlePasswordLogin}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+                onPress={handlePasswordLogin}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Entrar</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => setStep('email')}
+              >
+                <Text style={styles.backBtnText}>← Entrar com código</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity
             style={styles.registerLink}
@@ -121,103 +281,48 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const INPUT_BG = '#2D1020';
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#1A0A14',
-  },
-  scroll: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 48,
-  },
+  safe:   { flex: 1, backgroundColor: '#1A0A14' },
+  scroll: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 48 },
 
   logo: {
-    width: 120,
-    height: 60,
-    resizeMode: 'contain',
-    alignSelf: 'center',
-    marginBottom: 32,
+    width: 120, height: 60, resizeMode: 'contain',
+    alignSelf: 'center', marginBottom: 32,
   },
 
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#6B4A58',
-    marginBottom: 32,
-  },
+  title:    { fontSize: 24, fontWeight: '700', color: '#FFFFFF', marginBottom: 6 },
+  subtitle: { fontSize: 14, fontWeight: '400', color: '#6B4A58', marginBottom: 32, lineHeight: 20 },
 
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#C9A8B6',
-    marginBottom: 8,
-    letterSpacing: 0.4,
-  },
+  label: { fontSize: 12, fontWeight: '600', color: '#C9A8B6', marginBottom: 8, letterSpacing: 0.4 },
 
   input: {
-    backgroundColor: INPUT_BG,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#FFFFFF',
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, fontWeight: '400', color: '#FFFFFF',
     marginBottom: 18,
   },
-
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  phonePrefix: {
-    backgroundColor: INPUT_BG,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginRight: 8,
-  },
-  phonePrefixText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#C9A8B6',
-  },
-  phoneInput: {
-    flex: 1,
-    marginBottom: 0,
+  otpInput: {
+    fontSize: 28, fontWeight: '700', letterSpacing: 12, textAlign: 'center',
   },
 
-  primaryBtn: {
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: '#A8235A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  primaryBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  phoneRow:        { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  phonePrefix:     { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, marginRight: 8 },
+  phonePrefixText: { fontSize: 15, fontWeight: '600', color: '#C9A8B6' },
+  phoneInput:      { flex: 1, marginBottom: 0 },
 
-  registerLink: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  registerLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#A8235A',
-  },
+  primaryBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 16 },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+
+  linkBtn:      { alignItems: 'center', paddingVertical: 10 },
+  linkBtnText:  { fontSize: 14, fontWeight: '600', color: '#A8235A' },
+
+  backBtn:      { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+  backBtnText:  { fontSize: 13, fontWeight: '400', color: '#6B4A58' },
+
+  registerLink:     { alignItems: 'center', paddingVertical: 10, marginTop: 16 },
+  registerLinkText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },
 });
