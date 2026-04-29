@@ -47,6 +47,13 @@ function formatPhone(raw = '') {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+// Determina qual opção do dropdown corresponde ao valor salvo
+function resolveServicoOpcao(sf) {
+  if (!sf) return { opcao: '', outro: '' };
+  if (SERVICOS_OPCOES.slice(0, -1).includes(sf)) return { opcao: sf, outro: '' };
+  return { opcao: 'Outro', outro: sf };
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SummaryCard({ value, label }) {
@@ -58,9 +65,9 @@ function SummaryCard({ value, label }) {
   );
 }
 
-function ClientCard({ nome, vip, servico_favorito, telefone, total_visitas }) {
+function ClientCard({ nome, vip, servico_favorito, telefone, total_visitas, onPress }) {
   return (
-    <TouchableOpacity style={styles.clientCard} activeOpacity={0.72}>
+    <TouchableOpacity style={styles.clientCard} activeOpacity={0.72} onPress={onPress}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{getInitials(nome)}</Text>
       </View>
@@ -90,16 +97,58 @@ function ClientCard({ nome, vip, servico_favorito, telefone, total_visitas }) {
   );
 }
 
+// ─── Shared Dropdown for serviço favorito ────────────────────────────────────
+
+function ServicoDropdown({ opcao, setOpcao, aberto, setAberto }) {
+  return (
+    <>
+      <TouchableOpacity
+        style={[modal.input, modal.dropdownTrigger]}
+        onPress={() => setAberto(o => !o)}
+        activeOpacity={0.8}
+      >
+        <Text style={opcao ? modal.dropdownValueText : modal.dropdownPlaceholderText}>
+          {opcao || 'Serviço favorito'}
+        </Text>
+        <Text style={modal.dropdownArrow}>{aberto ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {aberto && (
+        <View style={modal.dropdownList}>
+          <ScrollView bounces={false} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            {SERVICOS_OPCOES.map((opt, idx) => (
+              <TouchableOpacity
+                key={opt}
+                style={[
+                  modal.dropdownItem,
+                  idx < SERVICOS_OPCOES.length - 1 && modal.dropdownItemBorder,
+                  opcao === opt && modal.dropdownItemActive,
+                ]}
+                onPress={() => { setOpcao(opt); setAberto(false); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[modal.dropdownItemText, opcao === opt && modal.dropdownItemTextActive]}>
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </>
+  );
+}
+
 // ─── Add Client Modal ─────────────────────────────────────────────────────────
 
 function AddClientModal({ visible, onClose, onSaved }) {
-  const [nome,            setNome]            = useState('');
-  const [telefone,        setTelefone]        = useState('');
-  const [servicoOpcao,    setServicoOpcao]    = useState('');
-  const [servicoAberto,   setServicoAberto]   = useState(false);
-  const [servicoOutro,    setServicoOutro]    = useState('');
-  const [observacoes,     setObservacoes]     = useState('');
-  const [saving,          setSaving]          = useState(false);
+  const [nome,          setNome]          = useState('');
+  const [telefone,      setTelefone]      = useState('');
+  const [servicoOpcao,  setServicoOpcao]  = useState('');
+  const [servicoAberto, setServicoAberto] = useState(false);
+  const [servicoOutro,  setServicoOutro]  = useState('');
+  const [observacoes,   setObservacoes]   = useState('');
+  const [saving,        setSaving]        = useState(false);
 
   const reset = () => {
     setNome(''); setTelefone('');
@@ -111,8 +160,7 @@ function AddClientModal({ visible, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!nome.trim()) {
-      Alert.alert('Campo obrigatório', 'Informe o nome da cliente.');
-      return;
+      Alert.alert('Campo obrigatório', 'Informe o nome da cliente.'); return;
     }
     setSaving(true);
     try {
@@ -122,9 +170,7 @@ function AddClientModal({ visible, onClose, onSaved }) {
       if (!userId) throw new Error('Usuário não autenticado.');
 
       const { data: teste, error: testeError } = await supabase
-        .from('clientes')
-        .select('id')
-        .limit(1);
+        .from('clientes').select('id').limit(1);
       console.log('TESTE SELECT:', { teste, testeError });
 
       const servicoFinal = servicoOpcao === 'Outro' ? servicoOutro.trim() : servicoOpcao;
@@ -151,18 +197,10 @@ function AddClientModal({ visible, onClose, onSaved }) {
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={modal.backdrop}>
         <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
             <ScrollView
               bounces={false}
@@ -198,40 +236,152 @@ function AddClientModal({ visible, onClose, onSaved }) {
                 />
               </View>
 
-              {/* Dropdown serviço favorito */}
-              <TouchableOpacity
-                style={[modal.input, modal.dropdownTrigger]}
-                onPress={() => setServicoAberto(o => !o)}
-                activeOpacity={0.8}
-              >
-                <Text style={servicoOpcao ? modal.dropdownValueText : modal.dropdownPlaceholderText}>
-                  {servicoOpcao || 'Serviço favorito'}
-                </Text>
-                <Text style={modal.dropdownArrow}>{servicoAberto ? '▲' : '▼'}</Text>
-              </TouchableOpacity>
+              <ServicoDropdown
+                opcao={servicoOpcao}
+                setOpcao={setServicoOpcao}
+                aberto={servicoAberto}
+                setAberto={setServicoAberto}
+              />
 
-              {servicoAberto && (
-                <View style={modal.dropdownList}>
-                  <ScrollView bounces={false} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                    {SERVICOS_OPCOES.map((opt, idx) => (
-                      <TouchableOpacity
-                        key={opt}
-                        style={[
-                          modal.dropdownItem,
-                          idx < SERVICOS_OPCOES.length - 1 && modal.dropdownItemBorder,
-                          servicoOpcao === opt && modal.dropdownItemActive,
-                        ]}
-                        onPress={() => { setServicoOpcao(opt); setServicoAberto(false); }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[modal.dropdownItemText, servicoOpcao === opt && modal.dropdownItemTextActive]}>
-                          {opt}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
+              {servicoOpcao === 'Outro' && (
+                <TextInput
+                  style={modal.input}
+                  placeholder="Nome do serviço"
+                  placeholderTextColor="#6B4A58"
+                  value={servicoOutro}
+                  onChangeText={setServicoOutro}
+                  autoCapitalize="sentences"
+                  returnKeyType="next"
+                />
               )}
+
+              <TextInput
+                style={[modal.input, modal.inputMulti]}
+                placeholder="Observações"
+                placeholderTextColor="#6B4A58"
+                value={observacoes}
+                onChangeText={setObservacoes}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={modal.saveBtnText}>Salvar</Text>
+                }
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Edit Client Modal ────────────────────────────────────────────────────────
+
+function EditClientModal({ visible, cliente, onClose, onSaved }) {
+  const [nome,          setNome]          = useState('');
+  const [telefone,      setTelefone]      = useState('');
+  const [servicoOpcao,  setServicoOpcao]  = useState('');
+  const [servicoAberto, setServicoAberto] = useState(false);
+  const [servicoOutro,  setServicoOutro]  = useState('');
+  const [observacoes,   setObservacoes]   = useState('');
+  const [saving,        setSaving]        = useState(false);
+
+  useEffect(() => {
+    if (cliente) {
+      setNome(cliente.nome ?? '');
+      const digits = (cliente.telefone ?? '').replace(/\D/g, '').slice(-10);
+      setTelefone(digits ? formatPhone(digits) : '');
+      const { opcao, outro } = resolveServicoOpcao(cliente.servico_favorito);
+      setServicoOpcao(opcao);
+      setServicoOutro(outro);
+      setServicoAberto(false);
+      setObservacoes(cliente.observacoes ?? '');
+    }
+  }, [cliente]);
+
+  const handleSave = async () => {
+    if (!nome.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe o nome da cliente.'); return;
+    }
+    setSaving(true);
+    try {
+      const servicoFinal = servicoOpcao === 'Outro' ? servicoOutro.trim() : servicoOpcao;
+      const { error } = await supabase
+        .from('clientes')
+        .update({
+          nome:             nome.trim(),
+          telefone:         telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
+          servico_favorito: servicoFinal || null,
+          observacoes:      observacoes.trim() || null,
+        })
+        .eq('id', cliente.id);
+      if (error) throw error;
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao salvar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!cliente) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <View style={modal.handle} />
+              <Text style={modal.title}>Editar Cliente</Text>
+
+              <TextInput
+                style={modal.input}
+                placeholder="Nome completo *"
+                placeholderTextColor="#6B4A58"
+                value={nome}
+                onChangeText={setNome}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+
+              <View style={modal.phoneRow}>
+                <View style={modal.phonePrefix}>
+                  <Text style={modal.phonePrefixText}>+1</Text>
+                </View>
+                <TextInput
+                  style={[modal.input, { flex: 1, marginBottom: 0 }]}
+                  placeholder="(305) 555-0100"
+                  placeholderTextColor="#6B4A58"
+                  value={telefone}
+                  onChangeText={raw => setTelefone(formatPhone(raw))}
+                  keyboardType="phone-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <ServicoDropdown
+                opcao={servicoOpcao}
+                setOpcao={setServicoOpcao}
+                aberto={servicoAberto}
+                setAberto={setServicoAberto}
+              />
 
               {servicoOpcao === 'Outro' && (
                 <TextInput
@@ -278,11 +428,13 @@ function AddClientModal({ visible, onClose, onSaved }) {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ClientesScreen() {
-  const [clientes,      setClientes]      = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [query,         setQuery]         = useState('');
-  const [modalVisible,  setModalVisible]  = useState(false);
-  const [userId,        setUserId]        = useState(null);
+  const [clientes,        setClientes]        = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [query,           setQuery]           = useState('');
+  const [addVisible,      setAddVisible]      = useState(false);
+  const [editVisible,     setEditVisible]     = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [userId,          setUserId]          = useState(null);
 
   const fetchClientes = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -318,6 +470,16 @@ export default function ClientesScreen() {
   }, [query, clientes]);
 
   const totalAtivas = clientes.filter(c => c.ativa).length;
+
+  const openEdit = (cliente) => {
+    setSelectedCliente(cliente);
+    setEditVisible(true);
+  };
+
+  const closeEdit = () => {
+    setEditVisible(false);
+    setSelectedCliente(null);
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -360,7 +522,13 @@ export default function ClientesScreen() {
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
         ) : filtered.length > 0 ? (
-          filtered.map(c => <ClientCard key={c.id} {...c} />)
+          filtered.map(c => (
+            <ClientCard
+              key={c.id}
+              {...c}
+              onPress={() => openEdit(c)}
+            />
+          ))
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
@@ -375,18 +543,22 @@ export default function ClientesScreen() {
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.85}
-        onPress={() => setModalVisible(true)}
+        onPress={() => setAddVisible(true)}
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
       <AddClientModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSaved={() => {
-          setModalVisible(false);
-          fetchClientes();
-        }}
+        visible={addVisible}
+        onClose={() => setAddVisible(false)}
+        onSaved={() => { setAddVisible(false); fetchClientes(); }}
+      />
+
+      <EditClientModal
+        visible={editVisible}
+        cliente={selectedCliente}
+        onClose={closeEdit}
+        onSaved={() => { closeEdit(); fetchClientes(); }}
       />
 
     </SafeAreaView>
@@ -401,7 +573,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
 
   header: { paddingHorizontal: 20, paddingTop: 28, marginBottom: 20 },
-  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.white, marginBottom: 3 },
+  headerTitle:    { fontSize: 28, fontWeight: '700', color: colors.white, marginBottom: 3 },
   headerSubtitle: { fontSize: 13, fontWeight: '400', color: colors.gray },
 
   searchWrap: { paddingHorizontal: 20, marginBottom: 20 },
@@ -434,24 +606,24 @@ const styles = StyleSheet.create({
     width: 46, height: 46, borderRadius: 23, backgroundColor: '#2E2E2E',
     alignItems: 'center', justifyContent: 'center', marginRight: 13, flexShrink: 0,
   },
-  avatarText: { fontSize: 15, fontWeight: '700', color: colors.cream },
-  clientInfo: { flex: 1, marginRight: 12 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3, flexWrap: 'wrap' },
-  clientName: { fontSize: 15, fontWeight: '700', color: colors.white },
+  avatarText:  { fontSize: 15, fontWeight: '700', color: colors.cream },
+  clientInfo:  { flex: 1, marginRight: 12 },
+  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3, flexWrap: 'wrap' },
+  clientName:  { fontSize: 15, fontWeight: '700', color: colors.white },
   vipBadge: {
     backgroundColor: 'rgba(232,196,160,0.14)', paddingHorizontal: 7, paddingVertical: 2,
     borderRadius: 6, borderWidth: 1, borderColor: 'rgba(232,196,160,0.28)',
   },
   vipBadgeText: { fontSize: 9, fontWeight: '800', color: colors.cream, letterSpacing: 0.7 },
-  serviceText: { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
-  phoneText: { fontSize: 12, fontWeight: '400', color: '#555555' },
+  serviceText:  { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
+  phoneText:    { fontSize: 12, fontWeight: '400', color: '#555555' },
 
-  visitsCol: { alignItems: 'center', flexShrink: 0 },
-  visitsCount: { fontSize: 20, fontWeight: '800', color: colors.white, lineHeight: 22 },
-  visitsLabel: { fontSize: 10, fontWeight: '400', color: colors.gray, marginTop: 2 },
+  visitsCol:    { alignItems: 'center', flexShrink: 0 },
+  visitsCount:  { fontSize: 20, fontWeight: '800', color: colors.white, lineHeight: 22 },
+  visitsLabel:  { fontSize: 10, fontWeight: '400', color: colors.gray, marginTop: 2 },
 
   emptyState: { alignItems: 'center', paddingTop: 48 },
-  emptyText: { fontSize: 14, fontWeight: '400', color: colors.gray },
+  emptyText:  { fontSize: 14, fontWeight: '400', color: colors.gray },
 
   fab: {
     position: 'absolute', bottom: 24, right: 20,
@@ -471,35 +643,25 @@ const INPUT_BG = '#2D1020';
 
 const modal = StyleSheet.create({
   backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'flex-end',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: '#1A0A14',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 40,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40,
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: '#3D1020',
-    alignSelf: 'center', marginBottom: 20,
+    backgroundColor: '#3D1020', alignSelf: 'center', marginBottom: 20,
   },
-  title: {
-    fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20,
-  },
+  title: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
   input: {
     backgroundColor: INPUT_BG, borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 14,
     fontSize: 15, fontWeight: '400', color: '#FFFFFF',
     marginBottom: 12,
   },
-  inputMulti: {
-    height: 80, paddingTop: 14,
-  },
+  inputMulti: { height: 80, paddingTop: 14 },
   phoneRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12,
   },
@@ -512,21 +674,17 @@ const modal = StyleSheet.create({
   dropdownTrigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  dropdownArrow: { fontSize: 11, color: '#6B4A58' },
-  dropdownValueText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownArrow:           { fontSize: 11, color: '#6B4A58' },
+  dropdownValueText:       { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   dropdownPlaceholderText: { fontSize: 15, fontWeight: '400', color: '#6B4A58' },
   dropdownList: {
-    backgroundColor: '#150810',
-    borderRadius: 12,
-    marginTop: -8,
-    marginBottom: 12,
-    maxHeight: 260,
-    overflow: 'hidden',
+    backgroundColor: '#150810', borderRadius: 12,
+    marginTop: -8, marginBottom: 12, maxHeight: 260, overflow: 'hidden',
   },
-  dropdownItem: { paddingHorizontal: 16, paddingVertical: 13 },
-  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
-  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
-  dropdownItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownItem:           { paddingHorizontal: 16, paddingVertical: 13 },
+  dropdownItemBorder:     { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  dropdownItemActive:     { backgroundColor: 'rgba(168,35,90,0.15)' },
+  dropdownItemText:       { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },
 
   saveBtn: {

@@ -50,16 +50,31 @@ function formatDate(isoStr) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
-function startOfMonth() {
-  const d = new Date();
-  d.setDate(1); d.setHours(0,0,0,0);
-  return d;
+// Date object → "MM/DD/YYYY"
+function dateToMDY(d) {
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
+// Auto-format MM/DD/YYYY as digits are typed
+function formatDateInput(text) {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+// "MM/DD/YYYY" → "YYYY-MM-DD" for Postgres DATE column
+function mdyToISO(str) {
+  const [mm, dd, yyyy] = str.split('/');
+  if (!yyyy || yyyy.length < 4) return null;
+  return `${yyyy}-${(mm||'01').padStart(2,'0')}-${(dd||'01').padStart(2,'0')}`;
+}
+
+function startOfMonth() {
+  const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d;
+}
 function endOfMonth() {
-  const d = new Date();
-  d.setMonth(d.getMonth()+1, 0); d.setHours(23,59,59,999);
-  return d;
+  const d = new Date(); d.setMonth(d.getMonth()+1, 0); d.setHours(23,59,59,999); return d;
 }
 
 // ─── Category Dropdown ───────────────────────────────────────────────────────
@@ -68,38 +83,23 @@ function CategoriaDropdown({ value, onChange }) {
   const [open, setOpen] = useState(false);
   return (
     <View>
-      <TouchableOpacity
-        style={[modal.input, modal.dropdownTrigger]}
-        onPress={() => setOpen(o => !o)}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={[modal.input, modal.dropdownTrigger]} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <Text style={value ? modal.inputText : modal.inputPlaceholder}>
           {value || 'Selecione a categoria'}
         </Text>
         <Text style={modal.dropdownArrow}>{open ? '▲' : '▼'}</Text>
       </TouchableOpacity>
-
       {open && (
         <View style={modal.dropdownList}>
-          <ScrollView
-            style={{ maxHeight: 200 }}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
             {CATEGORIAS.map((cat, idx) => (
               <TouchableOpacity
                 key={cat}
-                style={[
-                  modal.dropdownItem,
-                  idx < CATEGORIAS.length - 1 && modal.dropdownItemBorder,
-                  value === cat && modal.dropdownItemActive,
-                ]}
+                style={[modal.dropdownItem, idx < CATEGORIAS.length-1 && modal.dropdownItemBorder, value === cat && modal.dropdownItemActive]}
                 onPress={() => { onChange(cat); setOpen(false); }}
                 activeOpacity={0.7}
               >
-                <Text style={[modal.dropdownItemText, value === cat && modal.dropdownItemTextActive]}>
-                  {cat}
-                </Text>
+                <Text style={[modal.dropdownItemText, value === cat && modal.dropdownItemTextActive]}>{cat}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -112,29 +112,37 @@ function CategoriaDropdown({ value, onChange }) {
 // ─── Add Despesa Modal ───────────────────────────────────────────────────────
 
 function AddDespesaModal({ visible, onClose, onSaved, userId }) {
-  const [categoria, setCategoria] = useState('');
-  const [valor,     setValor]     = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [saving,    setSaving]    = useState(false);
+  const [categoria,       setCategoria]       = useState('');
+  const [valor,           setValor]           = useState('');
+  const [descricao,       setDescricao]       = useState('');
+  const [recorrencia,     setRecorrencia]     = useState('variavel');
+  const [statusPagamento, setStatusPagamento] = useState('em_aberto');
+  const [parcelaAtual,    setParcelaAtual]    = useState('');
+  const [totalParcelas,   setTotalParcelas]   = useState('');
+  const [saving,          setSaving]          = useState(false);
 
-  const reset = () => { setCategoria(''); setValor(''); setDescricao(''); };
+  const reset = () => {
+    setCategoria(''); setValor(''); setDescricao('');
+    setRecorrencia('variavel'); setStatusPagamento('em_aberto');
+    setParcelaAtual(''); setTotalParcelas('');
+  };
   const handleClose = () => { reset(); onClose(); };
 
   const handleSave = async () => {
-    if (!categoria) {
-      Alert.alert('Campo obrigatório', 'Selecione uma categoria.'); return;
-    }
-    if (!valor || parseFloat(valor.replace(/[^0-9.]/g,'')) <= 0) {
-      Alert.alert('Campo obrigatório', 'Informe um valor válido.'); return;
-    }
+    if (!categoria) { Alert.alert('Campo obrigatório', 'Selecione uma categoria.'); return; }
+    if (!valor || parseFloat(valor.replace(/[^0-9.]/g,'')) <= 0) { Alert.alert('Campo obrigatório', 'Informe um valor válido.'); return; }
     setSaving(true);
     try {
       const { error } = await supabase.from('financeiro').insert({
-        profissional_id: userId,
-        tipo:            'despesa',
+        profissional_id:  userId,
+        tipo:             'despesa',
         categoria,
-        valor:           parseFloat(valor.replace(/[^0-9.]/g,'')),
-        descricao:       descricao.trim() || null,
+        valor:            parseFloat(valor.replace(/[^0-9.]/g,'')),
+        descricao:        descricao.trim() || null,
+        recorrencia,
+        status_pagamento: statusPagamento,
+        parcela_atual:    recorrencia === 'parcelada' ? (parseInt(parcelaAtual, 10) || null) : null,
+        total_parcelas:   recorrencia === 'parcelada' ? (parseInt(totalParcelas, 10) || null) : null,
       });
       if (error) throw error;
       reset();
@@ -150,49 +158,272 @@ function AddDespesaModal({ visible, onClose, onSaved, userId }) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={modal.backdrop}>
         <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
-
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={modal.sheet}>
-            <View style={modal.handle} />
-            <Text style={modal.title}>Nova Despesa</Text>
+          <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
+            <ScrollView bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              <View style={modal.handle} />
+              <Text style={modal.title}>Nova Despesa</Text>
 
-            <Text style={modal.label}>CATEGORIA</Text>
-            <CategoriaDropdown value={categoria} onChange={setCategoria} />
+              <Text style={modal.label}>CATEGORIA</Text>
+              <CategoriaDropdown value={categoria} onChange={setCategoria} />
 
-            <Text style={modal.label}>VALOR ($)</Text>
-            <TextInput
-              style={modal.input}
-              placeholder="0.00"
-              placeholderTextColor="#6B4A58"
-              value={valor}
-              onChangeText={setValor}
-              keyboardType="decimal-pad"
-              returnKeyType="next"
-            />
+              <Text style={modal.label}>VALOR ($)</Text>
+              <TextInput style={modal.input} placeholder="0.00" placeholderTextColor="#6B4A58" value={valor} onChangeText={setValor} keyboardType="decimal-pad" returnKeyType="next" />
 
-            <Text style={modal.label}>DESCRIÇÃO</Text>
-            <TextInput
-              style={[modal.input, modal.inputMulti]}
-              placeholder="Opcional"
-              placeholderTextColor="#6B4A58"
-              value={descricao}
-              onChangeText={setDescricao}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
+              <Text style={modal.label}>DESCRIÇÃO</Text>
+              <TextInput style={[modal.input, modal.inputMulti]} placeholder="Opcional" placeholderTextColor="#6B4A58" value={descricao} onChangeText={setDescricao} multiline numberOfLines={3} textAlignVertical="top" />
 
-            <TouchableOpacity
-              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
-              onPress={handleSave}
-              disabled={saving}
-              activeOpacity={0.85}
-            >
-              {saving
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={modal.saveBtnText}>Salvar</Text>
-              }
-            </TouchableOpacity>
+              <Text style={modal.label}>RECORRÊNCIA</Text>
+              <View style={modal.toggleRow}>
+                {[
+                  { label: 'Variável',  value: 'variavel'  },
+                  { label: 'Fixa',      value: 'fixa'      },
+                  { label: 'Parcelada', value: 'parcelada' },
+                ].map(opt => {
+                  const active = recorrencia === opt.value;
+                  return (
+                    <TouchableOpacity key={opt.value} style={[modal.toggleBtn, active && modal.toggleBtnActive]} onPress={() => setRecorrencia(opt.value)} activeOpacity={0.75}>
+                      <Text style={[modal.toggleBtnText, active && modal.toggleBtnTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {recorrencia === 'parcelada' && (
+                <>
+                  <Text style={modal.label}>PARCELAS</Text>
+                  <View style={modal.parcelasRow}>
+                    <TextInput
+                      style={[modal.input, modal.parcelaInput]}
+                      placeholder="Atual (ex: 3)"
+                      placeholderTextColor="#6B4A58"
+                      value={parcelaAtual}
+                      onChangeText={t => setParcelaAtual(t.replace(/\D/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                    />
+                    <Text style={modal.parcelasDe}>de</Text>
+                    <TextInput
+                      style={[modal.input, modal.parcelaInput]}
+                      placeholder="Total (ex: 12)"
+                      placeholderTextColor="#6B4A58"
+                      value={totalParcelas}
+                      onChangeText={t => setTotalParcelas(t.replace(/\D/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                    />
+                  </View>
+                </>
+              )}
+
+              <Text style={modal.label}>STATUS DE PAGAMENTO</Text>
+              <View style={modal.toggleRow}>
+                {[
+                  { label: 'Paga',      value: 'paga'      },
+                  { label: 'Em aberto', value: 'em_aberto' },
+                  { label: 'Em atraso', value: 'em_atraso' },
+                ].map(opt => {
+                  const active = statusPagamento === opt.value;
+                  return (
+                    <TouchableOpacity key={opt.value} style={[modal.toggleBtn, active && modal.toggleBtnActive]} onPress={() => setStatusPagamento(opt.value)} activeOpacity={0.75}>
+                      <Text style={[modal.toggleBtnText, active && modal.toggleBtnTextActive]} numberOfLines={1} adjustsFontSizeToFit>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity style={[modal.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={modal.saveBtnText}>Salvar</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Edit Despesa Modal ──────────────────────────────────────────────────────
+
+function EditDespesaModal({ visible, despesa, onClose, onSaved }) {
+  const [categoria,       setCategoria]       = useState('');
+  const [valor,           setValor]           = useState('');
+  const [descricao,       setDescricao]       = useState('');
+  const [dataDespesa,     setDataDespesa]     = useState('');
+  const [recorrencia,     setRecorrencia]     = useState('variavel');
+  const [statusPagamento, setStatusPagamento] = useState('em_aberto');
+  const [parcelaAtual,    setParcelaAtual]    = useState('');
+  const [totalParcelas,   setTotalParcelas]   = useState('');
+  const [saving,          setSaving]          = useState(false);
+
+  useEffect(() => {
+    if (despesa) {
+      setCategoria(despesa.categoria ?? '');
+      setValor(despesa.valor ? String(parseFloat(despesa.valor).toFixed(2)) : '');
+      setDescricao(despesa.descricao ?? '');
+      // data_despesa is DATE-only (no time); add noon to avoid UTC shift on parsing
+      const baseDate = despesa.data_despesa
+        ? new Date(`${despesa.data_despesa}T12:00:00`)
+        : new Date(despesa.created_at);
+      setDataDespesa(dateToMDY(baseDate));
+      setRecorrencia(despesa.recorrencia ?? 'variavel');
+      setStatusPagamento(despesa.status_pagamento ?? 'em_aberto');
+      setParcelaAtual(despesa.parcela_atual != null ? String(despesa.parcela_atual) : '');
+      setTotalParcelas(despesa.total_parcelas != null ? String(despesa.total_parcelas) : '');
+    }
+  }, [despesa]);
+
+  const handleSave = async () => {
+    if (!categoria) { Alert.alert('Campo obrigatório', 'Selecione uma categoria.'); return; }
+    if (!valor || parseFloat(valor.replace(/[^0-9.]/g,'')) <= 0) { Alert.alert('Campo obrigatório', 'Informe um valor válido.'); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('financeiro')
+        .update({
+          categoria,
+          valor:            parseFloat(valor.replace(/[^0-9.]/g,'')),
+          descricao:        descricao.trim() || null,
+          data_despesa:     mdyToISO(dataDespesa) || null,
+          recorrencia,
+          status_pagamento: statusPagamento,
+          parcela_atual:    recorrencia === 'parcelada' ? (parseInt(parcelaAtual, 10) || null) : null,
+          total_parcelas:   recorrencia === 'parcelada' ? (parseInt(totalParcelas, 10) || null) : null,
+        })
+        .eq('id', despesa.id);
+      if (error) throw error;
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao salvar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExcluir = () => {
+    Alert.alert(
+      'Excluir despesa',
+      'Esta ação não pode ser desfeita. Deseja excluir?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir', style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const { error } = await supabase.from('financeiro').delete().eq('id', despesa.id);
+              if (error) throw error;
+              onSaved();
+            } catch (err) {
+              Alert.alert('Erro ao excluir', err.message);
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (!despesa) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
+            <ScrollView bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              <View style={modal.handle} />
+              <Text style={modal.title}>Editar Despesa</Text>
+
+              <Text style={modal.label}>CATEGORIA</Text>
+              <CategoriaDropdown value={categoria} onChange={setCategoria} />
+
+              <Text style={modal.label}>VALOR ($)</Text>
+              <TextInput style={modal.input} placeholder="0.00" placeholderTextColor="#6B4A58" value={valor} onChangeText={setValor} keyboardType="decimal-pad" returnKeyType="next" />
+
+              <Text style={modal.label}>DESCRIÇÃO</Text>
+              <TextInput style={[modal.input, modal.inputMulti]} placeholder="Opcional" placeholderTextColor="#6B4A58" value={descricao} onChangeText={setDescricao} multiline numberOfLines={3} textAlignVertical="top" />
+
+              <Text style={modal.label}>DATA DA DESPESA</Text>
+              <TextInput
+                style={modal.input}
+                placeholder="MM/DD/YYYY"
+                placeholderTextColor="#6B4A58"
+                value={dataDespesa}
+                onChangeText={t => setDataDespesa(formatDateInput(t))}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+
+              <Text style={modal.label}>RECORRÊNCIA</Text>
+              <View style={modal.toggleRow}>
+                {[
+                  { label: 'Variável',   value: 'variavel'   },
+                  { label: 'Fixa',       value: 'fixa'       },
+                  { label: 'Parcelada',  value: 'parcelada'  },
+                ].map(opt => {
+                  const active = recorrencia === opt.value;
+                  return (
+                    <TouchableOpacity key={opt.value} style={[modal.toggleBtn, active && modal.toggleBtnActive]} onPress={() => setRecorrencia(opt.value)} activeOpacity={0.75}>
+                      <Text style={[modal.toggleBtnText, active && modal.toggleBtnTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {recorrencia === 'parcelada' && (
+                <>
+                  <Text style={modal.label}>PARCELAS</Text>
+                  <View style={modal.parcelasRow}>
+                    <TextInput
+                      style={[modal.input, modal.parcelaInput]}
+                      placeholder="Atual (ex: 3)"
+                      placeholderTextColor="#6B4A58"
+                      value={parcelaAtual}
+                      onChangeText={t => setParcelaAtual(t.replace(/\D/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                    />
+                    <Text style={modal.parcelasDe}>de</Text>
+                    <TextInput
+                      style={[modal.input, modal.parcelaInput]}
+                      placeholder="Total (ex: 12)"
+                      placeholderTextColor="#6B4A58"
+                      value={totalParcelas}
+                      onChangeText={t => setTotalParcelas(t.replace(/\D/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                    />
+                  </View>
+                </>
+              )}
+
+              <Text style={modal.label}>STATUS DE PAGAMENTO</Text>
+              <View style={modal.toggleRow}>
+                {[
+                  { label: 'Paga',      value: 'paga'      },
+                  { label: 'Em aberto', value: 'em_aberto' },
+                  { label: 'Em atraso', value: 'em_atraso' },
+                ].map(opt => {
+                  const active = statusPagamento === opt.value;
+                  return (
+                    <TouchableOpacity key={opt.value} style={[modal.toggleBtn, active && modal.toggleBtnActive]} onPress={() => setStatusPagamento(opt.value)} activeOpacity={0.75}>
+                      <Text style={[modal.toggleBtnText, active && modal.toggleBtnTextActive]} numberOfLines={1} adjustsFontSizeToFit>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity style={[modal.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={modal.saveBtnText}>Salvar</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[modal.deleteBtn, saving && { opacity: 0.7 }]} onPress={handleExcluir} disabled={saving} activeOpacity={0.85}>
+                <Text style={modal.deleteBtnText}>Excluir despesa</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -202,28 +433,51 @@ function AddDespesaModal({ visible, onClose, onSaved, userId }) {
 
 // ─── Despesa Card ─────────────────────────────────────────────────────────────
 
-function DespesaCard({ categoria, valor, descricao, created_at }) {
+function DespesaCard({ categoria, valor, descricao, created_at, recorrencia, status_pagamento, parcela_atual, total_parcelas, onPress }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.cardLeft}>
-        <Text style={styles.cardCategoria} numberOfLines={1}>{categoria}</Text>
-        {descricao ? (
-          <Text style={styles.cardDescricao} numberOfLines={1}>{descricao}</Text>
-        ) : null}
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardCategoria} numberOfLines={1}>{categoria}</Text>
+          {recorrencia === 'variavel' && (
+            <View style={[styles.badge, styles.badgeNeutro]}><Text style={styles.badgeText}>Variável</Text></View>
+          )}
+          {recorrencia === 'fixa' && (
+            <View style={styles.badge}><Text style={styles.badgeText}>Fixa</Text></View>
+          )}
+          {recorrencia === 'parcelada' && (
+            <View style={styles.badge}><Text style={styles.badgeText}>Parcelada</Text></View>
+          )}
+          {status_pagamento === 'paga' && (
+            <View style={[styles.badge, styles.badgePago]}><Text style={styles.badgeText}>Paga</Text></View>
+          )}
+          {status_pagamento === 'em_aberto' && (
+            <View style={[styles.badge, styles.badgeNeutro]}><Text style={styles.badgeText}>Em aberto</Text></View>
+          )}
+          {status_pagamento === 'em_atraso' && (
+            <View style={[styles.badge, styles.badgeAtraso]}><Text style={styles.badgeText}>Em atraso</Text></View>
+          )}
+        </View>
+        {recorrencia === 'parcelada' && parcela_atual != null && total_parcelas != null && (
+          <Text style={styles.cardParcelas}>{parcela_atual}/{total_parcelas} parcelas</Text>
+        )}
+        {descricao ? <Text style={styles.cardDescricao} numberOfLines={1}>{descricao}</Text> : null}
         <Text style={styles.cardDate}>{formatDate(created_at)}</Text>
       </View>
       <Text style={styles.cardValor}>{formatCurrency(valor)}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function DespesasScreen({ navigation }) {
-  const [despesas,     setDespesas]     = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [userId,       setUserId]       = useState(null);
+  const [despesas,        setDespesas]        = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [addVisible,      setAddVisible]      = useState(false);
+  const [editVisible,     setEditVisible]     = useState(false);
+  const [selectedDespesa, setSelectedDespesa] = useState(null);
+  const [userId,          setUserId]          = useState(null);
 
   const fetchDespesas = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -252,19 +506,18 @@ export default function DespesasScreen({ navigation }) {
     const start = startOfMonth();
     const end   = endOfMonth();
     return despesas
-      .filter(d => {
-        const dt = new Date(d.created_at);
-        return dt >= start && dt <= end;
-      })
+      .filter(d => { const dt = new Date(d.created_at); return dt >= start && dt <= end; })
       .reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0);
   }, [despesas]);
 
   const mesLabel = `${MONTHS[new Date().getMonth()]} ${new Date().getFullYear()}`;
 
+  const openEdit  = d => { setSelectedDespesa(d); setEditVisible(true); };
+  const closeEdit = () => { setEditVisible(false); setSelectedDespesa(null); };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
-      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={styles.backArrow}>‹</Text>
@@ -273,21 +526,16 @@ export default function DespesasScreen({ navigation }) {
         <View style={styles.headerRight} />
       </View>
 
-      {/* ── Total do mês ── */}
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total em {mesLabel}</Text>
         <Text style={styles.totalValue}>{formatCurrency(totalMes)}</Text>
       </View>
 
-      {/* ── Lista ── */}
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
         ) : despesas.length > 0 ? (
-          despesas.map(d => <DespesaCard key={d.id} {...d} />)
+          despesas.map(d => <DespesaCard key={d.id} {...d} onPress={() => openEdit(d)} />)
         ) : (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Nenhuma despesa registrada ainda.</Text>
@@ -296,20 +544,22 @@ export default function DespesasScreen({ navigation }) {
         )}
       </ScrollView>
 
-      {/* ── FAB ── */}
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.85}
-        onPress={() => setModalVisible(true)}
-      >
+      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => setAddVisible(true)}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
       <AddDespesaModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSaved={() => { setModalVisible(false); fetchDespesas(); }}
+        visible={addVisible}
+        onClose={() => setAddVisible(false)}
+        onSaved={() => { setAddVisible(false); fetchDespesas(); }}
         userId={userId}
+      />
+
+      <EditDespesaModal
+        visible={editVisible}
+        despesa={selectedDespesa}
+        onClose={closeEdit}
+        onSaved={() => { closeEdit(); fetchDespesas(); }}
       />
 
     </SafeAreaView>
@@ -321,52 +571,33 @@ export default function DespesasScreen({ navigation }) {
 const CARD_BG = '#222222';
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.background },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 20, marginBottom: 20,
-  },
+  safe:        { flex: 1, backgroundColor: colors.background },
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, marginBottom: 20 },
   backBtn:     { width: 32, alignItems: 'center' },
   backArrow:   { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
   headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
   headerRight: { width: 32 },
-
-  totalCard: {
-    backgroundColor: colors.primary,
-    marginHorizontal: 20, borderRadius: 16,
-    paddingVertical: 20, paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  totalLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: 6 },
-  totalValue: { fontSize: 36, fontWeight: '800', color: colors.white },
-
-  scroll: { paddingHorizontal: 20, paddingBottom: 110 },
-
-  card: {
-    backgroundColor: CARD_BG, borderRadius: 14, padding: 16,
-    marginBottom: 10, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'space-between',
-  },
-  cardLeft:      { flex: 1, marginRight: 12 },
-  cardCategoria: { fontSize: 15, fontWeight: '600', color: colors.white, marginBottom: 2 },
-  cardDescricao: { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
-  cardDate:      { fontSize: 11, fontWeight: '400', color: '#444444' },
-  cardValor:     { fontSize: 17, fontWeight: '800', color: '#F87171' },
-
+  totalCard:   { backgroundColor: colors.primary, marginHorizontal: 20, borderRadius: 16, paddingVertical: 20, paddingHorizontal: 20, marginBottom: 20 },
+  totalLabel:  { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: 6 },
+  totalValue:  { fontSize: 36, fontWeight: '800', color: colors.white },
+  scroll:      { paddingHorizontal: 20, paddingBottom: 110 },
+  card:        { backgroundColor: CARD_BG, borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardLeft:    { flex: 1, marginRight: 12 },
+  cardTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' },
+  cardCategoria:   { fontSize: 15, fontWeight: '600', color: colors.white },
+  badge:           { backgroundColor: 'rgba(168,35,90,0.2)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(168,35,90,0.4)' },
+  badgePago:       { backgroundColor: 'rgba(74,222,128,0.12)', borderColor: 'rgba(74,222,128,0.3)' },
+  badgeAtraso:     { backgroundColor: 'rgba(248,113,113,0.12)', borderColor: 'rgba(248,113,113,0.3)' },
+  badgeNeutro:     { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.15)' },
+  badgeText:       { fontSize: 9, fontWeight: '700', color: colors.white, letterSpacing: 0.4 },
+  cardParcelas:    { fontSize: 11, fontWeight: '500', color: '#555555', marginBottom: 3 },
+  cardDescricao:   { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
+  cardDate:        { fontSize: 11, fontWeight: '400', color: '#444444' },
+  cardValor:       { fontSize: 17, fontWeight: '800', color: '#F87171' },
   empty:     { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 15, fontWeight: '500', color: colors.gray, marginBottom: 6 },
   emptyHint: { fontSize: 13, fontWeight: '400', color: '#444444' },
-
-  fab: {
-    position: 'absolute', bottom: 24, right: 20,
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
-  },
+  fab: { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
   fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
 });
 
@@ -377,46 +608,36 @@ const SUBTLE   = '#3D1020';
 
 const modal = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: '#1A0A14',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40,
-  },
-  handle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20,
-  },
-  title: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
-  label: {
-    fontSize: 10, fontWeight: '700', color: '#6B4A58',
-    letterSpacing: 1.2, marginBottom: 8, marginTop: 4,
-  },
-  input: {
-    backgroundColor: INPUT_BG, borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, fontWeight: '400', color: '#FFFFFF',
-    marginBottom: 12,
-  },
+  sheet:    { backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40 },
+  handle:   { width: 40, height: 4, borderRadius: 2, backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20 },
+  title:    { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
+  label:    { fontSize: 10, fontWeight: '700', color: '#6B4A58', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+  input:    { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontWeight: '400', color: '#FFFFFF', marginBottom: 12 },
   inputText:        { color: '#FFFFFF' },
   inputPlaceholder: { color: '#6B4A58' },
   inputMulti: { height: 80, paddingTop: 14 },
 
-  dropdownTrigger: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  dropdownArrow: { fontSize: 11, color: '#6B4A58' },
-  dropdownList: {
-    backgroundColor: INPUT_BG, borderRadius: 12, marginBottom: 12, overflow: 'hidden',
-  },
-  dropdownItem:       { paddingHorizontal: 16, paddingVertical: 13 },
-  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
-  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.2)' },
+  dropdownTrigger:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dropdownArrow:          { fontSize: 11, color: '#6B4A58' },
+  dropdownList:           { backgroundColor: INPUT_BG, borderRadius: 12, marginBottom: 12, overflow: 'hidden' },
+  dropdownItem:           { paddingHorizontal: 16, paddingVertical: 13 },
+  dropdownItemBorder:     { borderBottomWidth: 1, borderBottomColor: SUBTLE },
+  dropdownItemActive:     { backgroundColor: 'rgba(168,35,90,0.2)' },
   dropdownItemText:       { fontSize: 14, fontWeight: '400', color: '#FFFFFF' },
   dropdownItemTextActive: { fontWeight: '700', color: colors.primary },
 
-  saveBtn: {
-    height: 52, borderRadius: 14, backgroundColor: '#A8235A',
-    alignItems: 'center', justifyContent: 'center', marginTop: 8,
-  },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  parcelasRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  parcelaInput:  { flex: 1, marginBottom: 0 },
+  parcelasDe:    { fontSize: 14, fontWeight: '500', color: '#6B4A58' },
+
+  toggleRow:           { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  toggleBtn:           { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: INPUT_BG },
+  toggleBtnActive:     { backgroundColor: colors.primary },
+  toggleBtnText:       { fontSize: 13, fontWeight: '600', color: '#6B4A58' },
+  toggleBtnTextActive: { color: '#FFFFFF' },
+
+  saveBtn:       { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  saveBtnText:   { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  deleteBtn:     { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 8, borderWidth: 1, borderColor: '#F87171' },
+  deleteBtnText: { fontSize: 16, fontWeight: '700', color: '#F87171' },
 });
