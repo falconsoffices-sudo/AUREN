@@ -1,40 +1,65 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const MONTHLY_EARNED = 6290;
-const MONTHLY_GOAL   = 7000;
-const MONTHLY_LEFT   = MONTHLY_GOAL - MONTHLY_EARNED;
-
-const PAYMENTS = [
-  { id: 1, abbr: 'ZL', label: 'Zelle',    value: '$3.420', bg: '#1A0D38', color: '#A78BFA' },
-  { id: 2, abbr: 'CA', label: 'Cartão',   value: '$1.890', bg: '#0B1C32', color: '#60A5FA' },
-  { id: 3, abbr: 'DI', label: 'Dinheiro', value: '$780',   bg: '#0A2218', color: '#4ade80' },
-  { id: 4, abbr: 'CH', label: 'Cheque',   value: '$200',   bg: '#261500', color: '#FB923C' },
+const MONTHS = [
+  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 
-const METAS = [
-  { id: 1, label: 'Meta mensal',  current: 6290, total: 7000 },
-  { id: 2, label: 'Meta semanal', current: 1840, total: 2000 },
+const PAYMENT_META = [
+  { key: 'zelle',    abbr: 'ZL', label: 'Zelle',    bg: '#1A0D38', color: '#A78BFA' },
+  { key: 'cartao',   abbr: 'CA', label: 'Cartão',   bg: '#0B1C32', color: '#60A5FA' },
+  { key: 'dinheiro', abbr: 'DI', label: 'Dinheiro', bg: '#0A2218', color: '#4ade80' },
+  { key: 'cheque',   abbr: 'CH', label: 'Cheque',   bg: '#261500', color: '#FB923C' },
+  { key: 'venmo',    abbr: 'VM', label: 'Venmo',    bg: '#1A2038', color: '#818CF8' },
+  { key: 'cashapp',  abbr: 'CS', label: 'CashApp',  bg: '#0A2010', color: '#34d399' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function pct(current, total) {
+  if (!total) return 0;
   return Math.min(Math.round((current / total) * 100), 100);
 }
 
 function fmt(n) {
-  return '$' + n.toLocaleString('pt-BR');
+  return '$' + Number(n || 0).toLocaleString('pt-BR');
+}
+
+function getDateRanges() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmtDate = dt =>
+    `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+
+  const hoje = fmtDate(now);
+
+  const diaSemana      = now.getDay();
+  const diasAteSegunda = diaSemana === 0 ? 6 : diaSemana - 1;
+  const seg            = new Date(now); seg.setDate(now.getDate() - diasAteSegunda);
+  const dom            = new Date(seg); dom.setDate(seg.getDate() + 6);
+  const semanaInicio   = `${fmtDate(seg)}T00:00:00`;
+  const semanaFim      = `${fmtDate(dom)}T23:59:59`;
+
+  const ultimoDia = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const mesInicio = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01T00:00:00`;
+  const mesFim    = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(ultimoDia)}T23:59:59`;
+
+  return { hoje, semanaInicio, semanaFim, mesInicio, mesFim };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -79,7 +104,111 @@ function MetaBar({ label, current, total }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CaixaScreen() {
-  const monthPct = pct(MONTHLY_EARNED, MONTHLY_GOAL);
+  const [loading,         setLoading]         = useState(true);
+  const [ganhosMes,       setGanhosMes]       = useState(0);
+  const [ganhosHoje,      setGanhosHoje]      = useState(0);
+  const [ganhosHojeCount, setGanhosHojeCount] = useState(0);
+  const [ganhosSemana,    setGanhosSemana]    = useState(0);
+  const [metaMensal,      setMetaMensal]      = useState(0);
+  const [despesasMes,     setDespesasMes]     = useState(0);
+  const [pagamentos,      setPagamentos]      = useState({});
+
+  const carregarDados = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData?.user?.id;
+    if (!uid) { setLoading(false); return; }
+
+    const { hoje, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
+
+    const [mesRes, hojeRes, semRes, finRes, despRes] = await Promise.all([
+      supabase
+        .from('agendamentos')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', mesInicio)
+        .lte('data_hora', mesFim),
+
+      supabase
+        .from('agendamentos')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', `${hoje}T00:00:00`)
+        .lte('data_hora', `${hoje}T23:59:59`),
+
+      supabase
+        .from('agendamentos')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', semanaInicio)
+        .lte('data_hora', semanaFim),
+
+      supabase
+        .from('financeiro')
+        .select('metodo_pagamento, valor')
+        .eq('profissional_id', uid)
+        .eq('tipo', 'receita'),
+
+      supabase
+        .from('financeiro')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .eq('tipo', 'despesa')
+        .gte('created_at', mesInicio)
+        .lte('created_at', mesFim),
+    ]);
+
+    const soma = rows => (rows ?? []).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
+
+    setGanhosMes(soma(mesRes.data));
+    setGanhosHoje(soma(hojeRes.data));
+    setGanhosHojeCount(hojeRes.data?.length ?? 0);
+    setGanhosSemana(soma(semRes.data));
+    setDespesasMes(soma(despRes.data));
+
+    const byMethod = {};
+    for (const row of finRes.data ?? []) {
+      const key = row.metodo_pagamento ?? 'outro';
+      byMethod[key] = (byMethod[key] || 0) + (parseFloat(row.valor) || 0);
+    }
+    setPagamentos(byMethod);
+
+    try {
+      const stored = await AsyncStorage.getItem('auren:metas');
+      if (stored) {
+        const m = JSON.parse(stored);
+        setMetaMensal(parseFloat(m.meta_mensal) || 0);
+      }
+    } catch {}
+
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => { carregarDados(); }, [carregarDados])
+  );
+
+  const monthName = MONTHS[new Date().getMonth()];
+  const monthPct  = pct(ganhosMes, metaMensal);
+  const metaLeft  = Math.max(0, metaMensal - ganhosMes);
+  const lucroReal = ganhosMes - despesasMes;
+
+  const payRows = [];
+  for (let i = 0; i < PAYMENT_META.length; i += 2) {
+    payRows.push(PAYMENT_META.slice(i, i + 2));
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -90,14 +219,16 @@ export default function CaixaScreen() {
 
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Financeiro</Text>
-          <Text style={styles.headerSub}>Abril · parcial</Text>
+          <Text style={styles.headerSub}>{monthName} · parcial</Text>
         </View>
 
         <View style={styles.mainCard}>
           <Text style={styles.mainCardLabel}>GANHOS DO MÊS</Text>
-          <Text style={styles.mainCardValue}>$6.290</Text>
+          <Text style={styles.mainCardValue}>{fmt(ganhosMes)}</Text>
           <Text style={styles.mainCardSub}>
-            Meta $7.000 · faltam ${MONTHLY_LEFT.toLocaleString('pt-BR')}
+            {metaMensal > 0
+              ? `Meta ${fmt(metaMensal)} · faltam ${fmt(metaLeft)}`
+              : 'Sem meta definida — configure em Metas'}
           </Text>
           <ProgressBar progress={monthPct} />
           <Text style={styles.mainCardPct}>{monthPct}% da meta</Text>
@@ -106,36 +237,55 @@ export default function CaixaScreen() {
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { flex: 1 }]}>
             <Text style={styles.statLabel}>HOJE</Text>
-            <Text style={styles.statValue}>$270</Text>
-            <Text style={styles.statSub}>3 atendimentos</Text>
+            <Text style={styles.statValue}>{fmt(ganhosHoje)}</Text>
+            <Text style={styles.statSub}>
+              {ganhosHojeCount} {ganhosHojeCount === 1 ? 'atendimento' : 'atendimentos'}
+            </Text>
           </View>
           <View style={[styles.statCard, { flex: 1 }]}>
             <Text style={styles.statLabel}>ESTA SEMANA</Text>
-            <Text style={styles.statValue}>$1.840</Text>
-            <Text style={[styles.statSub, styles.statGrowth]}>↑ +12%</Text>
+            <Text style={styles.statValue}>{fmt(ganhosSemana)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, { flex: 1 }]}>
+            <Text style={styles.statLabel}>DESPESAS DO MÊS</Text>
+            <Text style={[styles.statValue, styles.valueRed]}>{fmt(despesasMes)}</Text>
+          </View>
+          <View style={[styles.statCard, { flex: 1 }]}>
+            <Text style={styles.statLabel}>LUCRO REAL</Text>
+            <Text style={[styles.statValue, lucroReal >= 0 ? styles.valueGreen : styles.valueRed]}>
+              {fmt(lucroReal)}
+            </Text>
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Pagamentos recebidos</Text>
         <View style={styles.payGrid}>
-          <View style={styles.payRow}>
-            <PaymentCard {...PAYMENTS[0]} />
-            <PaymentCard {...PAYMENTS[1]} />
-          </View>
-          <View style={styles.payRow}>
-            <PaymentCard {...PAYMENTS[2]} />
-            <PaymentCard {...PAYMENTS[3]} />
-          </View>
+          {payRows.map((row, ri) => (
+            <View key={ri} style={styles.payRow}>
+              {row.map(p => (
+                <PaymentCard
+                  key={p.key}
+                  abbr={p.abbr}
+                  label={p.label}
+                  bg={p.bg}
+                  color={p.color}
+                  value={fmt(pagamentos[p.key] || 0)}
+                />
+              ))}
+            </View>
+          ))}
         </View>
 
         <Text style={styles.sectionTitle}>Metas</Text>
         <View style={styles.metasCard}>
-          {METAS.map((m, i) => (
-            <View key={m.id}>
-              <MetaBar {...m} />
-              {i < METAS.length - 1 && <View style={styles.metaDivider} />}
-            </View>
-          ))}
+          <MetaBar
+            label="Meta mensal"
+            current={ganhosMes}
+            total={metaMensal}
+          />
         </View>
 
       </ScrollView>
@@ -153,7 +303,8 @@ const CARD_BG = '#222222';
 const SUBTLE  = '#2C2C2C';
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe:   { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingHorizontal: 20, paddingBottom: 110 },
 
   header: { paddingTop: 28, marginBottom: 24 },
@@ -236,10 +387,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: colors.gray,
   },
-  statGrowth: {
-    fontWeight: '600',
-    color: '#4ade80',
-  },
+  valueRed:   { color: '#F87171' },
+  valueGreen: { color: '#4ade80' },
 
   sectionTitle: {
     fontSize: 16,
@@ -316,11 +465,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '400',
     color: colors.gray,
-  },
-  metaDivider: {
-    height: 1,
-    backgroundColor: SUBTLE,
-    marginVertical: 18,
   },
 
   fab: {
