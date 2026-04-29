@@ -46,33 +46,32 @@ function formatHora(dataHoraStr) {
   });
 }
 
-// Retorna a data de hoje como string YYYY-MM-DD (data local do dispositivo)
-function getHojeStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-// Retorna strings YYYY-MM-DD para início da semana (segunda) e início do mês
-function getPeriodStrs() {
-  const d   = new Date();
-  const dow = d.getDay(); // 0=Dom
-  const daysFromMonday = dow === 0 ? 6 : dow - 1;
-
-  const inicioSemanaDate = new Date(d);
-  inicioSemanaDate.setDate(d.getDate() - daysFromMonday);
-
+// Monta strings de data local sem conversão UTC
+function getDateRanges() {
+  const now = new Date();
   const pad = n => String(n).padStart(2, '0');
-  const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+  const fmtDate = dt =>
+    `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 
-  return {
-    inicioSemanaStr: fmt(inicioSemanaDate),
-    fimSemanaStr:    fmt(d),
-    inicioMesStr:    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`,
-    fimMesStr:       fmt(d),
-  };
+  // Dia
+  const hoje        = fmtDate(now);
+  const ontemDate   = new Date(now); ontemDate.setDate(now.getDate() - 1);
+  const ontem       = fmtDate(ontemDate);
+
+  // Semana: segunda → domingo
+  const diaSemana      = now.getDay(); // 0=Dom
+  const diasAteSegunda = diaSemana === 0 ? 6 : diaSemana - 1;
+  const seg            = new Date(now); seg.setDate(now.getDate() - diasAteSegunda);
+  const dom            = new Date(seg); dom.setDate(seg.getDate() + 6);
+  const semanaInicio   = `${fmtDate(seg)}T00:00:00`;
+  const semanaFim      = `${fmtDate(dom)}T23:59:59`;
+
+  // Mês: dia 1 → último dia do mês
+  const ultimoDia = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const mesInicio = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01T00:00:00`;
+  const mesFim    = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(ultimoDia)}T23:59:59`;
+
+  return { hoje, ontem, semanaInicio, semanaFim, mesInicio, mesFim };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -131,83 +130,33 @@ export default function HomeScreen() {
     const uid = userData?.user?.id;
     if (!uid) { setLoading(false); return; }
 
-    const hoje = getHojeStr();
-    const { inicioSemanaStr, fimSemanaStr, inicioMesStr, fimMesStr } = getPeriodStrs();
+    const { hoje, ontem, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
 
-    console.log('[HomeScreen] query params:', {
-      hoje,
-      inicioSemanaStr,
-      fimSemanaStr,
-      inicioMesStr,
-      fimMesStr,
-    });
-
-    const [
-      profileRes,
-      agendRes,
-      agendSemanaRes,
-      agendMesRes,
-      finSemanaRes,
-      finMesRes,
-    ] = await Promise.all([
+    const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('nome, nivel_gamificacao')
         .eq('id', uid)
         .single(),
 
+      // Todos os agendamentos da semana — filtra hoje em JS para evitar problema de timezone
       supabase
         .from('agendamentos')
         .select('*, clientes(nome), servicos(nome, valor)')
         .eq('profissional_id', uid)
-        .gte('data_hora', `${hoje}T00:00:00`)
-        .lte('data_hora', `${hoje}T23:59:59`)
+        .gte('data_hora', semanaInicio)
+        .lte('data_hora', semanaFim)
         .order('data_hora'),
 
-      // Agendamentos previstos desta semana (finalizado + confirmado + pendente)
+      // Faturamento do mês
       supabase
         .from('agendamentos')
         .select('valor')
         .eq('profissional_id', uid)
         .in('status', ['finalizado', 'confirmado', 'pendente'])
-        .gte('data_hora', `${inicioSemanaStr}T00:00:00`)
-        .lte('data_hora', `${fimSemanaStr}T23:59:59`),
-
-      // Agendamentos previstos deste mês (finalizado + confirmado + pendente)
-      supabase
-        .from('agendamentos')
-        .select('valor')
-        .eq('profissional_id', uid)
-        .in('status', ['finalizado', 'confirmado', 'pendente'])
-        .gte('data_hora', `${inicioMesStr}T00:00:00`)
-        .lte('data_hora', `${fimMesStr}T23:59:59`),
-
-      // Receitas em financeiro desta semana
-      supabase
-        .from('financeiro')
-        .select('valor')
-        .eq('profissional_id', uid)
-        .eq('tipo', 'receita')
-        .gte('created_at', `${inicioSemanaStr}T00:00:00`)
-        .lte('created_at', `${fimSemanaStr}T23:59:59`),
-
-      // Receitas em financeiro deste mês
-      supabase
-        .from('financeiro')
-        .select('valor')
-        .eq('profissional_id', uid)
-        .eq('tipo', 'receita')
-        .gte('created_at', `${inicioMesStr}T00:00:00`)
-        .lte('created_at', `${fimMesStr}T23:59:59`),
+        .gte('data_hora', mesInicio)
+        .lte('data_hora', mesFim),
     ]);
-
-    console.log('[HomeScreen] profileRes:', profileRes.data, profileRes.error);
-    console.log('[HomeScreen] agendRes count:', agendRes.data?.length, '| error:', agendRes.error);
-    console.log('[HomeScreen] agendRes data:', JSON.stringify(agendRes.data, null, 2));
-    console.log('[HomeScreen] agendSemana finalizados:', agendSemanaRes.data?.length, '| error:', agendSemanaRes.error);
-    console.log('[HomeScreen] agendMes finalizados:', agendMesRes.data?.length, '| error:', agendMesRes.error);
-    console.log('[HomeScreen] finSemana receitas:', finSemanaRes.data?.length, '| error:', finSemanaRes.error);
-    console.log('[HomeScreen] finMes receitas:', finMesRes.data?.length, '| error:', finMesRes.error);
 
     if (profileRes.data) {
       if (profileRes.data.nome)
@@ -215,11 +164,14 @@ export default function HomeScreen() {
       setNivelGamificacao(profileRes.data.nivel_gamificacao ?? 1);
     }
 
-    if (agendRes.data) setAgendamentosHoje(agendRes.data);
+    const semanaData = agendSemanaRes.data ?? [];
+    const statusFat  = ['finalizado', 'confirmado', 'pendente'];
 
-    const soma = rows => (rows ?? []).reduce((s, r) => s + Number(r.valor || 0), 0);
-    setFaturamentoSemana(soma(agendSemanaRes.data) + soma(finSemanaRes.data));
-    setFaturamentoMes(soma(agendMesRes.data)    + soma(finMesRes.data));
+    setAgendamentosHoje(semanaData.filter(a => a.data_hora.startsWith(hoje)));
+
+    const soma = rows => rows.reduce((s, r) => s + Number(r.valor || 0), 0);
+    setFaturamentoSemana(soma(semanaData.filter(a => statusFat.includes(a.status))));
+    setFaturamentoMes(soma(agendMesRes.data ?? []));
 
     setLoading(false);
   }, []);

@@ -117,7 +117,7 @@ function isoToTimeAMPM(isoStr) {
   return `${String(h12).padStart(2,'0')}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-// "MM/DD/YYYY" + "HH:MM AM/PM" (or "HH:MM") → ISO string
+// "MM/DD/YYYY" + "HH:MM AM/PM" (or "HH:MM") → string local sem conversão UTC
 function buildDataHoraFromInputs(dateStr, timeStr) {
   const [mm, dd, yyyy] = dateStr.split('/').map(s => parseInt(s, 10) || 0);
   const upper = timeStr.trim().toUpperCase();
@@ -128,19 +128,17 @@ function buildDataHoraFromInputs(dateStr, timeStr) {
   const ampm = parts[1];
   if (ampm === 'PM' && h !== 12) h += 12;
   if (ampm === 'AM' && h === 12) h = 0;
-  return new Date(
-    yyyy || new Date().getFullYear(),
-    (mm || 1) - 1,
-    dd || 1,
-    h, m, 0
-  ).toISOString();
+  const pad  = n => String(n).padStart(2, '0');
+  const year = yyyy || new Date().getFullYear();
+  return `${year}-${pad(mm || 1)}-${pad(dd || 1)}T${pad(h)}:${pad(m)}:00`;
 }
 
 function buildDataHora(date, timeStr) {
   const [hh, mm] = timeStr.split(':');
   const d = new Date(date);
   d.setHours(parseInt(hh || '0', 10), parseInt(mm || '0', 10), 0, 0);
-  return d.toISOString();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }
 
 function normalize(str = '') {
