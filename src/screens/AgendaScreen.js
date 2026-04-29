@@ -196,6 +196,37 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     if (!time || time.length < 3) { Alert.alert('Campo obrigatório', 'Informe o horário no formato HH:MM.'); return; }
     setSaving(true);
     try {
+      const novoInicio  = new Date(buildDataHora(selectedDate, time));
+      const novoDuracao = selectedServico.duracao_minutos || 60;
+      const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
+
+      const dayStart = new Date(selectedDate); dayStart.setHours(0,  0,  0,   0);
+      const dayEnd   = new Date(selectedDate); dayEnd.setHours(23, 59, 59, 999);
+
+      const { data: existentes } = await supabase
+        .from('agendamentos')
+        .select('data_hora, servicos(duracao_minutos)')
+        .eq('profissional_id', userId)
+        .neq('status', 'cancelado')
+        .gte('data_hora', dayStart.toISOString())
+        .lte('data_hora', dayEnd.toISOString());
+
+      if (existentes) {
+        for (const a of existentes) {
+          const existenteInicio  = new Date(a.data_hora);
+          const existenteDuracao = a.servicos?.duracao_minutos || 60;
+          const existenteFim     = new Date(existenteInicio.getTime() + existenteDuracao * 60 * 1000);
+          if (novoInicio < existenteFim && novoFim > existenteInicio) {
+            Alert.alert(
+              'Horário indisponível',
+              `Você já tem um agendamento às ${formatTimeDisplay(a.data_hora)} neste horário.`
+            );
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
       const { error } = await supabase.from('agendamentos').insert({
         profissional_id: userId,
         cliente_id:      selectedCliente.id,
