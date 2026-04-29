@@ -186,7 +186,7 @@ export default function HomeScreen() {
   // Listeners realtime — recarrega ao mudar agendamentos ou financeiro
   useEffect(() => {
     const chAgend = supabase
-      .channel('agendamentos_hoje')
+      .channel('home_agendamentos')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos' },
         () => { carregarDados(); })
       .subscribe();

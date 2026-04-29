@@ -190,11 +190,198 @@ function AddServicoModal({ visible, onClose, onSaved }) {
   );
 }
 
+// ─── Edit Servico Modal ───────────────────────────────────────────────────────
+
+function EditServicoModal({ visible, servico, onClose, onSaved }) {
+  const [nomeOpcao,   setNomeOpcao]   = useState('');
+  const [nomeOutro,   setNomeOutro]   = useState('');
+  const [opcaoAberta, setOpcaoAberta] = useState(false);
+  const [valor,       setValor]       = useState('');
+  const [duracao,     setDuracao]     = useState('');
+  const [descricao,   setDescricao]   = useState('');
+  const [saving,      setSaving]      = useState(false);
+
+  useEffect(() => {
+    if (!visible || !servico) return;
+    const opcaoConhecida = SERVICOS_OPCOES.includes(servico.nome);
+    setNomeOpcao(opcaoConhecida ? servico.nome : 'Outro');
+    setNomeOutro(opcaoConhecida ? '' : servico.nome);
+    setOpcaoAberta(false);
+    setValor(servico.valor != null ? String(servico.valor) : '');
+    setDuracao(servico.duracao_minutos != null ? String(servico.duracao_minutos) : '');
+    setDescricao(servico.descricao ?? '');
+  }, [visible, servico]);
+
+  const handleSave = async () => {
+    const nomeFinal = nomeOpcao === 'Outro' ? nomeOutro.trim() : nomeOpcao;
+    if (!nomeFinal) { Alert.alert('Campo obrigatório', 'Informe o nome do serviço.'); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('servicos').update({
+        nome:            nomeFinal,
+        valor:           valor   ? parseFloat(valor.replace(/[^0-9.]/g, ''))   : null,
+        duracao_minutos: duracao ? parseInt(duracao.replace(/\D/g, ''), 10)    : null,
+        descricao:       descricao.trim() || null,
+      }).eq('id', servico.id);
+      if (error) throw error;
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao salvar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Excluir serviço',
+      `Deseja excluir "${servico?.nome}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir', style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const { error } = await supabase.from('servicos').delete().eq('id', servico.id);
+              if (error) throw error;
+              onSaved();
+            } catch (err) {
+              Alert.alert('Erro ao excluir', err.message);
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (!servico) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[modal.sheet, { paddingBottom: 0, maxHeight: '92%' }]}>
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <View style={modal.handle} />
+              <Text style={modal.title}>Editar serviço</Text>
+
+              <TouchableOpacity
+                style={[modal.input, modal.dropdownTrigger]}
+                onPress={() => setOpcaoAberta(o => !o)}
+                activeOpacity={0.8}
+              >
+                <Text style={nomeOpcao ? modal.dropdownValueText : modal.dropdownPlaceholderText}>
+                  {nomeOpcao || 'Selecione o serviço *'}
+                </Text>
+                <Text style={modal.dropdownArrow}>{opcaoAberta ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {opcaoAberta && (
+                <View style={modal.dropdownList}>
+                  <ScrollView bounces={false} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {SERVICOS_OPCOES.map((opt, idx) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          modal.dropdownItem,
+                          idx < SERVICOS_OPCOES.length - 1 && modal.dropdownItemBorder,
+                          nomeOpcao === opt && modal.dropdownItemActive,
+                        ]}
+                        onPress={() => { setNomeOpcao(opt); setOpcaoAberta(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[modal.dropdownItemText, nomeOpcao === opt && modal.dropdownItemTextActive]}>
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {nomeOpcao === 'Outro' && (
+                <TextInput
+                  style={modal.input}
+                  placeholder="Nome do serviço *"
+                  placeholderTextColor="#6B4A58"
+                  value={nomeOutro}
+                  onChangeText={setNomeOutro}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              )}
+
+              <View style={modal.row}>
+                <TextInput
+                  style={[modal.input, modal.halfInput]}
+                  placeholder="Valor ($)"
+                  placeholderTextColor="#6B4A58"
+                  value={valor}
+                  onChangeText={setValor}
+                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                />
+                <TextInput
+                  style={[modal.input, modal.halfInput, { marginRight: 0 }]}
+                  placeholder="Duração (min)"
+                  placeholderTextColor="#6B4A58"
+                  value={duracao}
+                  onChangeText={t => setDuracao(t.replace(/\D/g, ''))}
+                  keyboardType="number-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <TextInput
+                style={[modal.input, modal.inputMulti]}
+                placeholder="Descrição (opcional)"
+                placeholderTextColor="#6B4A58"
+                value={descricao}
+                onChangeText={setDescricao}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={modal.saveBtnText}>Salvar</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[modal.deleteBtn, saving && { opacity: 0.7 }]}
+                onPress={handleDelete}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                <Text style={modal.deleteBtnText}>Excluir serviço</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Servico Card ─────────────────────────────────────────────────────────────
 
-function ServicoCard({ nome, valor, duracao_minutos, descricao }) {
+function ServicoCard({ nome, valor, duracao_minutos, descricao, onPress }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.cardTop}>
         <Text style={styles.cardName} numberOfLines={1}>{nome}</Text>
         {valor != null && (
@@ -207,7 +394,7 @@ function ServicoCard({ nome, valor, duracao_minutos, descricao }) {
       {descricao ? (
         <Text style={styles.cardDesc} numberOfLines={2}>{descricao}</Text>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -217,6 +404,8 @@ export default function ServicosScreen({ navigation }) {
   const [servicos,      setServicos]      = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [modalVisible,  setModalVisible]  = useState(false);
+  const [editServico,   setEditServico]   = useState(null);
+  const [editVisible,   setEditVisible]   = useState(false);
   const [userId,        setUserId]        = useState(null);
 
   const fetchServicos = useCallback(async (uid) => {
@@ -261,7 +450,13 @@ export default function ServicosScreen({ navigation }) {
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
         ) : servicos.length > 0 ? (
-          servicos.map(s => <ServicoCard key={s.id} {...s} />)
+          servicos.map(s => (
+            <ServicoCard
+              key={s.id}
+              {...s}
+              onPress={() => { setEditServico(s); setEditVisible(true); }}
+            />
+          ))
         ) : (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Nenhum serviço cadastrado ainda.</Text>
@@ -281,10 +476,14 @@ export default function ServicosScreen({ navigation }) {
       <AddServicoModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSaved={() => {
-          setModalVisible(false);
-          fetchServicos();
-        }}
+        onSaved={() => { setModalVisible(false); fetchServicos(); }}
+      />
+
+      <EditServicoModal
+        visible={editVisible}
+        servico={editServico}
+        onClose={() => { setEditVisible(false); setEditServico(null); }}
+        onSaved={() => { setEditVisible(false); setEditServico(null); fetchServicos(); }}
       />
 
     </SafeAreaView>
@@ -403,5 +602,7 @@ const modal = StyleSheet.create({
     height: 52, borderRadius: 14, backgroundColor: '#A8235A',
     alignItems: 'center', justifyContent: 'center', marginTop: 8,
   },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  saveBtnText:   { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  deleteBtn:     { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 8, borderWidth: 1, borderColor: '#F87171' },
+  deleteBtnText: { fontSize: 16, fontWeight: '700', color: '#F87171' },
 });

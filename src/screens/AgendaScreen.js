@@ -145,6 +145,45 @@ function normalize(str = '') {
   return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// ─── Servico Picker Modal ─────────────────────────────────────────────────────
+
+function ServicoPickerModal({ visible, servicos, loadingServicos, onSelect, onClose }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={[modal.sheet, { maxHeight: '70%' }]}>
+          <View style={modal.handle} />
+          <Text style={modal.title}>Selecionar Serviço</Text>
+          {loadingServicos ? (
+            <ActivityIndicator color={colors.primary} style={{ marginBottom: 20 }} />
+          ) : servicos.length === 0 ? (
+            <Text style={modal.emptyHint}>Cadastre seus serviços no Perfil primeiro.</Text>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {servicos.map((s, idx) => (
+                <TouchableOpacity
+                  key={s.id}
+                  style={[modal.pickerItem, idx < servicos.length - 1 && modal.pickerItemBorder]}
+                  onPress={() => onSelect(s)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={modal.pickerItemNome}>{s.nome}</Text>
+                    {s.duracao_minutos ? <Text style={modal.pickerItemMeta}>{formatDuration(s.duracao_minutos)}</Text> : null}
+                  </View>
+                  {s.valor != null && <Text style={modal.pickerItemValor}>${parseFloat(s.valor).toFixed(2)}</Text>}
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Add Agendamento Modal ────────────────────────────────────────────────────
 
 function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }) {
@@ -155,6 +194,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const [servicos,        setServicos]        = useState([]);
   const [selectedServico, setSelectedServico] = useState(null);
   const [loadingServicos, setLoadingServicos] = useState(false);
+  const [pickerVisible,   setPickerVisible]   = useState(false);
   const [time,            setTime]            = useState('');
   const [tipoEndereco,    setTipoEndereco]    = useState('comercial');
   const [observacoes,     setObservacoes]     = useState('');
@@ -162,7 +202,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
 
   const reset = () => {
     setClienteSearch(''); setClientes([]); setSelectedCliente(null);
-    setServicos([]);      setSelectedServico(null);
+    setServicos([]);      setSelectedServico(null); setPickerVisible(false);
     setTime('');          setTipoEndereco('comercial'); setObservacoes('');
   };
   const handleClose = () => { reset(); onClose(); };
@@ -175,6 +215,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
       supabase.from('clientes').select('id, nome').eq('profissional_id', userId).order('nome'),
       supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', userId).order('nome'),
     ]).then(([cRes, sRes]) => {
+      console.log('[AddModal] servicos userId:', userId, '| data:', sRes.data, '| error:', sRes.error);
       if (cRes.data) setClientes(cRes.data);
       if (sRes.data) setServicos(sRes.data);
       setLoadingClientes(false);
@@ -285,21 +326,21 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
               )}
 
               <Text style={modal.sectionLabel}>SERVIÇO</Text>
-              {loadingServicos ? <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} /> :
-                servicos.length === 0 ? <Text style={modal.emptyHint}>Nenhum serviço cadastrado ainda.</Text> :
-                servicos.map(s => {
-                  const sel = selectedServico?.id === s.id;
-                  return (
-                    <TouchableOpacity key={s.id} style={[modal.servicoRow, sel && modal.servicoRowSelected]} onPress={() => setSelectedServico(sel ? null : s)} activeOpacity={0.75}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[modal.servicoNome, sel && modal.servicoNomeSel]}>{s.nome}</Text>
-                        {s.duracao_minutos ? <Text style={modal.servicoMeta}>{formatDuration(s.duracao_minutos)}</Text> : null}
-                      </View>
-                      {s.valor != null && <Text style={[modal.servicoValor, sel && modal.servicoValorSel]}>${parseFloat(s.valor).toFixed(2)}</Text>}
-                    </TouchableOpacity>
-                  );
-                })
-              }
+              <TouchableOpacity style={modal.pickerField} onPress={() => setPickerVisible(true)} activeOpacity={0.8}>
+                <Text style={selectedServico ? modal.pickerFieldText : modal.pickerFieldPlaceholder} numberOfLines={1}>
+                  {selectedServico
+                    ? `${selectedServico.nome}${selectedServico.valor != null ? '  ·  $' + parseFloat(selectedServico.valor).toFixed(2) : ''}`
+                    : 'Selecionar serviço...'}
+                </Text>
+                <Text style={modal.pickerFieldArrow}>▼</Text>
+              </TouchableOpacity>
+              <ServicoPickerModal
+                visible={pickerVisible}
+                servicos={servicos}
+                loadingServicos={loadingServicos}
+                onSelect={s => { setSelectedServico(s); setPickerVisible(false); }}
+                onClose={() => setPickerVisible(false)}
+              />
 
               <Text style={modal.sectionLabel}>DATA E HORA</Text>
               <View style={modal.dateBox}><Text style={modal.dateText}>{dateLabel}</Text></View>
@@ -342,6 +383,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
   const [servicos,        setServicos]        = useState([]);
   const [selectedServico, setSelectedServico] = useState(null);
   const [loadingServicos, setLoadingServicos] = useState(false);
+  const [pickerVisible,   setPickerVisible]   = useState(false);
   const [dateStr,         setDateStr]         = useState('');
   const [timeStr,         setTimeStr]         = useState('');
   const [status,          setStatus]          = useState('confirmado');
@@ -370,6 +412,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
       supabase.from('clientes').select('id, nome').eq('profissional_id', userId).order('nome'),
       supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', userId).order('nome'),
     ]).then(([cRes, sRes]) => {
+      console.log('[EditModal] servicos userId:', userId, '| data:', sRes.data, '| error:', sRes.error);
       if (cRes.data) setClientes(cRes.data);
       if (sRes.data) {
         setServicos(sRes.data);
@@ -487,21 +530,21 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
 
               {/* ── Serviço ── */}
               <Text style={modal.sectionLabel}>SERVIÇO</Text>
-              {loadingServicos ? <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} /> :
-                servicos.length === 0 ? <Text style={modal.emptyHint}>Nenhum serviço cadastrado ainda.</Text> :
-                servicos.map(s => {
-                  const sel = selectedServico?.id === s.id;
-                  return (
-                    <TouchableOpacity key={s.id} style={[modal.servicoRow, sel && modal.servicoRowSelected]} onPress={() => setSelectedServico(sel ? null : s)} activeOpacity={0.75}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[modal.servicoNome, sel && modal.servicoNomeSel]}>{s.nome}</Text>
-                        {s.duracao_minutos ? <Text style={modal.servicoMeta}>{formatDuration(s.duracao_minutos)}</Text> : null}
-                      </View>
-                      {s.valor != null && <Text style={[modal.servicoValor, sel && modal.servicoValorSel]}>${parseFloat(s.valor).toFixed(2)}</Text>}
-                    </TouchableOpacity>
-                  );
-                })
-              }
+              <TouchableOpacity style={modal.pickerField} onPress={() => setPickerVisible(true)} activeOpacity={0.8}>
+                <Text style={selectedServico ? modal.pickerFieldText : modal.pickerFieldPlaceholder} numberOfLines={1}>
+                  {selectedServico
+                    ? `${selectedServico.nome}${selectedServico.valor != null ? '  ·  $' + parseFloat(selectedServico.valor).toFixed(2) : ''}`
+                    : 'Selecionar serviço...'}
+                </Text>
+                <Text style={modal.pickerFieldArrow}>▼</Text>
+              </TouchableOpacity>
+              <ServicoPickerModal
+                visible={pickerVisible}
+                servicos={servicos}
+                loadingServicos={loadingServicos}
+                onSelect={s => { setSelectedServico(s); setPickerVisible(false); }}
+                onClose={() => setPickerVisible(false)}
+              />
 
               {/* ── Data e Hora ── */}
               <Text style={modal.sectionLabel}>DATA E HORA</Text>
@@ -827,4 +870,14 @@ const modal = StyleSheet.create({
   saveBtnText:   { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
   cancelBtn:     { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 8, borderWidth: 1, borderColor: '#F87171' },
   cancelBtnText: { fontSize: 16, fontWeight: '700', color: '#F87171' },
+
+  pickerField:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  pickerFieldText:        { fontSize: 15, color: '#FFFFFF', flex: 1 },
+  pickerFieldPlaceholder: { fontSize: 15, color: '#6B4A58', flex: 1 },
+  pickerFieldArrow:       { fontSize: 11, color: '#6B4A58', marginLeft: 8 },
+  pickerItem:             { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  pickerItemBorder:       { borderBottomWidth: 1, borderBottomColor: '#3D1020' },
+  pickerItemNome:         { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  pickerItemMeta:         { fontSize: 12, color: '#6B4A58', marginTop: 2 },
+  pickerItemValor:        { fontSize: 16, fontWeight: '700', color: colors.cream, marginLeft: 12 },
 });
