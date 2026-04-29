@@ -16,19 +16,6 @@ import colors from '../constants/colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ESTADOS = ['FL', 'TX', 'CA', 'NY', 'Outro'];
-
-const IDIOMAS = [
-  { label: 'PT-BR',    value: 'pt' },
-  { label: 'ES-LATAM', value: 'es' },
-];
-const GENEROS = [
-  { label: 'Feminino',  value: 'feminino'  },
-  { label: 'Masculino', value: 'masculino' },
-];
-
-const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
-
 const US_STATES = [
   { sigla: 'AL', nome: 'Alabama' },
   { sigla: 'AK', nome: 'Alaska' },
@@ -82,7 +69,25 @@ const US_STATES = [
   { sigla: 'WY', nome: 'Wyoming' },
 ];
 
+const IDIOMAS = [
+  { label: 'PT-BR',    value: 'pt' },
+  { label: 'ES-LATAM', value: 'es' },
+];
+
+const GENEROS = [
+  { label: 'Feminino',  value: 'feminino'  },
+  { label: 'Masculino', value: 'masculino' },
+];
+
+const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function stateLabel(sigla) {
+  if (!sigla) return '';
+  const found = US_STATES.find(s => s.sigla === sigla);
+  return found ? `${found.sigla} — ${found.nome}` : sigla;
+}
 
 function formatExpiracao(raw) {
   const digits = raw.replace(/\D/g, '').slice(0, 6);
@@ -101,7 +106,7 @@ function Field({ label, children }) {
   );
 }
 
-function Toggle({ options, value, onChange }) {
+function Toggle({ options, value, onChange, editing }) {
   return (
     <View style={styles.toggleRow}>
       {options.map(opt => {
@@ -109,9 +114,9 @@ function Toggle({ options, value, onChange }) {
         return (
           <TouchableOpacity
             key={opt.value}
-            style={[styles.toggleBtn, active && styles.toggleBtnActive]}
-            onPress={() => onChange(opt.value)}
-            activeOpacity={0.75}
+            style={[styles.toggleBtn, active && styles.toggleBtnActive, !editing && styles.toggleBtnReadonly]}
+            onPress={() => editing && onChange(opt.value)}
+            activeOpacity={editing ? 0.75 : 1}
           >
             <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
               {opt.label}
@@ -123,61 +128,55 @@ function Toggle({ options, value, onChange }) {
   );
 }
 
-function EstadoDropdown({ value, onChange }) {
-  const [open, setOpen] = useState(false);
+// Shared modal for picking any US state
+function StatePickerModal({ visible, title, value, onSelect, onClose }) {
   return (
-    <View>
-      <TouchableOpacity
-        style={[styles.input, styles.dropdownTrigger]}
-        onPress={() => setOpen(o => !o)}
-        activeOpacity={0.8}
-      >
-        <Text style={value ? styles.inputText : styles.inputPlaceholder}>
-          {value || 'Selecione o estado'}
-        </Text>
-        <Text style={styles.dropdownArrow}>{open ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-
-      {open && (
-        <View style={styles.dropdownList}>
-          {ESTADOS.map((est, idx) => (
-            <TouchableOpacity
-              key={est}
-              style={[
-                styles.dropdownItem,
-                idx < ESTADOS.length - 1 && styles.dropdownItemBorder,
-                value === est && styles.dropdownItemActive,
-              ]}
-              onPress={() => { onChange(est); setOpen(false); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.dropdownItemText, value === est && styles.dropdownItemTextActive]}>
-                {est}
-              </Text>
-            </TouchableOpacity>
-          ))}
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>{title}</Text>
+          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ marginBottom: 32 }}>
+            {US_STATES.map((st, idx) => (
+              <TouchableOpacity
+                key={st.sigla}
+                style={[
+                  styles.modalItem,
+                  idx < US_STATES.length - 1 && styles.modalItemBorder,
+                  value === st.sigla && styles.modalItemActive,
+                ]}
+                onPress={() => { onSelect(st.sigla); onClose(); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalItemText, value === st.sigla && styles.modalItemTextActive]}>
+                  {st.sigla} — {st.nome}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      )}
-    </View>
+      </View>
+    </Modal>
   );
 }
 
-function LicencaTipoDropdown({ value, onChange }) {
+function LicencaTipoDropdown({ value, onChange, editing }) {
   const [open, setOpen] = useState(false);
   return (
     <View>
       <TouchableOpacity
-        style={[styles.input, styles.dropdownTrigger]}
-        onPress={() => setOpen(o => !o)}
-        activeOpacity={0.8}
+        style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
+        onPress={() => editing && setOpen(o => !o)}
+        activeOpacity={editing ? 0.8 : 1}
       >
         <Text style={value ? styles.inputText : styles.inputPlaceholder}>
           {value || 'Selecione o tipo'}
         </Text>
-        <Text style={styles.dropdownArrow}>{open ? '▲' : '▼'}</Text>
+        {editing && <Text style={styles.dropdownArrow}>{open ? '▲' : '▼'}</Text>}
       </TouchableOpacity>
 
-      {open && (
+      {open && editing && (
         <View style={styles.dropdownList}>
           {LICENCA_TIPOS.map((tipo, idx) => (
             <TouchableOpacity
@@ -201,57 +200,35 @@ function LicencaTipoDropdown({ value, onChange }) {
   );
 }
 
-function EstadoLicencaModal({ visible, value, onSelect, onClose }) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.estadoModalBackdrop}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
-        <View style={styles.estadoModalSheet}>
-          <View style={styles.estadoModalHandle} />
-          <Text style={styles.estadoModalTitle}>Estado da licença</Text>
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ marginBottom: 32 }}>
-            {US_STATES.map((st, idx) => (
-              <TouchableOpacity
-                key={st.sigla}
-                style={[
-                  styles.estadoModalItem,
-                  idx < US_STATES.length - 1 && styles.estadoModalItemBorder,
-                  value === st.sigla && styles.estadoModalItemActive,
-                ]}
-                onPress={() => { onSelect(st.sigla); onClose(); }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.estadoModalItemText, value === st.sigla && styles.estadoModalItemTextActive]}>
-                  {st.sigla} — {st.nome}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function MeusDadosScreen({ navigation }) {
-  const [loading,           setLoading]           = useState(true);
-  const [saving,            setSaving]            = useState(false);
-  const [userId,            setUserId]            = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [editing,  setEditing]  = useState(false);
+  const [userId,   setUserId]   = useState(null);
 
-  const [nome,              setNome]              = useState('');
-  const [telefone,          setTelefone]          = useState('');
-  const [cidade,            setCidade]            = useState('');
-  const [estado,            setEstado]            = useState('');
-  const [idioma,            setIdioma]            = useState('pt');
-  const [genero,            setGenero]            = useState('feminino');
+  // Auth
+  const [email, setEmail] = useState('');
 
-  const [licencaNumero,     setLicencaNumero]     = useState('');
-  const [licencaTipo,       setLicencaTipo]       = useState('');
-  const [licencaEstado,     setLicencaEstado]     = useState('');
-  const [licencaExpiracao,  setLicencaExpiracao]  = useState('');
-  const [estadoModalVisible, setEstadoModalVisible] = useState(false);
+  // Dados pessoais
+  const [nome,     setNome]     = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [cidade,   setCidade]   = useState('');
+  const [estado,   setEstado]   = useState('');
+  const [zipCode,  setZipCode]  = useState('');
+  const [idioma,   setIdioma]   = useState('pt');
+  const [genero,   setGenero]   = useState('feminino');
+
+  // Licença
+  const [licencaNumero,    setLicencaNumero]    = useState('');
+  const [licencaTipo,      setLicencaTipo]      = useState('');
+  const [licencaEstado,    setLicencaEstado]    = useState('');
+  const [licencaExpiracao, setLicencaExpiracao] = useState('');
+
+  // Modal visibility
+  const [estadoModalVisible,        setEstadoModalVisible]        = useState(false);
+  const [licencaEstadoModalVisible, setLicencaEstadoModalVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -259,6 +236,7 @@ export default function MeusDadosScreen({ navigation }) {
       const uid = authData?.user?.id;
       if (!uid) { setLoading(false); return; }
       setUserId(uid);
+      setEmail(authData.user.email ?? '');
 
       const { data, error } = await supabase
         .from('profiles')
@@ -267,15 +245,16 @@ export default function MeusDadosScreen({ navigation }) {
         .single();
 
       if (data) {
-        setNome(data.nome              ?? '');
-        setTelefone(data.telefone      ?? '');
-        setCidade(data.cidade          ?? '');
-        setEstado(data.estado          ?? '');
-        setIdioma(data.idioma          ?? 'pt');
-        setGenero(data.genero          ?? 'feminino');
-        setLicencaNumero(data.licenca_numero    ?? '');
-        setLicencaTipo(data.licenca_tipo        ?? '');
-        setLicencaEstado(data.licenca_estado    ?? '');
+        setNome(data.nome                        ?? '');
+        setTelefone(data.telefone                ?? '');
+        setCidade(data.cidade                    ?? '');
+        setEstado(data.estado                    ?? '');
+        setZipCode(data.zip_code                 ?? '');
+        setIdioma(data.idioma                    ?? 'pt');
+        setGenero(data.genero                    ?? 'feminino');
+        setLicencaNumero(data.licenca_numero     ?? '');
+        setLicencaTipo(data.licenca_tipo         ?? '');
+        setLicencaEstado(data.licenca_estado     ?? '');
         setLicencaExpiracao(data.licenca_expiracao ?? '');
       } else if (error && error.code !== 'PGRST116') {
         Alert.alert('Erro ao carregar', error.message);
@@ -289,6 +268,10 @@ export default function MeusDadosScreen({ navigation }) {
       Alert.alert('Campo obrigatório', 'Informe o nome completo.');
       return;
     }
+    if (zipCode && !/^\d{5}$/.test(zipCode)) {
+      Alert.alert('Zip Code inválido', 'O Zip Code deve ter 5 dígitos.');
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase
@@ -296,27 +279,26 @@ export default function MeusDadosScreen({ navigation }) {
         .upsert({
           id:                userId,
           nome:              nome.trim(),
-          telefone:          telefone.trim()          || null,
-          cidade:            cidade.trim()            || null,
+          telefone:          telefone.trim()         || null,
+          cidade:            cidade.trim()           || null,
+          estado:            estado                  || null,
+          zip_code:          zipCode.trim()          || null,
           idioma,
           genero,
-          licenca_numero:    licencaNumero.trim()     || null,
-          licenca_tipo:      licencaTipo              || null,
-          licenca_estado:    licencaEstado            || null,
-          licenca_expiracao: licencaExpiracao.trim()  || null,
+          licenca_numero:    licencaNumero.trim()    || null,
+          licenca_tipo:      licencaTipo             || null,
+          licenca_estado:    licencaEstado           || null,
+          licenca_expiracao: licencaExpiracao.trim() || null,
         });
       if (error) throw error;
       Alert.alert('Salvo!', 'Seus dados foram atualizados.');
+      setEditing(false);
     } catch (err) {
       Alert.alert('Erro ao salvar', err.message);
     } finally {
       setSaving(false);
     }
   };
-
-  const estadoLabel = licencaEstado
-    ? `${licencaEstado} — ${US_STATES.find(s => s.sigla === licencaEstado)?.nome ?? ''}`
-    : '';
 
   if (loading) {
     return (
@@ -336,7 +318,22 @@ export default function MeusDadosScreen({ navigation }) {
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Meus Dados</Text>
-        <View style={styles.headerRight} />
+        {editing ? (
+          <TouchableOpacity
+            style={[styles.editBtn, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.8}
+          >
+            {saving
+              ? <ActivityIndicator color={colors.primary} size="small" />
+              : <Text style={styles.editBtnText}>Salvar</Text>}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)} activeOpacity={0.8}>
+            <Text style={styles.editBtnText}>Editar</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -345,13 +342,22 @@ export default function MeusDadosScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
 
+        {/* ── Email (somente leitura) ── */}
+        <Field label="Email">
+          <View style={[styles.input, styles.inputReadonly]}>
+            <Text style={styles.inputText} numberOfLines={1}>{email || '—'}</Text>
+          </View>
+        </Field>
+
+        {/* ── Dados pessoais ── */}
         <Field label="Nome completo">
           <TextInput
-            style={[styles.input, styles.inputText]}
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
             placeholder="Seu nome completo"
             placeholderTextColor={colors.gray}
             value={nome}
             onChangeText={setNome}
+            editable={editing}
             autoCapitalize="words"
             returnKeyType="next"
           />
@@ -359,11 +365,12 @@ export default function MeusDadosScreen({ navigation }) {
 
         <Field label="Telefone">
           <TextInput
-            style={[styles.input, styles.inputText]}
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
             placeholder="+1 (305) 555-0100"
             placeholderTextColor={colors.gray}
             value={telefone}
             onChangeText={setTelefone}
+            editable={editing}
             keyboardType="phone-pad"
             returnKeyType="next"
           />
@@ -371,89 +378,129 @@ export default function MeusDadosScreen({ navigation }) {
 
         <Field label="Cidade">
           <TextInput
-            style={[styles.input, styles.inputText]}
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
             placeholder="Miami"
             placeholderTextColor={colors.gray}
             value={cidade}
             onChangeText={setCidade}
+            editable={editing}
             autoCapitalize="words"
             returnKeyType="next"
           />
         </Field>
 
         <Field label="Estado">
-          <EstadoDropdown value={estado} onChange={setEstado} />
+          <TouchableOpacity
+            style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
+            onPress={() => editing && setEstadoModalVisible(true)}
+            activeOpacity={editing ? 0.8 : 1}
+          >
+            <Text style={estado ? styles.inputText : styles.inputPlaceholder}>
+              {stateLabel(estado) || 'Selecione o estado'}
+            </Text>
+            {editing && <Text style={styles.dropdownArrow}>▼</Text>}
+          </TouchableOpacity>
+        </Field>
+
+        <Field label="Zip Code">
+          <TextInput
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
+            placeholder="33101"
+            placeholderTextColor={colors.gray}
+            value={zipCode}
+            onChangeText={t => setZipCode(t.replace(/\D/g, '').slice(0, 5))}
+            editable={editing}
+            keyboardType="numeric"
+            maxLength={5}
+            returnKeyType="next"
+          />
         </Field>
 
         <Field label="Idioma">
-          <Toggle options={IDIOMAS} value={idioma} onChange={setIdioma} />
+          <Toggle options={IDIOMAS} value={idioma} onChange={setIdioma} editing={editing} />
         </Field>
 
         <Field label="Gênero">
-          <Toggle options={GENEROS} value={genero} onChange={setGenero} />
+          <Toggle options={GENEROS} value={genero} onChange={setGenero} editing={editing} />
         </Field>
 
         {/* ── Licença ── */}
+        <View style={styles.sectionDivider} />
+        <Text style={styles.sectionTitle}>Licença profissional</Text>
+
         <Field label="Número da licença">
           <TextInput
-            style={[styles.input, styles.inputText]}
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
             placeholder="Ex: 0123456"
             placeholderTextColor={colors.gray}
             value={licencaNumero}
             onChangeText={setLicencaNumero}
+            editable={editing}
             autoCapitalize="characters"
             returnKeyType="next"
           />
         </Field>
 
         <Field label="Tipo de licença">
-          <LicencaTipoDropdown value={licencaTipo} onChange={setLicencaTipo} />
+          <LicencaTipoDropdown value={licencaTipo} onChange={setLicencaTipo} editing={editing} />
         </Field>
 
         <Field label="Estado da licença">
           <TouchableOpacity
-            style={[styles.input, styles.dropdownTrigger]}
-            onPress={() => setEstadoModalVisible(true)}
-            activeOpacity={0.8}
+            style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
+            onPress={() => editing && setLicencaEstadoModalVisible(true)}
+            activeOpacity={editing ? 0.8 : 1}
           >
             <Text style={licencaEstado ? styles.inputText : styles.inputPlaceholder}>
-              {estadoLabel || 'Selecione o estado'}
+              {stateLabel(licencaEstado) || 'Selecione o estado'}
             </Text>
-            <Text style={styles.dropdownArrow}>▼</Text>
+            {editing && <Text style={styles.dropdownArrow}>▼</Text>}
           </TouchableOpacity>
         </Field>
 
         <Field label="Data de expiração">
           <TextInput
-            style={[styles.input, styles.inputText]}
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
             placeholder="MM/YYYY"
             placeholderTextColor={colors.gray}
             value={licencaExpiracao}
             onChangeText={raw => setLicencaExpiracao(formatExpiracao(raw))}
+            editable={editing}
             keyboardType="numeric"
             returnKeyType="done"
           />
         </Field>
 
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.85}
-        >
-          {saving
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.saveBtnText}>Salvar</Text>
-          }
-        </TouchableOpacity>
+        {editing && (
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.saveBtnText}>Salvar</Text>}
+          </TouchableOpacity>
+        )}
 
+        <View style={{ height: 16 }} />
       </ScrollView>
 
-      <EstadoLicencaModal
+      <StatePickerModal
         visible={estadoModalVisible}
+        title="Estado"
+        value={estado}
+        onSelect={setEstado}
+        onClose={() => setEstadoModalVisible(false)}
+      />
+
+      <StatePickerModal
+        visible={licencaEstadoModalVisible}
+        title="Estado da licença"
         value={licencaEstado}
         onSelect={setLicencaEstado}
-        onClose={() => setEstadoModalVisible(false)}
+        onClose={() => setLicencaEstadoModalVisible(false)}
       />
     </SafeAreaView>
   );
@@ -474,12 +521,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 20, marginBottom: 24,
   },
-  backBtn:     { width: 32, alignItems: 'center' },
-  backArrow:   { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
+  backBtn:    { width: 48, alignItems: 'flex-start' },
+  backArrow:  { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
   headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
-  headerRight: { width: 32 },
+  editBtn:    { width: 64, alignItems: 'flex-end' },
+  editBtnText: { fontSize: 15, fontWeight: '700', color: colors.primary },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
+
+  sectionDivider: { height: 1, backgroundColor: SUBTLE, marginBottom: 20 },
+  sectionTitle: {
+    fontSize: 13, fontWeight: '700', color: colors.gray,
+    letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 20,
+  },
 
   fieldWrap:  { marginBottom: 20 },
   fieldLabel: {
@@ -496,60 +550,51 @@ const styles = StyleSheet.create({
   },
   inputText:        { color: colors.white, fontWeight: '400' },
   inputPlaceholder: { color: colors.gray,  fontWeight: '400' },
+  inputReadonly:    { backgroundColor: '#1A1A1A' },
 
-  // Dropdown
   dropdownTrigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   dropdownArrow: { fontSize: 11, color: colors.gray },
   dropdownList: {
-    backgroundColor: CARD_BG,
-    borderRadius: 12,
-    marginTop: 6,
-    overflow: 'hidden',
+    backgroundColor: CARD_BG, borderRadius: 12, marginTop: 6, overflow: 'hidden',
   },
-  dropdownItem: {
-    paddingHorizontal: 16, paddingVertical: 14,
-  },
-  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
-  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
+  dropdownItem:           { paddingHorizontal: 16, paddingVertical: 14 },
+  dropdownItemBorder:     { borderBottomWidth: 1, borderBottomColor: SUBTLE },
+  dropdownItemActive:     { backgroundColor: 'rgba(168,35,90,0.15)' },
   dropdownItemText:       { fontSize: 15, fontWeight: '400', color: colors.white },
   dropdownItemTextActive: { fontWeight: '700', color: colors.primary },
 
-  // Toggle
   toggleRow: { flexDirection: 'row', gap: 10 },
   toggleBtn: {
     flex: 1, paddingVertical: 13, borderRadius: 12,
     alignItems: 'center', backgroundColor: INPUT_BG,
   },
-  toggleBtnActive: { backgroundColor: colors.primary },
+  toggleBtnActive:  { backgroundColor: colors.primary },
+  toggleBtnReadonly: { backgroundColor: '#1A1A1A' },
   toggleText:       { fontSize: 14, fontWeight: '600', color: colors.gray },
   toggleTextActive: { color: colors.white },
 
-  // Estado licença modal
-  estadoModalBackdrop: {
+  // State picker modal
+  modalBackdrop: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
   },
-  estadoModalSheet: {
+  modalSheet: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 12,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 24, paddingTop: 12,
     maxHeight: '75%',
   },
-  estadoModalHandle: {
+  modalHandle: {
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 16,
   },
-  estadoModalTitle: {
-    fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 16,
-  },
-  estadoModalItem: { paddingVertical: 14 },
-  estadoModalItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
-  estadoModalItemActive: { backgroundColor: 'rgba(168,35,90,0.08)' },
-  estadoModalItemText: { fontSize: 15, fontWeight: '400', color: colors.white },
-  estadoModalItemTextActive: { fontWeight: '700', color: colors.primary },
+  modalTitle:             { fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 16 },
+  modalItem:              { paddingVertical: 14 },
+  modalItemBorder:        { borderBottomWidth: 1, borderBottomColor: SUBTLE },
+  modalItemActive:        { backgroundColor: 'rgba(168,35,90,0.08)' },
+  modalItemText:          { fontSize: 15, fontWeight: '400', color: colors.white },
+  modalItemTextActive:    { fontWeight: '700', color: colors.primary },
 
   saveBtn: {
     height: 54, borderRadius: 14, backgroundColor: colors.primary,
