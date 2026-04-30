@@ -18,6 +18,7 @@ import TutoriaisScreen       from '../screens/TutoriaisScreen';
 import RelatorioScreen       from '../screens/RelatorioScreen';
 import IndicacaoScreen       from '../screens/IndicacaoScreen';
 import IntelClientelaScreen  from '../screens/IntelClientelaScreen';
+import ConexoesScreen        from '../screens/ConexoesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +42,7 @@ export default function PerfilStack() {
       <Stack.Screen name="Relatorio"     component={RelatorioScreen}     />
       <Stack.Screen name="Indicacao"      component={IndicacaoScreen}      />
       <Stack.Screen name="IntelClientela" component={IntelClientelaScreen} />
+      <Stack.Screen name="Conexoes"       component={ConexoesScreen}       />
     </Stack.Navigator>
   );
 }
