@@ -136,11 +136,15 @@ function formatExpiracao(raw) {
 
 function validateExpiracao(val) {
   if (!val) return null;
-  if (!/^\d{2}\/\d{4}$/.test(val)) return 'Formato inválido — use MM/YYYY';
+  if (!/^\d{2}\/\d{4}$/.test(val)) return 'Licença expirada ou data inválida';
   const mes = parseInt(val.slice(0, 2), 10);
   const ano = parseInt(val.slice(3), 10);
-  if (mes < 1 || mes > 12) return 'Mês deve ser entre 01 e 12';
-  if (ano < 2026) return 'Ano deve ser 2026 ou posterior';
+  if (mes < 1 || mes > 12) return 'Licença expirada ou data inválida';
+  const agora     = new Date();
+  const anoAtual  = agora.getFullYear();
+  const mesAtual  = agora.getMonth() + 1;
+  if (ano < anoAtual) return 'Licença expirada ou data inválida';
+  if (ano === anoAtual && mes < mesAtual) return 'Licença expirada ou data inválida';
   return null;
 }
 

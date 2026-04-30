@@ -88,6 +88,20 @@ function formatExpiracao(raw) {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
 
+function validateExpiracao(val) {
+  if (!val) return null;
+  if (!/^\d{2}\/\d{4}$/.test(val)) return 'Licença expirada ou data inválida';
+  const mes = parseInt(val.slice(0, 2), 10);
+  const ano = parseInt(val.slice(3), 10);
+  if (mes < 1 || mes > 12) return 'Licença expirada ou data inválida';
+  const agora    = new Date();
+  const anoAtual = agora.getFullYear();
+  const mesAtual = agora.getMonth() + 1;
+  if (ano < anoAtual) return 'Licença expirada ou data inválida';
+  if (ano === anoAtual && mes < mesAtual) return 'Licença expirada ou data inválida';
+  return null;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ToggleGroup({ options, value, onChange }) {
@@ -200,8 +214,9 @@ export default function AuthScreen({ navigation }) {
   const [estadoModalVisible, setEstadoModalVisible] = useState(false);
 
   // OTP
-  const [otpCode, setOtpCode] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [otpCode,            setOtpCode]            = useState('');
+  const [loading,            setLoading]            = useState(false);
+  const [licencaExpiracaoErro, setLicencaExpiracaoErro] = useState(null);
 
   const digits    = telefone.replace(/\D/g, '');
   const fullPhone = `+1${digits}`;
@@ -217,6 +232,12 @@ export default function AuthScreen({ navigation }) {
       !licencaNumero.trim() || !licencaTipo || !licencaEstado || !licencaExpiracao.trim()
     ) {
       Alert.alert('Campos obrigatórios', 'Preencha todos os campos para continuar.');
+      return;
+    }
+    const erroExp = validateExpiracao(licencaExpiracao);
+    if (erroExp) {
+      setLicencaExpiracaoErro(erroExp);
+      Alert.alert('Data inválida', erroExp);
       return;
     }
     setLoading(true);
@@ -381,14 +402,22 @@ export default function AuthScreen({ navigation }) {
 
               <Text style={styles.label}>Data de expiração</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, licencaExpiracaoErro && styles.inputInvalid]}
                 placeholder="MM/YYYY *"
                 placeholderTextColor="#6B4A58"
                 value={licencaExpiracao}
-                onChangeText={raw => setLicencaExpiracao(formatExpiracao(raw))}
+                onChangeText={raw => {
+                  const fmt = formatExpiracao(raw);
+                  setLicencaExpiracao(fmt);
+                  setLicencaExpiracaoErro(validateExpiracao(fmt));
+                }}
                 keyboardType="numeric"
+                maxLength={7}
                 returnKeyType="done"
               />
+              {licencaExpiracaoErro && (
+                <Text style={styles.fieldError}>{licencaExpiracaoErro}</Text>
+              )}
 
               <TouchableOpacity
                 style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
@@ -545,6 +574,9 @@ const styles = StyleSheet.create({
 
   backBtn:      { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
   backBtnText:  { fontSize: 13, fontWeight: '400', color: '#6B4A58' },
+
+  inputInvalid: { borderWidth: 1.5, borderColor: '#EF4444' },
+  fieldError:   { fontSize: 11, fontWeight: '600', color: '#EF4444', marginTop: -12, marginBottom: 14, letterSpacing: 0.2 },
 
   loginLink:     { alignItems: 'center', paddingVertical: 10 },
   loginLinkText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },

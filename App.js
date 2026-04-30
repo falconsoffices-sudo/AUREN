@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Image, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Image, StyleSheet, Animated } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -28,9 +28,9 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: c.background, borderTopColor: c.border },
+        tabBarStyle: { backgroundColor: '#FFFFFF', borderTopColor: '#E6D8CF', borderTopWidth: 1 },
         tabBarActiveTintColor: c.primary,
-        tabBarInactiveTintColor: c.textSecondary,
+        tabBarInactiveTintColor: '#B09AA8',
       }}
     >
       <Tab.Screen name="Início"   component={HomeScreen}     />
@@ -54,21 +54,29 @@ async function setupPushToken() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 3500);
+    // Começa fade-out 500ms antes do fim do splash
+    const fadeTimer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setShowSplash(false));
+    }, 3000);
     setupPushToken();
-    return () => clearTimeout(timer);
+    return () => clearTimeout(fadeTimer);
   }, []);
 
   if (showSplash) {
     return (
-      <View style={styles.splash}>
+      <Animated.View style={[styles.splash, { opacity: fadeAnim }]}>
         <Image
           source={require('./assets/images/emblema.png')}
           style={styles.emblema}
         />
-      </View>
+      </Animated.View>
     );
   }
 
