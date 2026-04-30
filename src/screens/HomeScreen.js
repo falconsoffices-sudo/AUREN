@@ -473,6 +473,24 @@ export default function HomeScreen({ navigation }) {
                   </Text>
                 </View>
               </View>
+
+              {slotsLivres !== null && slotsLivres > 0 && (
+                <TouchableOpacity
+                  style={styles.insightCard}
+                  onPress={() => navigation.navigate('Indicacao')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.insightDot} />
+                  <View style={styles.insightBody}>
+                    <Text style={styles.insightTitle}>Indique o AUREN</Text>
+                    <Text style={styles.insightText}>
+                      Você tem horários livres hoje. Que tal indicar o AUREN para
+                      uma colega profissional? Ela vai amar.
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 20, color: '#A8235A', lineHeight: 22, alignSelf: 'center', marginLeft: 8 }}>›</Text>
+                </TouchableOpacity>
+              )}
                 </>
               )}
             </>

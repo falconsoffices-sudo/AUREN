@@ -15,6 +15,7 @@ import PerfilStack      from './src/navigation/PerfilStack';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import SaibaMaisScreen  from './src/screens/SaibaMaisScreen';
 import PoliticasScreen  from './src/screens/PoliticasScreen';
+import IndicacaoScreen  from './src/screens/IndicacaoScreen';
 import { supabase } from './src/lib/supabase';
 import { registerForPushNotifications } from './src/lib/notifications';
 import { agendarNotificacaoRelatorio } from './src/lib/relatorio';
@@ -80,6 +81,7 @@ function AppContent() {
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="SaibaMais"  component={SaibaMaisScreen}  />
           <Stack.Screen name="Politicas"  component={PoliticasScreen}  />
+          <Stack.Screen name="Indicacao"  component={IndicacaoScreen}  />
           <Stack.Screen name="Main"       component={MainTabs}         />
         </Stack.Navigator>
       </NavigationContainer>

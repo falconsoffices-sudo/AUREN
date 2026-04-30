@@ -357,6 +357,15 @@ export default function ConfiguracoesScreen({ navigation }) {
           <View style={styles.linkDivider} />
           <TouchableOpacity
             style={styles.linkRow}
+            onPress={() => navigation.navigate('Indicacao')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.linkLabel}>Indicar um profissional</Text>
+            <Text style={styles.linkArrow}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.linkDivider} />
+          <TouchableOpacity
+            style={styles.linkRow}
             onPress={() => navigation.navigate('Tutoriais')}
             activeOpacity={0.7}
           >
