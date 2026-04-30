@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 import { scheduleNotification } from '../lib/notifications';
+import { sendSMS, applyTemplate } from '../lib/sms';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -278,6 +280,27 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         observacoes:     observacoes.trim() || null,
       });
       if (error) throw error;
+
+      // envia SMS de confirmação para a cliente
+      if (selectedCliente.telefone) {
+        try {
+          const stored = await AsyncStorage.getItem('auren:sms_templates');
+          const templates = stored ? JSON.parse(stored) : {};
+          const DEFAULT_CONFIRMACAO = 'Olá [nome]! Seu agendamento de [servico] está confirmado para [horario].';
+          const templateText = templates.confirmacao || DEFAULT_CONFIRMACAO;
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: prof } = user
+            ? await supabase.from('profiles').select('nome_completo').eq('id', user.id).single()
+            : { data: null };
+          const mensagem = applyTemplate(templateText, {
+            nome:              selectedCliente.nome,
+            horario:           formatTimeDisplay(buildDataHora(selectedDate, time)),
+            servico:           selectedServico.nome,
+            nome_profissional: prof?.nome_completo ?? '',
+          });
+          sendSMS(selectedCliente.telefone, mensagem).catch(() => {});
+        } catch (_) {}
+      }
 
       // agenda notificações locais de lembrete
       const secsUntil = (novoInicio.getTime() - Date.now()) / 1000;
