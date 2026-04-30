@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { scheduleNotification } from '../lib/notifications';
 import { sendSMS, applyTemplate } from '../lib/sms';
+import { calcularNivel } from '../lib/gamificacao';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -840,7 +841,11 @@ export default function AgendaScreen() {
       <AddAgendamentoModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSaved={() => { setModalVisible(false); fetchAgendamentos(userId, selected); }}
+        onSaved={() => {
+          setModalVisible(false);
+          fetchAgendamentos(userId, selected);
+          calcularNivel(userId).catch(() => {});
+        }}
         selectedDate={selected}
         userId={userId}
       />
@@ -850,7 +855,11 @@ export default function AgendaScreen() {
         agendamento={editAgendamento}
         userId={userId}
         onClose={closeEdit}
-        onSaved={() => { closeEdit(); fetchAgendamentos(userId, selected); }}
+        onSaved={() => {
+          closeEdit();
+          fetchAgendamentos(userId, selected);
+          calcularNivel(userId).catch(() => {});
+        }}
       />
 
     </SafeAreaView>

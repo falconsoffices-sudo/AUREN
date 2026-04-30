@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
+import { calcularNivel } from '../lib/gamificacao';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -220,6 +221,12 @@ export default function HomeScreen({ navigation }) {
       if (profileRes.data.nome)
         setPrimeiroNome(profileRes.data.nome.trim().split(' ')[0]);
       setNivelGamificacao(profileRes.data.nivel_gamificacao ?? 1);
+      // Recalcula nível em background; atualiza UI se subiu
+      calcularNivel(uid).then(result => {
+        if (result && result.nivel !== (profileRes.data.nivel_gamificacao ?? 1)) {
+          setNivelGamificacao(result.nivel);
+        }
+      }).catch(() => {});
       if (profileRes.data.created_at) {
         const criado = new Date(profileRes.data.created_at);
         const dias = Math.floor((Date.now() - criado.getTime()) / (1000 * 60 * 60 * 24));
