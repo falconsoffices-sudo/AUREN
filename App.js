@@ -19,6 +19,7 @@ import IndicacaoScreen  from './src/screens/IndicacaoScreen';
 import { supabase } from './src/lib/supabase';
 import { registerForPushNotifications } from './src/lib/notifications';
 import { agendarNotificacaoRelatorio } from './src/lib/relatorio';
+import { verificarEnvioRelatorio } from './src/lib/emailRelatorio';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
@@ -103,6 +104,7 @@ export default function App() {
     }, 3000);
     setupPushToken();
     agendarNotificacaoRelatorio();
+    verificarEnvioRelatorio();
     return () => clearTimeout(fadeTimer);
   }, []);
 
