@@ -21,6 +21,7 @@ import IntelClientelaScreen  from '../screens/IntelClientelaScreen';
 import ConexoesScreen        from '../screens/ConexoesScreen';
 import EquipeScreen          from '../screens/EquipeScreen';
 import CommunityScreen       from '../screens/CommunityScreen';
+import PagamentosScreen      from '../screens/PagamentosScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -47,6 +48,7 @@ export default function PerfilStack() {
       <Stack.Screen name="Conexoes"       component={ConexoesScreen}       />
       <Stack.Screen name="Equipe"         component={EquipeScreen}         />
       <Stack.Screen name="Community"      component={CommunityScreen}      />
+      <Stack.Screen name="Pagamentos"     component={PagamentosScreen}     />
     </Stack.Navigator>
   );
 }

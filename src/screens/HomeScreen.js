@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { calcularNivel } from '../lib/gamificacao';
+import { scheduleNotification } from '../lib/notifications';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,8 @@ export default function HomeScreen({ navigation }) {
   const [diasTrial,         setDiasTrial]         = useState(null);
   const [slotsLivres,       setSlotsLivres]       = useState(null);
   const [licencaDias,       setLicencaDias]       = useState(null);
+  const [mostraDiaCuidado,  setMostraDiaCuidado]  = useState(false);
+  const [nomeIncompleto,    setNomeIncompleto]     = useState(false);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -194,7 +197,7 @@ export default function HomeScreen({ navigation }) {
     const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('nome, nivel_gamificacao, created_at, licenca_expiracao')
+        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente')
         .eq('id', uid)
         .single(),
 
@@ -239,7 +242,34 @@ export default function HomeScreen({ navigation }) {
         const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
         setLicencaDias(Math.round((exp.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
       }
+
+      // Banner nome incompleto: só após 30 dias de conta
+      if (profileRes.data.nome_completo_pendente && profileRes.data.created_at) {
+        const diasConta = Math.floor((Date.now() - new Date(profileRes.data.created_at).getTime()) / 86400000);
+        if (diasConta >= 30) setNomeIncompleto(true);
+      }
     }
+
+    // Card "Seu dia de cuidado" — uma vez por mês
+    try {
+      const agora   = new Date();
+      const mesKey  = `meu_dia_${agora.getMonth() + 1}_${agora.getFullYear()}`;
+      const jaViu   = await AsyncStorage.getItem(mesKey);
+      if (!jaViu) {
+        setMostraDiaCuidado(true);
+        await AsyncStorage.setItem(mesKey, '1');
+        // Notificação push para dia 1 do próximo mês às 9h
+        const proximo1 = new Date(agora.getFullYear(), agora.getMonth() + 1, 1, 9, 0, 0);
+        const secsAte  = (proximo1.getTime() - agora.getTime()) / 1000;
+        if (secsAte > 0) {
+          scheduleNotification(
+            'Seu dia de cuidado ✨',
+            'Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.',
+            secsAte,
+          ).catch(() => {});
+        }
+      }
+    } catch (_) {}
 
     const semanaData = agendSemanaRes.data ?? [];
     const statusFat  = ['finalizado', 'confirmado', 'pendente'];
@@ -383,6 +413,23 @@ export default function HomeScreen({ navigation }) {
                 </TouchableOpacity>
               )}
 
+              {/* Banner nome incompleto */}
+              {nomeIncompleto && (
+                <TouchableOpacity
+                  style={styles.nomeIncompletoBanner}
+                  onPress={() => navigation.navigate('Perfil', { screen: 'MeusDados' })}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.nomeIncompletoTitle}>Nome incompleto</Text>
+                    <Text style={styles.nomeIncompletoSub}>
+                      Complete seu nome completo em Meus Dados para continuar usando o AUREN.
+                    </Text>
+                  </View>
+                  <Text style={styles.nomeIncompletoArrow}>›</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Empty state */}
               {agendamentosHoje.length === 0 ? (
                 <View style={styles.emptyCard}>
@@ -498,6 +545,23 @@ export default function HomeScreen({ navigation }) {
                   <Text style={{ fontSize: 20, color: '#A8235A', lineHeight: 22, alignSelf: 'center', marginLeft: 8 }}>›</Text>
                 </TouchableOpacity>
               )}
+
+              {/* Card Seu dia de cuidado — aparece uma vez por mês */}
+              {mostraDiaCuidado && (
+                <View style={styles.diaCuidadoCard}>
+                  <Text style={styles.diaCuidadoTitle}>Seu dia de cuidado ✨</Text>
+                  <Text style={styles.diaCuidadoText}>
+                    Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.diaCuidadoBtn}
+                    onPress={() => navigation.navigate('Perfil', { screen: 'Conexoes' })}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.diaCuidadoBtnText}>Ver profissionais disponíveis</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
                 </>
               )}
             </>
@@ -587,5 +651,23 @@ function makeStyles(isDark) {
     licencaTitle:    { fontSize: 14, fontWeight: '700', color: text },
     licencaSub:      { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
     licencaCta:      { fontSize: 13, fontWeight: '700', color: '#A8235A', marginLeft: 12 },
+
+    nomeIncompletoBanner: {
+      backgroundColor: 'rgba(249,115,22,0.10)', borderRadius: 14,
+      padding: 14, marginBottom: 12, flexDirection: 'row',
+      alignItems: 'center', borderWidth: 1, borderColor: 'rgba(249,115,22,0.35)',
+    },
+    nomeIncompletoTitle: { fontSize: 14, fontWeight: '700', color: '#F97316', marginBottom: 2 },
+    nomeIncompletoSub:   { fontSize: 12, fontWeight: '400', color: sub, lineHeight: 18 },
+    nomeIncompletoArrow: { fontSize: 22, color: '#F97316', marginLeft: 10 },
+
+    diaCuidadoCard: {
+      backgroundColor: card, borderRadius: 16, padding: 18,
+      marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#A8235A', ...SM_SHADOW,
+    },
+    diaCuidadoTitle:   { fontSize: 15, fontWeight: '800', color: text, marginBottom: 8 },
+    diaCuidadoText:    { fontSize: 13, fontWeight: '400', color: sub, lineHeight: 20, marginBottom: 14 },
+    diaCuidadoBtn:     { backgroundColor: '#A8235A', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 18, alignSelf: 'flex-start' },
+    diaCuidadoBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   });
 }

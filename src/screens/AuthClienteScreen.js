@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 
 function formatPhone(raw) {
   const digits = raw.replace(/\D/g, '').slice(0, 10);
@@ -45,12 +46,12 @@ function ToggleGroup({ options, value, onChange }) {
 }
 
 export default function AuthClienteScreen({ navigation }) {
+  const { idioma } = useTheme();
   const [step, setStep] = useState('form');
 
   const [nome,     setNome]     = useState('');
   const [email,    setEmail]    = useState('');
   const [telefone, setTelefone] = useState('');
-  const [idioma,   setIdioma]   = useState('pt');
   const [otpCode,  setOtpCode]  = useState('');
   const [loading,  setLoading]  = useState(false);
 
@@ -97,6 +98,7 @@ export default function AuthClienteScreen({ navigation }) {
             telefone:     fullPhone,
             idioma,
             tipo_usuario: 'cliente',
+            nome_completo_pendente: nome.trim().split(/\s+/).filter(Boolean).length < 3,
           })
           .eq('id', data.user.id);
       }
@@ -169,17 +171,6 @@ export default function AuthClienteScreen({ navigation }) {
                   returnKeyType="done"
                 />
               </View>
-
-              <Text style={styles.label}>Idioma</Text>
-              <ToggleGroup
-                value={idioma}
-                onChange={setIdioma}
-                options={[
-                  { label: 'PT-BR',    value: 'pt' },
-                  { label: 'ES-LATAM', value: 'es' },
-                  { label: 'EN-US',    value: 'en' },
-                ]}
-              />
 
               <TouchableOpacity
                 style={[styles.primaryBtn, loading && { opacity: 0.7 }]}

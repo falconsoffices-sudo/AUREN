@@ -118,12 +118,17 @@ export default function LoginScreen({ navigation }) {
     const devEmail = email.trim() || DEV_EMAIL;
     setLoading(true);
     try {
+      // Limpa sessão anterior para garantir estado limpo
+      await supabase.auth.signOut();
       const { data, error } = await supabase.auth.signInWithPassword({
         email:    devEmail,
         password: makePassword(devEmail, DEV_PHONE),
       });
       if (error) throw error;
-      await routeAfterLogin(navigation, data.user?.id);
+      // Busca tipo_usuario direto do banco — sem cache
+      const uid = data.user?.id;
+      if (!uid) throw new Error('Usuário não encontrado após login.');
+      await routeAfterLogin(navigation, uid);
     } catch (err) {
       Alert.alert('Dev login falhou', err.message);
     } finally {

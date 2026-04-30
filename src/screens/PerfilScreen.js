@@ -39,6 +39,7 @@ const PLANS = [
 ];
 
 const MENU = [
+  { id: 0.5, label: 'Pagamentos' },
   { id: 1,  label: 'Meus Dados' },
   { id: 2,  label: 'Meus Serviços' },
   { id: 3,  label: 'Endereços' },
@@ -122,6 +123,7 @@ export default function PerfilScreen({ navigation }) {
 
   function menuPress(label) {
     switch (label) {
+      case 'Pagamentos':            return () => navigation.navigate('Pagamentos');
       case 'Meus Serviços':        return () => navigation.navigate('Servicos');
       case 'Meus Dados':           return () => navigation.navigate('MeusDados');
       case 'Endereços':            return () => navigation.navigate('Enderecos');

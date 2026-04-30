@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -199,16 +200,17 @@ function EstadoLicencaModal({ visible, value, onSelect, onClose }) {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function AuthScreen({ navigation }) {
-  const [step, setStep] = useState('form'); // 'form' | 'otp'
+  const { idioma } = useTheme();
+  const [step, setStep] = useState('tipo'); // 'tipo' | 'form' | 'otp'
 
   // Form fields
   const [nome,             setNome]             = useState('');
   const [email,            setEmail]            = useState('');
   const [telefone,         setTelefone]         = useState('');
-  const [idioma,           setIdioma]           = useState('pt');
   const [genero,           setGenero]           = useState('');
   const [licencaNumero,    setLicencaNumero]    = useState('');
   const [licencaTipo,      setLicencaTipo]      = useState('');
+  const [licencaTipoOutro, setLicencaTipoOutro] = useState('');
   const [licencaEstado,    setLicencaEstado]    = useState('');
   const [licencaExpiracao, setLicencaExpiracao] = useState('');
   const [estadoModalVisible, setEstadoModalVisible] = useState(false);
@@ -218,6 +220,14 @@ export default function AuthScreen({ navigation }) {
   const [otpCode,            setOtpCode]            = useState('');
   const [loading,            setLoading]            = useState(false);
   const [licencaExpiracaoErro, setLicencaExpiracaoErro] = useState(null);
+
+  function handleTipo(tipo) {
+    if (tipo === 'cliente') {
+      navigation.navigate('AuthCliente');
+    } else {
+      setStep('form');
+    }
+  }
 
   const digits    = telefone.replace(/\D/g, '');
   const fullPhone = `+1${digits}`;
@@ -229,7 +239,7 @@ export default function AuthScreen({ navigation }) {
   // ── Step 1: validate form + send email OTP ───────────────────
   const handleSendOtp = async () => {
     if (!termsAccepted) {
-      Alert.alert('Aceite necessário', 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.');
+      Alert.alert('Aceite necessário', 'Você precisa aceitar os Termos de Uso para continuar.');
       return;
     }
     if (
@@ -237,6 +247,10 @@ export default function AuthScreen({ navigation }) {
       !licencaNumero.trim() || !licencaTipo || !licencaEstado || !licencaExpiracao.trim()
     ) {
       Alert.alert('Campos obrigatórios', 'Preencha todos os campos para continuar.');
+      return;
+    }
+    if (licencaTipo === 'Outro' && !licencaTipoOutro.trim()) {
+      Alert.alert('Campos obrigatórios', 'Digite o tipo de licença personalizado.');
       return;
     }
     const erroExp = validateExpiracao(licencaExpiracao);
@@ -282,10 +296,11 @@ export default function AuthScreen({ navigation }) {
             idioma,
             genero,
             licenca_numero:    licencaNumero.trim(),
-            licenca_tipo:      licencaTipo,
+            licenca_tipo:      licencaTipo === 'Outro' ? licencaTipoOutro.trim() : licencaTipo,
             licenca_estado:    licencaEstado,
             licenca_expiracao: licencaExpiracao.trim(),
             tipo_usuario:      'profissional',
+            nome_completo_pendente: nome.trim().split(/\s+/).filter(Boolean).length < 3,
           })
           .eq('id', data.user.id);
       }
@@ -313,6 +328,44 @@ export default function AuthScreen({ navigation }) {
             source={require('../../assets/images/logo.png')}
             style={styles.logo}
           />
+
+          {/* ══ STEP: tipo ══ */}
+          {step === 'tipo' && (
+            <>
+              <Text style={styles.title}>Como você vai usar o AUREN?</Text>
+
+              <TouchableOpacity
+                style={styles.tipoCard}
+                onPress={() => handleTipo('profissional')}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tipoLabel}>Profissional</Text>
+                  <Text style={styles.tipoSub}>Gerencie sua agenda, clientes e finanças</Text>
+                </View>
+                <Text style={styles.tipoArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tipoCard, styles.tipoCardCliente]}
+                onPress={() => handleTipo('cliente')}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tipoLabel}>Cliente</Text>
+                  <Text style={styles.tipoSub}>Agende com sua profissional favorita</Text>
+                </View>
+                <Text style={styles.tipoArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={styles.backBtnText}>← Voltar</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           {/* ══ STEP: form ══ */}
           {step === 'form' && (
@@ -360,16 +413,6 @@ export default function AuthScreen({ navigation }) {
                 />
               </View>
 
-              <Text style={styles.label}>Idioma</Text>
-              <ToggleGroup
-                value={idioma}
-                onChange={setIdioma}
-                options={[
-                  { label: 'PT-BR',    value: 'pt' },
-                  { label: 'ES-LATAM', value: 'es' },
-                ]}
-              />
-
               <Text style={styles.label}>Gênero</Text>
               <ToggleGroup
                 value={genero}
@@ -393,6 +436,17 @@ export default function AuthScreen({ navigation }) {
 
               <Text style={styles.label}>Tipo de licença</Text>
               <LicencaTipoDropdown value={licencaTipo} onChange={setLicencaTipo} />
+              {licencaTipo === 'Outro' && (
+                <TextInput
+                  style={[styles.input, { marginTop: -10 }]}
+                  placeholder="Digite o tipo de licença *"
+                  placeholderTextColor="#6B4A58"
+                  value={licencaTipoOutro}
+                  onChangeText={setLicencaTipoOutro}
+                  autoCapitalize="sentences"
+                  returnKeyType="next"
+                />
+              )}
 
               <Text style={styles.label}>Estado da licença</Text>
               <TouchableOpacity
@@ -620,4 +674,24 @@ const styles = StyleSheet.create({
   checkmark:       { fontSize: 12, fontWeight: '700', color: '#FFFFFF', lineHeight: 14 },
   termsLabel:      { flex: 1, fontSize: 13, fontWeight: '400', color: '#8A8A8E', lineHeight: 20 },
   termsLink:       { fontSize: 13, fontWeight: '600', color: '#A8235A', textDecorationLine: 'underline' },
+
+  // Idioma step
+  idiomaChips:         { flexDirection: 'row', gap: 10, marginVertical: 28, justifyContent: 'center' },
+  idiomaChip:          { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5, borderColor: '#A8235A' },
+  idiomaChipActive:    { backgroundColor: '#A8235A' },
+  idiomaChipText:      { fontSize: 13, fontWeight: '700', color: '#A8235A', letterSpacing: 0.4 },
+  idiomaChipTextActive:{ color: '#FFFFFF' },
+
+  // Tipo step
+  tipoCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1A1B1E', borderRadius: 16,
+    padding: 20, marginBottom: 14,
+    borderWidth: 1.5, borderColor: '#2A2A30',
+  },
+  tipoCardCliente: { borderColor: '#A8235A22' },
+  tipoIcon:  { fontSize: 32, marginRight: 16 },
+  tipoLabel: { fontSize: 17, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
+  tipoSub:   { fontSize: 13, fontWeight: '400', color: '#6B4A58' },
+  tipoArrow: { fontSize: 22, color: '#A8235A', marginLeft: 8 },
 });
