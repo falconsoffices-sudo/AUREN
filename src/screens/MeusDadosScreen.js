@@ -81,6 +81,45 @@ const GENEROS = [
 
 const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
 
+const CIDADES = [
+  // Florida
+  'Miami, FL', 'Orlando, FL', 'Tampa, FL', 'Jacksonville, FL', 'Fort Lauderdale, FL',
+  'St. Petersburg, FL', 'Hialeah, FL', 'Tallahassee, FL', 'Port St. Lucie, FL',
+  'Cape Coral, FL', 'Fort Myers, FL', 'Boca Raton, FL', 'Pembroke Pines, FL',
+  'Hollywood, FL', 'Miramar, FL', 'Coral Springs, FL', 'Gainesville, FL',
+  'Clearwater, FL', 'Palm Bay, FL', 'West Palm Beach, FL',
+  // Texas
+  'Houston, TX', 'San Antonio, TX', 'Dallas, TX', 'Austin, TX', 'Fort Worth, TX',
+  'El Paso, TX', 'Arlington, TX', 'Corpus Christi, TX', 'Plano, TX', 'Laredo, TX',
+  'Lubbock, TX', 'Irving, TX', 'McAllen, TX', 'Garland, TX', 'Frisco, TX',
+  // California
+  'Los Angeles, CA', 'San Diego, CA', 'San Jose, CA', 'San Francisco, CA',
+  'Fresno, CA', 'Sacramento, CA', 'Long Beach, CA', 'Oakland, CA',
+  'Bakersfield, CA', 'Anaheim, CA', 'Santa Ana, CA', 'Riverside, CA',
+  'Stockton, CA', 'Irvine, CA', 'Chula Vista, CA',
+  // New York
+  'New York City, NY', 'Buffalo, NY', 'Rochester, NY', 'Yonkers, NY', 'Syracuse, NY',
+  'Albany, NY', 'New Rochelle, NY',
+  // New Jersey
+  'Newark, NJ', 'Jersey City, NJ', 'Paterson, NJ', 'Elizabeth, NJ',
+  'Edison, NJ', 'Trenton, NJ', 'Woodbridge, NJ',
+  // Georgia
+  'Atlanta, GA', 'Columbus, GA', 'Savannah, GA', 'Athens, GA',
+  'Augusta, GA', 'Sandy Springs, GA', 'Roswell, GA',
+  // North Carolina
+  'Charlotte, NC', 'Raleigh, NC', 'Greensboro, NC', 'Durham, NC',
+  'Winston-Salem, NC', 'Fayetteville, NC', 'Cary, NC',
+  // Illinois
+  'Chicago, IL', 'Aurora, IL', 'Rockford, IL', 'Joliet, IL',
+  'Naperville, IL', 'Springfield, IL', 'Peoria, IL',
+  // Arizona
+  'Phoenix, AZ', 'Tucson, AZ', 'Mesa, AZ', 'Chandler, AZ',
+  'Scottsdale, AZ', 'Glendale, AZ', 'Tempe, AZ', 'Gilbert, AZ',
+  // Nevada
+  'Las Vegas, NV', 'Henderson, NV', 'Reno, NV', 'North Las Vegas, NV',
+  'Sparks, NV',
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function stateLabel(sigla) {
@@ -93,6 +132,16 @@ function formatExpiracao(raw) {
   const digits = raw.replace(/\D/g, '').slice(0, 6);
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+function validateExpiracao(val) {
+  if (!val) return null;
+  if (!/^\d{2}\/\d{4}$/.test(val)) return 'Formato inválido — use MM/YYYY';
+  const mes = parseInt(val.slice(0, 2), 10);
+  const ano = parseInt(val.slice(3), 10);
+  if (mes < 1 || mes > 12) return 'Mês deve ser entre 01 e 12';
+  if (ano < 2026) return 'Ano deve ser 2026 ou posterior';
+  return null;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -125,6 +174,66 @@ function Toggle({ options, value, onChange, editing }) {
         );
       })}
     </View>
+  );
+}
+
+function CidadePickerModal({ visible, value, onSelect, onOutra, onClose }) {
+  const [busca, setBusca] = useState('');
+
+  // Limpa a busca sempre que o modal fecha
+  React.useEffect(() => { if (!visible) setBusca(''); }, [visible]);
+
+  const filtradas = busca.trim()
+    ? CIDADES.filter(c => c.toLowerCase().includes(busca.trim().toLowerCase()))
+    : CIDADES;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={styles.cidadeModalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Selecione a cidade</Text>
+          <TextInput
+            style={styles.cidadeSearch}
+            placeholder="Buscar cidade..."
+            placeholderTextColor={colors.gray}
+            value={busca}
+            onChangeText={setBusca}
+            autoCapitalize="words"
+            returnKeyType="search"
+          />
+          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ marginBottom: 32 }}>
+            {filtradas.map((cidade, idx) => (
+              <TouchableOpacity
+                key={cidade}
+                style={[
+                  styles.modalItem,
+                  idx < filtradas.length - 1 && styles.modalItemBorder,
+                  value === cidade && styles.modalItemActive,
+                ]}
+                onPress={() => { onSelect(cidade); onClose(); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalItemText, value === cidade && styles.modalItemTextActive]}>
+                  {cidade}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {filtradas.length > 0 && <View style={styles.modalItemBorder} />}
+            <TouchableOpacity
+              style={styles.modalItem}
+              onPress={() => { onOutra(); onClose(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modalItemText, { color: colors.primary, fontWeight: '600' }]}>
+                Outra cidade...
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -227,8 +336,13 @@ export default function MeusDadosScreen({ navigation }) {
   const [licencaExpiracao, setLicencaExpiracao] = useState('');
 
   // Modal visibility
+  const [cidadeModalVisible,        setCidadeModalVisible]        = useState(false);
+  const [cidadeIsCustom,            setCidadeIsCustom]            = useState(false);
   const [estadoModalVisible,        setEstadoModalVisible]        = useState(false);
   const [licencaEstadoModalVisible, setLicencaEstadoModalVisible] = useState(false);
+
+  // Validation errors
+  const [expiracaoErro, setExpiracaoErro] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -247,7 +361,9 @@ export default function MeusDadosScreen({ navigation }) {
       if (data) {
         setNome(data.nome                        ?? '');
         setTelefone(data.telefone                ?? '');
-        setCidade(data.cidade                    ?? '');
+        const cidadeVal = data.cidade ?? '';
+        setCidade(cidadeVal);
+        setCidadeIsCustom(cidadeVal !== '' && !CIDADES.includes(cidadeVal));
         setEstado(data.estado                    ?? '');
         setZipCode(data.zip_code                 ?? '');
         setIdioma(data.idioma                    ?? 'pt');
@@ -270,6 +386,12 @@ export default function MeusDadosScreen({ navigation }) {
     }
     if (zipCode && !/^\d{5}$/.test(zipCode)) {
       Alert.alert('Zip Code inválido', 'O Zip Code deve ter 5 dígitos.');
+      return;
+    }
+    const erroExp = validateExpiracao(licencaExpiracao);
+    if (erroExp) {
+      setExpiracaoErro(erroExp);
+      Alert.alert('Data inválida', erroExp);
       return;
     }
     setSaving(true);
@@ -377,16 +499,37 @@ export default function MeusDadosScreen({ navigation }) {
         </Field>
 
         <Field label="Cidade">
-          <TextInput
-            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
-            placeholder="Miami"
-            placeholderTextColor={colors.gray}
-            value={cidade}
-            onChangeText={setCidade}
-            editable={editing}
-            autoCapitalize="words"
-            returnKeyType="next"
-          />
+          {editing && cidadeIsCustom ? (
+            <View>
+              <TextInput
+                style={[styles.input, styles.inputText]}
+                placeholder="Digite a cidade"
+                placeholderTextColor={colors.gray}
+                value={cidade}
+                onChangeText={setCidade}
+                autoCapitalize="words"
+                returnKeyType="next"
+                autoFocus
+              />
+              <TouchableOpacity
+                style={styles.voltarListaBtn}
+                onPress={() => { setCidade(''); setCidadeIsCustom(false); setCidadeModalVisible(true); }}
+              >
+                <Text style={styles.voltarListaText}>← Escolher da lista</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
+              onPress={() => editing && setCidadeModalVisible(true)}
+              activeOpacity={editing ? 0.8 : 1}
+            >
+              <Text style={cidade ? styles.inputText : styles.inputPlaceholder}>
+                {cidade || 'Selecione a cidade'}
+              </Text>
+              {editing && <Text style={styles.dropdownArrow}>▼</Text>}
+            </TouchableOpacity>
+          )}
         </Field>
 
         <Field label="Estado">
@@ -460,15 +603,27 @@ export default function MeusDadosScreen({ navigation }) {
 
         <Field label="Data de expiração">
           <TextInput
-            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
+            style={[
+              styles.input, styles.inputText,
+              !editing && styles.inputReadonly,
+              expiracaoErro && editing && styles.inputError,
+            ]}
             placeholder="MM/YYYY"
             placeholderTextColor={colors.gray}
             value={licencaExpiracao}
-            onChangeText={raw => setLicencaExpiracao(formatExpiracao(raw))}
+            onChangeText={raw => {
+              const formatted = formatExpiracao(raw);
+              setLicencaExpiracao(formatted);
+              setExpiracaoErro(validateExpiracao(formatted));
+            }}
             editable={editing}
             keyboardType="numeric"
+            maxLength={7}
             returnKeyType="done"
           />
+          {expiracaoErro && editing && (
+            <Text style={styles.fieldError}>{expiracaoErro}</Text>
+          )}
         </Field>
 
         {editing && (
@@ -486,6 +641,14 @@ export default function MeusDadosScreen({ navigation }) {
 
         <View style={{ height: 16 }} />
       </ScrollView>
+
+      <CidadePickerModal
+        visible={cidadeModalVisible}
+        value={cidade}
+        onSelect={c => { setCidade(c); setCidadeIsCustom(false); }}
+        onOutra={() => { setCidade(''); setCidadeIsCustom(true); }}
+        onClose={() => setCidadeModalVisible(false)}
+      />
 
       <StatePickerModal
         visible={estadoModalVisible}
@@ -574,6 +737,30 @@ const styles = StyleSheet.create({
   toggleBtnReadonly: { backgroundColor: '#1A1A1A' },
   toggleText:       { fontSize: 14, fontWeight: '600', color: colors.gray },
   toggleTextActive: { color: colors.white },
+
+  inputError: { borderWidth: 1.5, borderColor: '#EF4444' },
+
+  fieldError: {
+    fontSize: 11, fontWeight: '600', color: '#EF4444',
+    marginTop: 6, letterSpacing: 0.2,
+  },
+
+  voltarListaBtn: { paddingTop: 6, paddingBottom: 2 },
+  voltarListaText: { fontSize: 12, fontWeight: '600', color: colors.primary },
+
+  // City picker modal (taller than state picker — needs search bar)
+  cidadeModalSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 24, paddingTop: 12,
+    maxHeight: '85%',
+  },
+  cidadeSearch: {
+    backgroundColor: '#2D1020', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 15, color: colors.white,
+    marginBottom: 14,
+  },
 
   // State picker modal
   modalBackdrop: {
