@@ -39,7 +39,7 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 2500);
+    const timer = setTimeout(() => setShowSplash(false), 3500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -47,8 +47,8 @@ export default function App() {
     return (
       <View style={styles.splash}>
         <Image
-          source={require('./assets/images/logo.png')}
-          style={styles.logo}
+          source={require('./assets/images/emblema.png')}
+          style={styles.emblema}
         />
       </View>
     );
@@ -75,9 +75,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: {
-    width: 200,
-    height: 100,
+  emblema: {
+    width: 360,
+    height: 360,
     resizeMode: 'contain',
   },
 });
