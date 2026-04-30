@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,58 +7,95 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const IDIOMAS = [
+  { key: 'pt', label: 'PT-BR' },
+  { key: 'es', label: 'ES-419' },
+  { key: 'en', label: 'EN-US' },
+];
+
+const COPY = {
+  pt: {
+    frase:  'Sua agenda.\nSeu negócio.\nSeu futuro.',
+    criar:  'Criar conta',
+    entrar: 'Já tenho conta',
+  },
+  es: {
+    frase:  'Tu agenda.\nTu negocio.\nTu futuro.',
+    criar:  'Crear cuenta',
+    entrar: 'Ya tengo cuenta',
+  },
+  en: {
+    frase:  'Your schedule.\nYour business.\nYour future.',
+    criar:  'Create account',
+    entrar: 'I already have an account',
+  },
+};
 
 export default function WelcomeScreen({ navigation }) {
+  const [idioma, setIdioma] = useState('pt');
+
+  useEffect(() => {
+    AsyncStorage.getItem('idioma_preferido').then(val => {
+      if (val && COPY[val]) setIdioma(val);
+    });
+  }, []);
+
+  const selectIdioma = async (key) => {
+    setIdioma(key);
+    await AsyncStorage.setItem('idioma_preferido', key);
+  };
+
+  const t = COPY[idioma];
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
 
-      {/* ── Top: logo + copy ── */}
       <View style={styles.top}>
         <Image
           source={require('../../assets/images/logo.png')}
           style={styles.logo}
         />
 
-        <Text style={styles.headline}>
-          Sua agenda.{'\n'}Seu negócio.{'\n'}Seu futuro.
-        </Text>
+        <View style={styles.chips}>
+          {IDIOMAS.map(({ key, label }) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.chip, idioma === key && styles.chipActive]}
+              onPress={() => selectIdioma(key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.chipText, idioma === key && styles.chipTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <Text style={styles.subheadline}>
-          Tu agenda. Tu negocio. Tu futuro.
-        </Text>
+        <Text style={styles.headline}>{t.frase}</Text>
       </View>
 
-      {/* ── Spacer ── */}
       <View style={styles.spacer} />
 
-      {/* ── Botões ── */}
       <View style={styles.buttons}>
-
-        <LinearGradient
-          colors={['#C4356E', '#A8235A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradientWrap}
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Auth')}
         >
-          <TouchableOpacity
-            style={styles.btnInner}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Auth')}
-          >
-            <Text style={styles.gradientBtnText}>Criar conta</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+          <Text style={styles.primaryBtnText}>{t.criar}</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.outlineBtn}
           activeOpacity={0.75}
           onPress={() => navigation.navigate('Login')}
         >
-          <Text style={styles.outlineBtnText}>Já tenho conta</Text>
+          <Text style={styles.outlineBtnText}>{t.entrar}</Text>
         </TouchableOpacity>
-
       </View>
+
     </SafeAreaView>
   );
 }
@@ -67,61 +104,79 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#1A0A14',
+    justifyContent: 'space-between',
   },
 
   top: {
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 48,
     paddingHorizontal: 32,
   },
+
   logo: {
-    width: 120,
-    height: 80,
+    width: 560,
+    height: 224,
     resizeMode: 'contain',
-    marginBottom: 40,
+    marginBottom: 20,
   },
+
+  chips: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#A8235A',
+  },
+  chipActive: {
+    backgroundColor: '#A8235A',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A8235A',
+    letterSpacing: 0.4,
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+  },
+
   headline: {
     fontSize: 28,
     fontWeight: '800',
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 36,
-    marginBottom: 12,
-  },
-  subheadline: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#C9A8B6',
-    textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 38,
+    marginTop: 24,
   },
 
   spacer: { flex: 1 },
 
   buttons: {
     paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingBottom: 48,
     gap: 12,
   },
 
-  gradientWrap: {
-    height: 50,
+  primaryBtn: {
+    height: 52,
     borderRadius: 14,
-    overflow: 'hidden',
-  },
-  btnInner: {
-    flex: 1,
+    backgroundColor: '#A8235A',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gradientBtnText: {
+  primaryBtnText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
 
   outlineBtn: {
-    height: 50,
+    height: 52,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#A8235A',
