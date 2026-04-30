@@ -1,24 +1,29 @@
 {
   "expo": {
-    "name": "auren",
+    "name": "AUREN",
     "slug": "auren",
     "version": "1.0.0",
+    "description": "Gestão completa para profissionais de manicure",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/emblema.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/emblema.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1A0A14"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.falcons.auren",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.falcons.auren",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/emblema.png",
+        "backgroundColor": "#1A0A14"
       },
       "edgeToEdgeEnabled": true
     },
