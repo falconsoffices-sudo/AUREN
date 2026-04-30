@@ -45,6 +45,7 @@ const MENU = [
   { id: 4,  label: 'Templates de SMS' },
   { id: 5,  label: 'Metas e Objetivos' },
   { id: 5.5, label: 'Relatório Mensal' },
+  { id: 5.6, label: 'Inteligência de Clientela' },
   { id: 6,  label: 'Despesas' },
   { id: 7,  label: 'Gamificação' },
   { id: 8,  label: 'Presentear com AUREN' },
@@ -126,7 +127,8 @@ export default function PerfilScreen({ navigation }) {
       case 'Configurações':        return () => navigation.navigate('Configuracoes');
       case 'Templates de SMS':     return () => navigation.navigate('TemplatesSMS');
       case 'Metas e Objetivos':    return () => navigation.navigate('Metas');
-      case 'Relatório Mensal':    return () => navigation.navigate('Relatorio');
+      case 'Relatório Mensal':          return () => navigation.navigate('Relatorio');
+      case 'Inteligência de Clientela': return () => navigation.navigate('IntelClientela');
       case 'Gamificação':          return () => navigation.navigate('Gamificacao');
       case 'Presentear com AUREN': return () => navigation.navigate('Presentear');
       case 'Ajuda':                return () => navigation.navigate('Ajuda');

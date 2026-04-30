@@ -144,6 +144,202 @@ function ServicoDropdown({ opcao, setOpcao, aberto, setAberto }) {
   );
 }
 
+// ─── Cliente Histórico Modal ──────────────────────────────────────────────────
+
+function formatDtBrief(dt) {
+  const d = new Date(dt);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatMoeda(v) {
+  return Number(v || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+
+const STATUS_COLOR = {
+  confirmado: '#10B981',
+  finalizado: '#6B7280',
+  cancelado:  '#EF4444',
+  pendente:   '#F59E0B',
+};
+
+function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) {
+  const [loading,      setLoading]      = useState(false);
+  const [agendamentos, setAgendamentos] = useState([]);
+
+  useEffect(() => {
+    if (!visible || !cliente || !userId) return;
+    setLoading(true);
+    supabase
+      .from('agendamentos')
+      .select('id, data_hora, status, valor, servicos(nome)')
+      .eq('profissional_id', userId)
+      .eq('cliente_id', cliente.id)
+      .order('data_hora', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setAgendamentos(data ?? []);
+        setLoading(false);
+      });
+  }, [visible, cliente, userId]);
+
+  if (!cliente) return null;
+
+  const ativos      = agendamentos.filter(a => a.status !== 'cancelado');
+  const totalVisitas = ativos.length;
+  const valorTotal  = ativos.reduce((s, a) => s + Number(a.valor || 0), 0);
+  const ultimaVisita = ativos[0]?.data_hora ?? null;
+
+  const bySvc = {};
+  for (const a of ativos) {
+    const nome = a.servicos?.nome ?? '—';
+    bySvc[nome] = (bySvc[nome] ?? 0) + 1;
+  }
+  const topServicos = Object.entries(bySvc)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={[modal.sheet, { maxHeight: '92%', paddingBottom: 0 }]}>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View style={modal.handle} />
+
+            {/* ── Cabeçalho ── */}
+            <View style={hist.headerRow}>
+              <View style={hist.avatar}>
+                <Text style={hist.avatarText}>{getInitials(cliente.nome)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={hist.nome}>{cliente.nome}</Text>
+                {cliente.vip && (
+                  <View style={hist.vipBadge}>
+                    <Text style={hist.vipText}>VIP</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* ── Resumo ── */}
+            <View style={hist.resumoRow}>
+              <View style={hist.resumoCell}>
+                <Text style={hist.resumoVal}>{totalVisitas}</Text>
+                <Text style={hist.resumoLbl}>visitas</Text>
+              </View>
+              <View style={hist.resumoDiv} />
+              <View style={hist.resumoCell}>
+                <Text style={hist.resumoVal}>{formatMoeda(valorTotal)}</Text>
+                <Text style={hist.resumoLbl}>total gasto</Text>
+              </View>
+              <View style={hist.resumoDiv} />
+              <View style={hist.resumoCell}>
+                <Text style={hist.resumoVal}>{ultimaVisita ? formatDtBrief(ultimaVisita) : '—'}</Text>
+                <Text style={hist.resumoLbl}>última visita</Text>
+              </View>
+            </View>
+
+            {/* ── Serviços mais feitos ── */}
+            {topServicos.length > 0 && (
+              <>
+                <Text style={hist.sectionLabel}>SERVIÇOS MAIS FEITOS</Text>
+                <View style={hist.card}>
+                  {topServicos.map(([nome, count], i) => (
+                    <View key={i}>
+                      {i > 0 && <View style={hist.divider} />}
+                      <View style={hist.svcRow}>
+                        <Text style={hist.svcNome} numberOfLines={1}>{nome}</Text>
+                        <Text style={hist.svcCount}>{count}×</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {/* ── Histórico completo ── */}
+            <Text style={hist.sectionLabel}>HISTÓRICO</Text>
+            {loading ? (
+              <ActivityIndicator color="#A8235A" style={{ marginTop: 20 }} />
+            ) : agendamentos.length === 0 ? (
+              <Text style={hist.semDados}>Nenhum atendimento registrado.</Text>
+            ) : (
+              <View style={hist.card}>
+                {agendamentos.map((a, i) => (
+                  <View key={a.id}>
+                    {i > 0 && <View style={hist.divider} />}
+                    <View style={hist.agRow}>
+                      <View style={[hist.statusDot, { backgroundColor: STATUS_COLOR[a.status] ?? '#6B7280' }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={hist.agServico} numberOfLines={1}>
+                          {a.servicos?.nome ?? '—'}
+                        </Text>
+                        <Text style={hist.agData}>{formatDtBrief(a.data_hora)}</Text>
+                      </View>
+                      <Text style={hist.agValor}>{formatMoeda(a.valor)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* ── Ações ── */}
+            <View style={hist.btnRow}>
+              <TouchableOpacity style={hist.btnEditar} onPress={onEditar} activeOpacity={0.85}>
+                <Text style={hist.btnEditarText}>Editar cliente</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={hist.btnFechar} onPress={onClose} activeOpacity={0.75}>
+                <Text style={hist.btnFecharText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const hist = StyleSheet.create({
+  headerRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 14 },
+  avatar:     { width: 52, height: 52, borderRadius: 26, backgroundColor: '#3D1020', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 18, fontWeight: '700', color: '#E8C4A0' },
+  nome:       { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
+  vipBadge:   { backgroundColor: 'rgba(232,196,160,0.14)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(232,196,160,0.28)' },
+  vipText:    { fontSize: 9, fontWeight: '800', color: '#E8C4A0', letterSpacing: 0.7 },
+
+  resumoRow:  { flexDirection: 'row', backgroundColor: '#1A1B1E', borderRadius: 14, marginBottom: 22, overflow: 'hidden' },
+  resumoCell: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  resumoDiv:  { width: 1, backgroundColor: '#2A2A2A' },
+  resumoVal:  { fontSize: 13, fontWeight: '800', color: '#FFFFFF', marginBottom: 3 },
+  resumoLbl:  { fontSize: 10, color: '#8A8A8E' },
+
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#8A8A8E', letterSpacing: 1.2, marginBottom: 8 },
+  card:       { backgroundColor: '#1A1B1E', borderRadius: 12, overflow: 'hidden', marginBottom: 18 },
+  divider:    { height: 1, backgroundColor: '#2A2A2A' },
+
+  svcRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
+  svcNome:   { fontSize: 13, fontWeight: '500', color: '#FFFFFF', flex: 1 },
+  svcCount:  { fontSize: 13, fontWeight: '700', color: '#A8235A' },
+
+  agRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, gap: 10 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  agServico: { fontSize: 13, fontWeight: '500', color: '#FFFFFF' },
+  agData:    { fontSize: 11, color: '#8A8A8E', marginTop: 1 },
+  agValor:   { fontSize: 13, fontWeight: '700', color: '#C8C8CE', flexShrink: 0 },
+
+  semDados:  { fontSize: 13, color: '#8A8A8E', marginBottom: 18 },
+
+  btnRow:     { flexDirection: 'row', gap: 10, marginTop: 4 },
+  btnEditar:  { flex: 2, height: 50, borderRadius: 12, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center' },
+  btnEditarText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  btnFechar:  { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#3A3A3A', alignItems: 'center', justifyContent: 'center' },
+  btnFecharText: { fontSize: 15, fontWeight: '600', color: '#8A8A8E' },
+});
+
 // ─── Add Client Modal ─────────────────────────────────────────────────────────
 
 function AddClientModal({ visible, onClose, onSaved }) {
@@ -438,10 +634,12 @@ export default function ClientesScreen() {
   const [clientes,        setClientes]        = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [query,           setQuery]           = useState('');
-  const [addVisible,      setAddVisible]      = useState(false);
-  const [editVisible,     setEditVisible]     = useState(false);
-  const [selectedCliente, setSelectedCliente] = useState(null);
-  const [userId,          setUserId]          = useState(null);
+  const [addVisible,        setAddVisible]        = useState(false);
+  const [editVisible,       setEditVisible]       = useState(false);
+  const [selectedCliente,   setSelectedCliente]   = useState(null);
+  const [historicoVisible,  setHistoricoVisible]  = useState(false);
+  const [historicoCliente,  setHistoricoCliente]  = useState(null);
+  const [userId,            setUserId]            = useState(null);
 
   const fetchClientes = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -477,6 +675,11 @@ export default function ClientesScreen() {
   }, [query, clientes]);
 
   const totalAtivas = clientes.filter(c => c.ativa).length;
+
+  const openHistorico = (cliente) => {
+    setHistoricoCliente(cliente);
+    setHistoricoVisible(true);
+  };
 
   const openEdit = (cliente) => {
     setSelectedCliente(cliente);
@@ -533,7 +736,7 @@ export default function ClientesScreen() {
             <ClientCard
               key={c.id}
               {...c}
-              onPress={() => openEdit(c)}
+              onPress={() => openHistorico(c)}
             />
           ))
         ) : (
@@ -554,6 +757,17 @@ export default function ClientesScreen() {
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      <ClienteHistoricoModal
+        visible={historicoVisible}
+        cliente={historicoCliente}
+        userId={userId}
+        onClose={() => setHistoricoVisible(false)}
+        onEditar={() => {
+          setHistoricoVisible(false);
+          setTimeout(() => openEdit(historicoCliente), 320);
+        }}
+      />
 
       <AddClientModal
         visible={addVisible}
