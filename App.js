@@ -17,6 +17,7 @@ import SaibaMaisScreen  from './src/screens/SaibaMaisScreen';
 import PoliticasScreen  from './src/screens/PoliticasScreen';
 import { supabase } from './src/lib/supabase';
 import { registerForPushNotifications } from './src/lib/notifications';
+import { agendarNotificacaoRelatorio } from './src/lib/relatorio';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
@@ -99,6 +100,7 @@ export default function App() {
       }).start(() => setShowSplash(false));
     }, 3000);
     setupPushToken();
+    agendarNotificacaoRelatorio();
     return () => clearTimeout(fadeTimer);
   }, []);
 

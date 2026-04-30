@@ -15,6 +15,7 @@ import AjudaScreen           from '../screens/AjudaScreen';
 import SaibaMaisScreen       from '../screens/SaibaMaisScreen';
 import PoliticasScreen       from '../screens/PoliticasScreen';
 import TutoriaisScreen       from '../screens/TutoriaisScreen';
+import RelatorioScreen       from '../screens/RelatorioScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -35,6 +36,7 @@ export default function PerfilStack() {
       <Stack.Screen name="SaibaMais"     component={SaibaMaisScreen}     />
       <Stack.Screen name="Politicas"     component={PoliticasScreen}     />
       <Stack.Screen name="Tutoriais"     component={TutoriaisScreen}     />
+      <Stack.Screen name="Relatorio"     component={RelatorioScreen}     />
     </Stack.Navigator>
   );
 }
