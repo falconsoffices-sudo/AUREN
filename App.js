@@ -9,7 +9,7 @@ import WelcomeScreen             from './src/screens/WelcomeScreen';
 import AuthScreen                from './src/screens/AuthScreen';
 import AuthClienteScreen         from './src/screens/AuthClienteScreen';
 import LoginScreen               from './src/screens/LoginScreen';
-import ClientePlaceholderScreen  from './src/screens/ClientePlaceholderScreen';
+import MainClienteScreen         from './src/screens/MainClienteScreen';
 import HomeScreen       from './src/screens/HomeScreen';
 import AgendaScreen     from './src/screens/AgendaScreen';
 import ClientesScreen   from './src/screens/ClientesScreen';
@@ -84,7 +84,7 @@ function AppContent() {
           <Stack.Screen name="Auth"             component={AuthScreen}               />
           <Stack.Screen name="AuthCliente"      component={AuthClienteScreen}        />
           <Stack.Screen name="Login"            component={LoginScreen}              />
-          <Stack.Screen name="ClientePlaceholder" component={ClientePlaceholderScreen} />
+          <Stack.Screen name="MainCliente"        component={MainClienteScreen}        />
           <Stack.Screen name="Onboarding"       component={OnboardingScreen}         />
           <Stack.Screen name="SaibaMais"  component={SaibaMaisScreen}  />
           <Stack.Screen name="Politicas"  component={PoliticasScreen}  />

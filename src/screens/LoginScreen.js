@@ -18,7 +18,7 @@ import { supabase } from '../lib/supabase';
 async function routeAfterLogin(navigation, uid) {
   try {
     const { data } = await supabase.from('profiles').select('tipo_usuario').eq('id', uid).single();
-    navigation.replace(data?.tipo_usuario === 'cliente' ? 'ClientePlaceholder' : 'Main');
+    navigation.replace(data?.tipo_usuario === 'cliente' ? 'MainCliente' : 'Main');
   } catch {
     navigation.replace('Main');
   }

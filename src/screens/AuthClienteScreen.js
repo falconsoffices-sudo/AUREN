@@ -101,7 +101,7 @@ export default function AuthClienteScreen({ navigation }) {
           .eq('id', data.user.id);
       }
 
-      navigation.replace('ClientePlaceholder');
+      navigation.replace('MainCliente');
     } catch (err) {
       Alert.alert('Erro ao verificar', err.message);
     } finally {
