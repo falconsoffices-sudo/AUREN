@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image, StyleSheet, Animated } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -20,6 +21,7 @@ import { supabase } from './src/lib/supabase';
 import { registerForPushNotifications } from './src/lib/notifications';
 import { agendarNotificacaoRelatorio } from './src/lib/relatorio';
 import { verificarEnvioRelatorio } from './src/lib/emailRelatorio';
+import { enviarSMSRota } from './src/lib/sms';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
@@ -102,10 +104,29 @@ export default function App() {
         useNativeDriver: true,
       }).start(() => setShowSplash(false));
     }, 3000);
+
     setupPushToken();
     agendarNotificacaoRelatorio();
     verificarEnvioRelatorio();
-    return () => clearTimeout(fadeTimer);
+
+    // Quando notificação de rota chega em foreground, dispara SMS
+    const sub = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data;
+      if (data?.type === 'sms_rota' && data?.telefone) {
+        enviarSMSRota(
+          data.telefone,
+          data.profissionalNome ?? '',
+          data.horario ?? '',
+          data.endereco ?? '',
+          data.isDomicilio ?? false,
+        ).catch(() => {});
+      }
+    });
+
+    return () => {
+      clearTimeout(fadeTimer);
+      sub.remove();
+    };
   }, []);
 
   if (showSplash) {

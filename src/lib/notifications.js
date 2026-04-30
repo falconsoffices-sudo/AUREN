@@ -26,9 +26,9 @@ export async function registerForPushNotifications() {
   return token;
 }
 
-export async function scheduleNotification(title, body, seconds) {
+export async function scheduleNotification(title, body, seconds, data = {}) {
   await Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: true },
+    content: { title, body, sound: true, data },
     trigger: { seconds: Math.max(1, Math.round(seconds)) },
   });
 }

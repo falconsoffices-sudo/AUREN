@@ -223,7 +223,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     setLoadingClientes(true);
     setLoadingServicos(true);
     Promise.all([
-      supabase.from('clientes').select('id, nome').eq('profissional_id', userId).order('nome'),
+      supabase.from('clientes').select('id, nome, telefone, endereco').eq('profissional_id', userId).order('nome'),
       supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', userId).order('nome'),
     ]).then(([cRes, sRes]) => {
       console.log('[AddModal] servicos userId:', userId, '| data:', sRes.data, '| error:', sRes.error);
@@ -289,6 +289,16 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
       });
       if (error) throw error;
 
+      // Busca perfil + endereço comercial para SMS e rota
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: prof } = user
+        ? await supabase
+            .from('profiles')
+            .select('nome_completo, nome, endereco_comercial')
+            .eq('id', user.id)
+            .single()
+        : { data: null };
+
       // envia SMS de confirmação para a cliente
       if (selectedCliente.telefone) {
         try {
@@ -296,35 +306,58 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
           const templates = stored ? JSON.parse(stored) : {};
           const DEFAULT_CONFIRMACAO = 'Olá [nome]! Seu agendamento de [servico] está confirmado para [horario].';
           const templateText = templates.confirmacao || DEFAULT_CONFIRMACAO;
-          const { data: { user } } = await supabase.auth.getUser();
-          const { data: prof } = user
-            ? await supabase.from('profiles').select('nome_completo').eq('id', user.id).single()
-            : { data: null };
           const mensagem = applyTemplate(templateText, {
             nome:              selectedCliente.nome,
             horario:           formatTimeDisplay(buildDataHora(selectedDate, time)),
             servico:           selectedServico.nome,
-            nome_profissional: prof?.nome_completo ?? '',
+            nome_profissional: prof?.nome_completo ?? prof?.nome ?? '',
           });
           sendSMS(selectedCliente.telefone, mensagem).catch(() => {});
         } catch (_) {}
       }
 
-      // agenda notificações locais de lembrete
-      const secsUntil = (novoInicio.getTime() - Date.now()) / 1000;
-      const horaFmt   = formatTimeDisplay(novoInicio.toISOString());
-      if (secsUntil > 3600) {
+      // Determina endereço para link de rota
+      const isDomicilio = tipoEndereco === 'domicilio';
+      let enderecoRota = '';
+      if (isDomicilio) {
+        // Profissional vai até a cliente — usa endereço da cliente
+        enderecoRota = selectedCliente.endereco ?? '';
+      } else {
+        // Cliente vai até a profissional — usa endereço comercial do perfil
+        try {
+          const ec = JSON.parse(prof?.endereco_comercial || '{}');
+          enderecoRota = [ec.rua, ec.numero, ec.cidade, ec.estado].filter(Boolean).join(', ');
+        } catch (_) {}
+      }
+
+      // Agenda notificações locais de lembrete
+      const secsUntil    = (novoInicio.getTime() - Date.now()) / 1000;
+      const horaFmt      = formatTimeDisplay(novoInicio.toISOString());
+      const profNome     = prof?.nome_completo ?? prof?.nome ?? '';
+
+      // 24h antes — lembrete simples
+      if (secsUntil > 86400) {
         scheduleNotification(
           'Lembrete de agendamento',
           `${selectedCliente.nome} amanhã às ${horaFmt}`,
-          secsUntil - 86400 > 60 ? secsUntil - 86400 : secsUntil - 3600
+          secsUntil - 86400
         ).catch(() => {});
       }
+
+      // 1h antes — lembrete + dados para disparar SMS com rota ao notificar
       if (secsUntil > 3600) {
         scheduleNotification(
           'Próximo atendimento',
           `${selectedCliente.nome} em 1 hora`,
-          secsUntil - 3600
+          secsUntil - 3600,
+          {
+            type:             'sms_rota',
+            telefone:         selectedCliente.telefone ?? null,
+            profissionalNome: profNome,
+            horario:          horaFmt,
+            endereco:         enderecoRota,
+            isDomicilio,
+          }
         ).catch(() => {});
       }
 

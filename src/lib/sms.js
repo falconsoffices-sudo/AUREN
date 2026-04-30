@@ -37,3 +37,36 @@ export function applyTemplate(template, vars) {
     .replace(/\[servico\]/g,            vars.servico            ?? '')
     .replace(/\[nome_profissional\]/g,  vars.nome_profissional  ?? '');
 }
+
+/**
+ * Envia SMS com link de rota do Google Maps 1h antes do agendamento.
+ * isDomicilio=true → endereço é da cliente (profissional vai até ela).
+ * isDomicilio=false → endereço é do estabelecimento (cliente vai até a prof.).
+ */
+export async function enviarSMSRota(clienteTelefone, profissionalNome, horario, endereco, isDomicilio = false) {
+  if (!clienteTelefone) return { success: false, motivo: 'sem telefone' };
+
+  const mapsLink = endereco
+    ? `https://maps.google.com/?q=${encodeURIComponent(endereco)}`
+    : 'https://maps.google.com/';
+
+  const TEMPLATE_KEY = isDomicilio ? 'auren_template_1h_domicilio' : 'auren_template_1h';
+  const TEMPLATE_PADRAO = isDomicilio
+    ? 'Olá! [nome] chegará às [hora] no seu endereço. Confirme aqui: [link]'
+    : 'Olá! Seu horário com [nome] é hoje às [hora]. Clique para o caminho: [link]';
+
+  let template = TEMPLATE_PADRAO;
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const stored = await AsyncStorage.getItem(TEMPLATE_KEY);
+    if (stored) template = stored;
+  } catch (_) {}
+
+  const mensagem = template
+    .replace(/\[nome\]/g,    profissionalNome)
+    .replace(/\[hora\]/g,    horario)
+    .replace(/\[horario\]/g, horario)
+    .replace(/\[link\]/g,    mapsLink);
+
+  return sendSMS(clienteTelefone, mensagem);
+}
