@@ -285,6 +285,7 @@ export default function AuthScreen({ navigation }) {
             licenca_tipo:      licencaTipo,
             licenca_estado:    licencaEstado,
             licenca_expiracao: licencaExpiracao.trim(),
+            tipo_usuario:      'profissional',
           })
           .eq('id', data.user.id);
       }

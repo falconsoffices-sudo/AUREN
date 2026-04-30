@@ -5,9 +5,11 @@ import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import WelcomeScreen    from './src/screens/WelcomeScreen';
-import AuthScreen       from './src/screens/AuthScreen';
-import LoginScreen      from './src/screens/LoginScreen';
+import WelcomeScreen             from './src/screens/WelcomeScreen';
+import AuthScreen                from './src/screens/AuthScreen';
+import AuthClienteScreen         from './src/screens/AuthClienteScreen';
+import LoginScreen               from './src/screens/LoginScreen';
+import ClientePlaceholderScreen  from './src/screens/ClientePlaceholderScreen';
 import HomeScreen       from './src/screens/HomeScreen';
 import AgendaScreen     from './src/screens/AgendaScreen';
 import ClientesScreen   from './src/screens/ClientesScreen';
@@ -78,10 +80,12 @@ function AppContent() {
     <SafeAreaProvider>
       <NavigationContainer theme={isDark ? customDarkTheme : undefined}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Welcome"    component={WelcomeScreen}    />
-          <Stack.Screen name="Auth"       component={AuthScreen}       />
-          <Stack.Screen name="Login"      component={LoginScreen}      />
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Welcome"           component={WelcomeScreen}            />
+          <Stack.Screen name="Auth"             component={AuthScreen}               />
+          <Stack.Screen name="AuthCliente"      component={AuthClienteScreen}        />
+          <Stack.Screen name="Login"            component={LoginScreen}              />
+          <Stack.Screen name="ClientePlaceholder" component={ClientePlaceholderScreen} />
+          <Stack.Screen name="Onboarding"       component={OnboardingScreen}         />
           <Stack.Screen name="SaibaMais"  component={SaibaMaisScreen}  />
           <Stack.Screen name="Politicas"  component={PoliticasScreen}  />
           <Stack.Screen name="Indicacao"  component={IndicacaoScreen}  />

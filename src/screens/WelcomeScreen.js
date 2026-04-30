@@ -17,19 +17,22 @@ const IDIOMAS = [
 
 const COPY = {
   pt: {
-    frase:  'Sua agenda.\nSeu negócio.\nSeu futuro.',
-    criar:  'Criar conta',
-    entrar: 'Já tenho conta',
+    frase:        'Sua agenda.\nSeu negócio.\nSeu futuro.',
+    criarProf:    'Criar conta — Sou profissional',
+    criarCliente: 'Criar conta — Sou cliente',
+    entrar:       'Já tenho conta',
   },
   es: {
-    frase:  'Tu agenda.\nTu negocio.\nTu futuro.',
-    criar:  'Crear cuenta',
-    entrar: 'Ya tengo cuenta',
+    frase:        'Tu agenda.\nTu negocio.\nTu futuro.',
+    criarProf:    'Crear cuenta — Soy profesional',
+    criarCliente: 'Crear cuenta — Soy cliente',
+    entrar:       'Ya tengo cuenta',
   },
   en: {
-    frase:  'Your schedule.\nYour business.\nYour future.',
-    criar:  'Create account',
-    entrar: 'I already have an account',
+    frase:        'Your schedule.\nYour business.\nYour future.',
+    criarProf:    'Create account — I\'m a professional',
+    criarCliente: 'Create account — I\'m a client',
+    entrar:       'I already have an account',
   },
 };
 
@@ -84,15 +87,23 @@ export default function WelcomeScreen({ navigation }) {
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Auth')}
         >
-          <Text style={styles.primaryBtnText}>{t.criar}</Text>
+          <Text style={styles.primaryBtnText}>{t.criarProf}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.outlineBtn}
           activeOpacity={0.75}
+          onPress={() => navigation.navigate('AuthCliente')}
+        >
+          <Text style={styles.outlineBtnText}>{t.criarCliente}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.loginLink}
+          activeOpacity={0.7}
           onPress={() => navigation.navigate('Login')}
         >
-          <Text style={styles.outlineBtnText}>{t.entrar}</Text>
+          <Text style={styles.loginLinkText}>{t.entrar}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -205,9 +216,12 @@ const styles = StyleSheet.create({
     color: '#A8235A',
   },
 
-  saibaMaisBtn: { alignItems: 'center', paddingVertical: 10 },
+  loginLink:     { alignItems: 'center', paddingVertical: 10 },
+  loginLinkText: { fontSize: 15, fontWeight: '600', color: '#A8235A' },
+
+  saibaMaisBtn: { alignItems: 'center', paddingVertical: 8 },
   saibaMaisBtnText: { fontSize: 13, fontWeight: '600', color: '#6B4A58' },
 
-  termsLink:     { alignItems: 'center', paddingVertical: 8 },
+  termsLink:     { alignItems: 'center', paddingVertical: 6 },
   termsLinkText: { fontSize: 11, fontWeight: '400', color: '#555560', textDecorationLine: 'underline' },
 });

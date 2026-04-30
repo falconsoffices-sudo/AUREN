@@ -15,6 +15,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
+async function routeAfterLogin(navigation, uid) {
+  try {
+    const { data } = await supabase.from('profiles').select('tipo_usuario').eq('id', uid).single();
+    navigation.replace(data?.tipo_usuario === 'cliente' ? 'ClientePlaceholder' : 'Main');
+  } catch {
+    navigation.replace('Main');
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatPhone(raw) {
@@ -69,13 +78,13 @@ export default function LoginScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otpCode,
         type: 'email',
       });
       if (error) throw error;
-      navigation.replace('Main');
+      await routeAfterLogin(navigation, data.user?.id);
     } catch (err) {
       Alert.alert('Código incorreto', err.message);
     } finally {
@@ -91,12 +100,12 @@ export default function LoginScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: makePassword(email.trim(), telefone),
       });
       if (error) throw error;
-      navigation.replace('Main');
+      await routeAfterLogin(navigation, data.user?.id);
     } catch (err) {
       Alert.alert('Erro ao entrar', err.message);
     } finally {
@@ -109,12 +118,12 @@ export default function LoginScreen({ navigation }) {
     const devEmail = email.trim() || DEV_EMAIL;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email:    devEmail,
         password: makePassword(devEmail, DEV_PHONE),
       });
       if (error) throw error;
-      navigation.replace('Main');
+      await routeAfterLogin(navigation, data.user?.id);
     } catch (err) {
       Alert.alert('Dev login falhou', err.message);
     } finally {
