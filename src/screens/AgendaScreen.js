@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
+import { scheduleNotification } from '../lib/notifications';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -277,6 +278,25 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         observacoes:     observacoes.trim() || null,
       });
       if (error) throw error;
+
+      // agenda notificações locais de lembrete
+      const secsUntil = (novoInicio.getTime() - Date.now()) / 1000;
+      const horaFmt   = formatTimeDisplay(novoInicio.toISOString());
+      if (secsUntil > 3600) {
+        scheduleNotification(
+          'Lembrete de agendamento',
+          `${selectedCliente.nome} amanhã às ${horaFmt}`,
+          secsUntil - 86400 > 60 ? secsUntil - 86400 : secsUntil - 3600
+        ).catch(() => {});
+      }
+      if (secsUntil > 3600) {
+        scheduleNotification(
+          'Próximo atendimento',
+          `${selectedCliente.nome} em 1 hora`,
+          secsUntil - 3600
+        ).catch(() => {});
+      }
+
       reset();
       onSaved();
     } catch (err) {
