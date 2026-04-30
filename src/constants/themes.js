@@ -1,11 +1,11 @@
 export const DARK = {
   colors: {
-    background:    '#1A0A14',
-    card:          '#2D1020',
+    background:    '#0E0F11',
+    card:          '#1A1B1E',
     text:          '#F5EDE8',
-    textSecondary: '#C9A8B6',
+    textSecondary: '#8A8A8E',
     primary:       '#A8235A',
-    border:        '#3D1A2E',
+    border:        '#2A2A2A',
   },
   shadows: {
     sm: {

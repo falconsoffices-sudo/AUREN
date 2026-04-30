@@ -501,10 +501,10 @@ export default function AuthScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1A0A14' },
+  safe: { flex: 1, backgroundColor: '#0E0F11' },
   scroll: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 48 },
 
   logo: {
@@ -557,11 +557,11 @@ const styles = StyleSheet.create({
   dropdownItemTextActive:   { fontWeight: '700', color: '#A8235A' },
 
   estadoModalBackdrop:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  estadoModalSheet:         { backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '75%' },
+  estadoModalSheet:         { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '75%' },
   estadoModalHandle:        { width: 40, height: 4, borderRadius: 2, backgroundColor: '#3D1020', alignSelf: 'center', marginBottom: 16 },
   estadoModalTitle:         { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 16 },
   estadoModalItem:          { paddingVertical: 14 },
-  estadoModalItemBorder:    { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  estadoModalItemBorder:    { borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
   estadoModalItemActive:    { backgroundColor: 'rgba(168,35,90,0.08)' },
   estadoModalItemText:      { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   estadoModalItemTextActive:{ fontWeight: '700', color: '#A8235A' },

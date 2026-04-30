@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -65,14 +66,17 @@ function getDateRanges() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }) {
+  const { isDark } = useTheme();
   return (
-    <View style={styles.track}>
-      <View style={[styles.fill, { width: `${progress}%` }]} />
+    <View style={{ height: 8, backgroundColor: isDark ? '#1A1B1E' : '#E6D8CF', borderRadius: 4, overflow: 'hidden' }}>
+      <View style={{ height: 8, backgroundColor: colors.primary, borderRadius: 4, width: `${progress}%` }} />
     </View>
   );
 }
 
 function PaymentCard({ abbr, label, value, bg, color }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return (
     <View style={styles.payCard}>
       <View style={[styles.payIndicator, { backgroundColor: bg }]}>
@@ -85,6 +89,8 @@ function PaymentCard({ abbr, label, value, bg, color }) {
 }
 
 function MetaBar({ label, current, total }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const progress = pct(current, total);
   return (
     <View style={styles.metaItem}>
@@ -104,6 +110,8 @@ function MetaBar({ label, current, total }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CaixaScreen() {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const [loading,         setLoading]         = useState(true);
   const [ganhosMes,       setGanhosMes]       = useState(0);
   const [ganhosHoje,      setGanhosHoje]      = useState(0);
@@ -299,187 +307,65 @@ export default function CaixaScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_BG = '#222222';
-const SUBTLE  = '#2C2C2C';
+function makeStyles(isDark) {
+  const bg   = isDark ? '#0E0F11' : '#F5EDE8';
+  const card = isDark ? '#1A1B1E' : '#FFFFFF';
+  const text = isDark ? '#F5EDE8' : '#1A0A14';
+  const sub  = isDark ? '#C9A8B6' : '#6B4A58';
 
-const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 110 },
+  return StyleSheet.create({
+    safe:   { flex: 1, backgroundColor: bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scroll: { paddingHorizontal: 20, paddingBottom: 110 },
 
-  header: { paddingTop: 28, marginBottom: 24 },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: 3,
-  },
-  headerSub: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.gray,
-  },
+    header: { paddingTop: 28, marginBottom: 24 },
+    headerTitle: { fontSize: 28, fontWeight: '700', color: text, marginBottom: 3 },
+    headerSub:   { fontSize: 13, fontWeight: '400', color: sub },
 
-  mainCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 22,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-  },
-  mainCardLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: 1.5,
-    marginBottom: 10,
-  },
-  mainCardValue: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: colors.white,
-    lineHeight: 52,
-    marginBottom: 8,
-  },
-  mainCardSub: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.gray,
-    marginBottom: 16,
-  },
-  mainCardPct: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-    marginTop: 8,
-  },
+    mainCard: {
+      backgroundColor: card, borderRadius: 16, padding: 22,
+      marginBottom: 12, borderLeftWidth: 3, borderLeftColor: colors.primary,
+    },
+    mainCardLabel: { fontSize: 11, fontWeight: '700', color: colors.primary, letterSpacing: 1.5, marginBottom: 10 },
+    mainCardValue: { fontSize: 48, fontWeight: '800', color: text, lineHeight: 52, marginBottom: 8 },
+    mainCardSub:   { fontSize: 13, fontWeight: '400', color: sub, marginBottom: 16 },
+    mainCardPct:   { fontSize: 12, fontWeight: '400', color: sub, marginTop: 8 },
 
-  track: {
-    height: 8,
-    backgroundColor: SUBTLE,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 4,
-  },
+    statsRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
+    statCard:  { backgroundColor: card, borderRadius: 16, padding: 18 },
+    statLabel: { fontSize: 10, fontWeight: '700', color: sub, letterSpacing: 1.2, marginBottom: 10 },
+    statValue: { fontSize: 24, fontWeight: '800', color: text, marginBottom: 5 },
+    statSub:   { fontSize: 12, fontWeight: '400', color: sub },
+    valueRed:   { color: '#F87171' },
+    valueGreen: { color: '#4ade80' },
 
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
-  statCard: { backgroundColor: CARD_BG, borderRadius: 16, padding: 18 },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.gray,
-    letterSpacing: 1.2,
-    marginBottom: 10,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.white,
-    marginBottom: 5,
-  },
-  statSub: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-  },
-  valueRed:   { color: '#F87171' },
-  valueGreen: { color: '#4ade80' },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: text, marginBottom: 14 },
 
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: 14,
-  },
+    payGrid: { gap: 10, marginBottom: 28 },
+    payRow:  { flexDirection: 'row', gap: 10 },
+    payCard: { flex: 1, backgroundColor: card, borderRadius: 16, padding: 16 },
+    payIndicator: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    payAbbr:  { fontSize: 13, fontWeight: '800', letterSpacing: 0.4 },
+    payLabel: { fontSize: 12, fontWeight: '400', color: sub, marginBottom: 4 },
+    payValue: { fontSize: 18, fontWeight: '700', color: text },
 
-  payGrid: { gap: 10, marginBottom: 28 },
-  payRow: { flexDirection: 'row', gap: 10 },
-  payCard: {
-    flex: 1,
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
-  },
-  payIndicator: {
-    width: 40, height: 40,
-    borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
-  },
-  payAbbr: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  payLabel: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-    marginBottom: 4,
-  },
-  payValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.white,
-  },
+    metasCard: { backgroundColor: card, borderRadius: 16, padding: 20, marginBottom: 12 },
+    metaItem:  { paddingVertical: 4 },
+    metaTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    metaLabel:  { fontSize: 14, fontWeight: '600', color: text },
+    metaPercent: { fontSize: 14, fontWeight: '700', color: colors.primary },
+    metaBottomRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+    metaCurrent: { fontSize: 13, fontWeight: '600', color: text },
+    metaTotal:   { fontSize: 13, fontWeight: '400', color: sub },
 
-  metasCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-  },
-  metaItem: { paddingVertical: 4 },
-  metaTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  metaLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  metaPercent: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  metaBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  metaCurrent: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  metaTotal: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.gray,
-  },
-
-  fab: {
-    position: 'absolute', bottom: 24, right: 20,
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
-  },
-  fabText: {
-    fontSize: 30,
-    fontWeight: '400',
-    color: colors.white,
-    lineHeight: 34,
-  },
-});
+    fab: {
+      position: 'absolute', bottom: 24, right: 20,
+      width: 56, height: 56, borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
+    },
+    fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
+  });
+}

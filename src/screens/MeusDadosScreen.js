@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -181,15 +181,14 @@ function Toggle({ options, value, onChange, editing }) {
   );
 }
 
-function CidadePickerModal({ visible, value, onSelect, onOutra, onClose }) {
+function CidadePickerModal({ visible, value, cidades, onSelect, onOutra, onClose }) {
   const [busca, setBusca] = useState('');
 
-  // Limpa a busca sempre que o modal fecha
   React.useEffect(() => { if (!visible) setBusca(''); }, [visible]);
 
   const filtradas = busca.trim()
-    ? CIDADES.filter(c => c.toLowerCase().includes(busca.trim().toLowerCase()))
-    : CIDADES;
+    ? cidades.filter(c => c.toLowerCase().includes(busca.trim().toLowerCase()))
+    : cidades;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -348,6 +347,18 @@ export default function MeusDadosScreen({ navigation }) {
   // Validation errors
   const [expiracaoErro, setExpiracaoErro] = useState(null);
 
+  const cidadesFiltradas = useMemo(() => {
+    if (!estado) return CIDADES;
+    return CIDADES.filter(c => c.endsWith(`, ${estado}`));
+  }, [estado]);
+
+  useEffect(() => {
+    if (cidade && estado && !cidade.endsWith(`, ${estado}`)) {
+      setCidade('');
+      setCidadeIsCustom(false);
+    }
+  }, [estado]);
+
   useEffect(() => {
     (async () => {
       const { data: authData } = await supabase.auth.getUser();
@@ -502,6 +513,19 @@ export default function MeusDadosScreen({ navigation }) {
           />
         </Field>
 
+        <Field label="Estado">
+          <TouchableOpacity
+            style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
+            onPress={() => editing && setEstadoModalVisible(true)}
+            activeOpacity={editing ? 0.8 : 1}
+          >
+            <Text style={estado ? styles.inputText : styles.inputPlaceholder}>
+              {stateLabel(estado) || 'Selecione o estado'}
+            </Text>
+            {editing && <Text style={styles.dropdownArrow}>▼</Text>}
+          </TouchableOpacity>
+        </Field>
+
         <Field label="Cidade">
           {editing && cidadeIsCustom ? (
             <View>
@@ -534,19 +558,6 @@ export default function MeusDadosScreen({ navigation }) {
               {editing && <Text style={styles.dropdownArrow}>▼</Text>}
             </TouchableOpacity>
           )}
-        </Field>
-
-        <Field label="Estado">
-          <TouchableOpacity
-            style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
-            onPress={() => editing && setEstadoModalVisible(true)}
-            activeOpacity={editing ? 0.8 : 1}
-          >
-            <Text style={estado ? styles.inputText : styles.inputPlaceholder}>
-              {stateLabel(estado) || 'Selecione o estado'}
-            </Text>
-            {editing && <Text style={styles.dropdownArrow}>▼</Text>}
-          </TouchableOpacity>
         </Field>
 
         <Field label="Zip Code">
@@ -649,6 +660,7 @@ export default function MeusDadosScreen({ navigation }) {
       <CidadePickerModal
         visible={cidadeModalVisible}
         value={cidade}
+        cidades={cidadesFiltradas}
         onSelect={c => { setCidade(c); setCidadeIsCustom(false); }}
         onOutra={() => { setCidade(''); setCidadeIsCustom(true); }}
         onClose={() => setCidadeModalVisible(false)}
@@ -760,7 +772,7 @@ const styles = StyleSheet.create({
     maxHeight: '85%',
   },
   cidadeSearch: {
-    backgroundColor: '#2D1020', borderRadius: 12,
+    backgroundColor: '#1A1B1E', borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 12,
     fontSize: 15, color: colors.white,
     marginBottom: 14,

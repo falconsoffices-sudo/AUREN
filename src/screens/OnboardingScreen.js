@@ -334,14 +334,14 @@ export default function OnboardingScreen({ navigation }) {
   );
 }
 
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: '#1A0A14' },
+  safe:   { flex: 1, backgroundColor: '#0E0F11' },
   scroll: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 48 },
 
   dots: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 36 },
-  dot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3D1A2E' },
+  dot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: '#2A2A2A' },
   dotActive: { backgroundColor: '#A8235A', width: 24 },
 
   stepTag:  { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1.4, marginBottom: 10 },

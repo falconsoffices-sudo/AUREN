@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -55,6 +56,8 @@ const MENU = [
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function PlanCard({ name, price, popular, items, onEscolher }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return (
     <View style={[styles.planCard, popular && styles.planCardPro]}>
       <View>
@@ -63,7 +66,7 @@ function PlanCard({ name, price, popular, items, onEscolher }) {
             <Text style={styles.popularBadgeText}>MAIS POPULAR</Text>
           </View>
         )}
-        <Text style={[styles.planName, popular && styles.planNamePro]}>{name}</Text>
+        <Text style={styles.planName}>{name}</Text>
         <View style={styles.planPriceRow}>
           <Text style={styles.planPrice}>{price}</Text>
           <Text style={styles.planPeriod}>/mês</Text>
@@ -90,6 +93,8 @@ function PlanCard({ name, price, popular, items, onEscolher }) {
 }
 
 function MenuItem({ label, danger, last, onPress }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return (
     <TouchableOpacity
       style={[styles.menuItem, !last && styles.menuItemBorder]}
@@ -107,6 +112,8 @@ function MenuItem({ label, danger, last, onPress }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PerfilScreen({ navigation }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const [planModal, setPlanModal] = useState(null);
 
   function menuPress(label) {
@@ -177,7 +184,7 @@ export default function PerfilScreen({ navigation }) {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>SEU PLANO</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#C9A8B6' : '#6B4A58' }]}>SEU PLANO</Text>
         <View style={styles.plansRow}>
           {PLANS.map(p => (
             <PlanCard
@@ -210,34 +217,34 @@ export default function PerfilScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setPlanModal(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalStyles.backdrop}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setPlanModal(null)} activeOpacity={1} />
           {planModal && (
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Plano {planModal.name}</Text>
-              <Text style={styles.modalPrice}>
-                {planModal.price}<Text style={styles.modalPricePer}>/mês</Text>
+            <View style={modalStyles.sheet}>
+              <View style={modalStyles.handle} />
+              <Text style={modalStyles.title}>Plano {planModal.name}</Text>
+              <Text style={modalStyles.price}>
+                {planModal.price}<Text style={modalStyles.pricePer}>/mês</Text>
               </Text>
-              <View style={styles.modalDivider} />
+              <View style={modalStyles.divider} />
               {planModal.items.map((item, i) => (
-                <View key={i} style={styles.modalItem}>
-                  <Text style={styles.modalCheck}>✓</Text>
-                  <Text style={styles.modalItemText}>{item}</Text>
+                <View key={i} style={modalStyles.item}>
+                  <Text style={modalStyles.check}>✓</Text>
+                  <Text style={modalStyles.itemText}>{item}</Text>
                 </View>
               ))}
               <TouchableOpacity
-                style={styles.modalBtn}
+                style={modalStyles.btn}
                 activeOpacity={0.85}
                 onPress={() => {
                   setPlanModal(null);
                   setTimeout(() => Alert.alert('Em breve!', 'Pagamento via Stripe em breve. Obrigada pelo interesse!'), 300);
                 }}
               >
-                <Text style={styles.modalBtnText}>Assinar agora</Text>
+                <Text style={modalStyles.btnText}>Assinar agora</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setPlanModal(null)}>
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+              <TouchableOpacity style={modalStyles.cancel} onPress={() => setPlanModal(null)}>
+                <Text style={modalStyles.cancelText}>Cancelar</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -275,195 +282,91 @@ const gearSt = StyleSheet.create({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_BG = '#222222';
-const SUBTLE  = '#2C2C2C';
+function makeStyles(isDark) {
+  const bg   = isDark ? '#0E0F11' : '#F5EDE8';
+  const card = isDark ? '#1A1B1E' : '#FFFFFF';
+  const text = isDark ? '#F5EDE8' : '#1A0A14';
+  const sub  = isDark ? '#C9A8B6' : '#6B4A58';
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 48 },
+  return StyleSheet.create({
+    safe:   { flex: 1, backgroundColor: bg },
+    scroll: { paddingHorizontal: 20, paddingBottom: 48 },
 
-  profileCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 20,
-    paddingTop: 48, paddingBottom: 28, paddingHorizontal: 20,
-    alignItems: 'center',
-    marginTop: 20, marginBottom: 28,
-    position: 'relative',
-  },
-  gearBtn: { position: 'absolute', top: 18, right: 18 },
-  avatarWrap: { marginBottom: 14 },
-  avatar: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.white,
-    letterSpacing: 1,
-  },
-  profileName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: 5,
-  },
-  profileSub: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.gray,
-    marginBottom: 16,
-  },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  levelBadge: {
-    backgroundColor: 'rgba(232,196,160,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(232,196,160,0.30)',
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 8,
-  },
-  levelBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.cream,
-    letterSpacing: 1,
-  },
-  agendaStatus: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.cream,
-  },
+    profileCard: {
+      backgroundColor: card, borderRadius: 20,
+      paddingTop: 48, paddingBottom: 28, paddingHorizontal: 20,
+      alignItems: 'center', marginTop: 20, marginBottom: 28, position: 'relative',
+    },
+    gearBtn:    { position: 'absolute', top: 18, right: 18 },
+    avatarWrap: { marginBottom: 14 },
+    avatar: {
+      width: 80, height: 80, borderRadius: 40,
+      backgroundColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    avatarText:   { fontSize: 28, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+    profileName:  { fontSize: 22, fontWeight: '700', color: text, marginBottom: 5 },
+    profileSub:   { fontSize: 13, fontWeight: '400', color: sub, marginBottom: 16 },
+    levelRow:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    levelBadge: {
+      backgroundColor: 'rgba(232,196,160,0.14)', borderWidth: 1,
+      borderColor: 'rgba(232,196,160,0.30)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+    },
+    levelBadgeText: { fontSize: 10, fontWeight: '800', color: colors.cream, letterSpacing: 1 },
+    agendaStatus:   { fontSize: 13, fontWeight: '600', color: colors.cream },
 
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.gray,
-    letterSpacing: 1.3,
-    marginBottom: 14,
-  },
+    sectionTitle: { fontSize: 11, fontWeight: '700', color: sub, letterSpacing: 1.3, marginBottom: 14 },
 
-  plansRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
-    alignItems: 'stretch',
-  },
-  planCard: {
-    flex: 1,
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
-    justifyContent: 'space-between',
-  },
-  planCardPro: { borderWidth: 1.5, borderColor: colors.primary },
-  popularBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  popularBadgeText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: colors.white,
-    letterSpacing: 0.8,
-  },
-  planName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.gray,
-    marginBottom: 4,
-  },
-  planNamePro: { color: colors.white },
-  planPriceRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
-  planPrice: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.white,
-    lineHeight: 28,
-  },
-  planPeriod: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.gray,
-    marginBottom: 3, marginLeft: 2,
-  },
-  planDivider: { height: 1, backgroundColor: SUBTLE, marginVertical: 12 },
-  planItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7, gap: 6 },
-  planCheck: { fontSize: 11, fontWeight: '400', color: colors.gray, marginTop: 1 },
-  planCheckPro: { color: colors.primary },
-  planItemText: {
-    fontSize: 11,
-    fontWeight: '400',
-    color: colors.gray,
-    flex: 1, lineHeight: 16,
-  },
-  planBtn: {
-    marginTop: 16, borderRadius: 10, paddingVertical: 11,
-    alignItems: 'center', borderWidth: 1, borderColor: colors.primary,
-  },
-  planBtnPro: { backgroundColor: colors.primary },
-  planBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  planBtnTextPro: { color: colors.white },
+    plansRow: { flexDirection: 'row', gap: 12, marginBottom: 28, alignItems: 'stretch' },
+    planCard: { flex: 1, backgroundColor: card, borderRadius: 16, padding: 16, justifyContent: 'space-between' },
+    planCardPro: { borderWidth: 1.5, borderColor: colors.primary },
+    popularBadge: {
+      backgroundColor: colors.primary, borderRadius: 6,
+      paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10,
+    },
+    popularBadgeText: { fontSize: 8, fontWeight: '800', color: colors.white, letterSpacing: 0.8 },
+    planName:         { fontSize: 16, fontWeight: '700', color: sub, marginBottom: 4 },
+    planPriceRow:     { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
+    planPrice:        { fontSize: 26, fontWeight: '800', color: text, lineHeight: 28 },
+    planPeriod:       { fontSize: 12, fontWeight: '400', color: sub, marginBottom: 3, marginLeft: 2 },
+    planDivider:      { height: 1, backgroundColor: isDark ? '#3D1020' : '#E6D8CF', marginVertical: 12 },
+    planItem:         { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7, gap: 6 },
+    planCheck:        { fontSize: 11, fontWeight: '400', color: sub, marginTop: 1 },
+    planCheckPro:     { color: colors.primary },
+    planItemText:     { fontSize: 11, fontWeight: '400', color: sub, flex: 1, lineHeight: 16 },
+    planBtn:          { marginTop: 16, borderRadius: 10, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
+    planBtnPro:       { backgroundColor: colors.primary },
+    planBtnText:      { fontSize: 13, fontWeight: '700', color: colors.primary },
+    planBtnTextPro:   { color: colors.white },
 
-  menuCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 24,
-  },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16, paddingHorizontal: 18,
-  },
-  menuItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
-  menuLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.white,
-  },
-  menuLabelDanger: { color: '#F87171' },
-  menuArrow: {
-    fontSize: 20,
-    fontWeight: '400',
-    color: '#444444',
-    lineHeight: 22,
-  },
+    menuCard: { backgroundColor: card, borderRadius: 16, overflow: 'hidden', marginBottom: 24 },
+    menuItem: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingVertical: 16, paddingHorizontal: 18,
+    },
+    menuItemBorder:  { borderBottomWidth: 1, borderBottomColor: isDark ? '#3D1020' : '#E6D8CF' },
+    menuLabel:       { fontSize: 15, fontWeight: '500', color: text },
+    menuLabelDanger: { color: '#F87171' },
+    menuArrow:       { fontSize: 20, fontWeight: '400', color: isDark ? '#555555' : '#B09AA8', lineHeight: 22 },
 
-  version: {
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '400',
-    color: '#3A3A3A',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
+    version: { textAlign: 'center', fontSize: 11, fontWeight: '400', color: sub, letterSpacing: 1, marginBottom: 8 },
+  });
+}
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: '#1A0A14', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40,
-  },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#3D1020', alignSelf: 'center', marginBottom: 24 },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
-  modalPrice: { fontSize: 32, fontWeight: '800', color: '#A8235A' },
-  modalPricePer: { fontSize: 14, fontWeight: '400', color: '#C9A8B6' },
-  modalDivider: { height: 1, backgroundColor: '#2D1020', marginVertical: 16 },
-  modalItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 },
-  modalCheck: { fontSize: 13, color: '#A8235A', fontWeight: '700', marginTop: 1 },
-  modalItemText: { fontSize: 14, color: '#C9A8B6', flex: 1 },
-  modalBtn: {
-    height: 54, borderRadius: 14, backgroundColor: '#A8235A',
-    alignItems: 'center', justifyContent: 'center', marginTop: 24,
-  },
-  modalBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  modalCancel: { alignItems: 'center', paddingVertical: 14 },
-  modalCancelText: { fontSize: 14, fontWeight: '600', color: '#6B4A58' },
+// Modal styles always dark (overlay)
+const modalStyles = StyleSheet.create({
+  backdrop:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet:          { backgroundColor: '#0E0F11', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40 },
+  handle:         { width: 40, height: 4, borderRadius: 2, backgroundColor: '#3D1020', alignSelf: 'center', marginBottom: 24 },
+  title:          { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
+  price:          { fontSize: 32, fontWeight: '800', color: '#A8235A' },
+  pricePer:       { fontSize: 14, fontWeight: '400', color: '#C9A8B6' },
+  divider:        { height: 1, backgroundColor: '#1A1B1E', marginVertical: 16 },
+  item:           { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 },
+  check:          { fontSize: 13, color: '#A8235A', fontWeight: '700', marginTop: 1 },
+  itemText:       { fontSize: 14, color: '#C9A8B6', flex: 1 },
+  btn:            { height: 54, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  btnText:        { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  cancel:         { alignItems: 'center', paddingVertical: 14 },
+  cancelText:     { fontSize: 14, fontWeight: '600', color: '#6B4A58' },
 });

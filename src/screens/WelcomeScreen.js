@@ -111,7 +111,7 @@ export default function WelcomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#1A0A14',
+    backgroundColor: '#0E0F11',
     justifyContent: 'space-between',
   },
 

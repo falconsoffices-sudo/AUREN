@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import colors from '../constants/colors';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -63,6 +64,24 @@ const IDIOMA_OPTIONS = [
   { label: 'ES-LATAM', value: 'es' },
 ];
 
+const DIAS_SEMANA = [
+  { label: 'Dom', value: 'dom' },
+  { label: 'Seg', value: 'seg' },
+  { label: 'Ter', value: 'ter' },
+  { label: 'Qua', value: 'qua' },
+  { label: 'Qui', value: 'qui' },
+  { label: 'Sex', value: 'sex' },
+  { label: 'Sáb', value: 'sab' },
+];
+
+const DEFAULT_HORARIO = {
+  dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
+  inicio: '08:00',
+  fim: '17:00',
+  almocoInicio: '12:00',
+  almocoFim: '13:00',
+};
+
 export default function ConfiguracoesScreen({ navigation }) {
   const { themeMode, setThemeMode } = useTheme();
 
@@ -73,6 +92,7 @@ export default function ConfiguracoesScreen({ navigation }) {
   const [notificacoes,     setNotificacoes]     = useState('on');
   const [dataFechamento,   setDataFechamento]   = useState('28');
   const [idioma,           setIdioma]           = useState('pt');
+  const [horario,          setHorario]          = useState(DEFAULT_HORARIO);
 
   useEffect(() => {
     (async () => {
@@ -97,9 +117,22 @@ export default function ConfiguracoesScreen({ navigation }) {
       } else if (error && error.code !== 'PGRST116') {
         Alert.alert('Erro ao carregar', error.message);
       }
+      try {
+        const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
+        if (storedH) setHorario({ ...DEFAULT_HORARIO, ...JSON.parse(storedH) });
+      } catch {}
       setLoading(false);
     })();
   }, []);
+
+  function toggleDia(value) {
+    setHorario(h => {
+      const dias = h.dias.includes(value)
+        ? h.dias.filter(d => d !== value)
+        : [...h.dias, value];
+      return { ...h, dias };
+    });
+  }
 
   const handleSave = async () => {
     const dia = parseInt(dataFechamento, 10);
@@ -109,14 +142,16 @@ export default function ConfiguracoesScreen({ navigation }) {
     }
     setSaving(true);
     try {
+      await AsyncStorage.setItem('auren:horario_atendimento', JSON.stringify(horario));
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          id:               userId,
+          id:                   userId,
           notificacoes,
-          modo_app:         themeMode,
-          data_fechamento:  dia,
+          modo_app:             themeMode,
+          data_fechamento:      dia,
           idioma,
+          horario_atendimento:  horario,
         });
       if (error) throw error;
       Alert.alert('Salvo!', 'Configurações atualizadas.');
@@ -221,6 +256,80 @@ export default function ConfiguracoesScreen({ navigation }) {
                 </TouchableOpacity>
               );
             })}
+          </View>
+        </View>
+
+        <SectionTitle label="HORÁRIO DE ATENDIMENTO" />
+        <View style={styles.card}>
+          <View style={{ paddingVertical: 14 }}>
+            <Text style={styles.rowLabel}>Dias de atendimento</Text>
+            <View style={styles.daysRow}>
+              {DIAS_SEMANA.map(d => {
+                const active = horario.dias.includes(d.value);
+                return (
+                  <TouchableOpacity
+                    key={d.value}
+                    style={[styles.dayBtn, active && styles.dayBtnActive]}
+                    onPress={() => toggleDia(d.value)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.dayBtnText, active && styles.dayBtnTextActive]}>{d.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Início</Text>
+            <TextInput
+              style={styles.numInput}
+              value={horario.inicio}
+              onChangeText={t => setHorario(h => ({ ...h, inicio: t }))}
+              placeholder="08:00"
+              placeholderTextColor={colors.gray}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Fim</Text>
+            <TextInput
+              style={styles.numInput}
+              value={horario.fim}
+              onChangeText={t => setHorario(h => ({ ...h, fim: t }))}
+              placeholder="17:00"
+              placeholderTextColor={colors.gray}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Almoço início</Text>
+            <TextInput
+              style={styles.numInput}
+              value={horario.almocoInicio}
+              onChangeText={t => setHorario(h => ({ ...h, almocoInicio: t }))}
+              placeholder="12:00"
+              placeholderTextColor={colors.gray}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Almoço fim</Text>
+            <TextInput
+              style={styles.numInput}
+              value={horario.almocoFim}
+              onChangeText={t => setHorario(h => ({ ...h, almocoFim: t }))}
+              placeholder="13:00"
+              placeholderTextColor={colors.gray}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
           </View>
         </View>
 
@@ -340,6 +449,15 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 4,
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+
+  daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 10, paddingBottom: 4 },
+  dayBtn: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: INPUT_BG,
+  },
+  dayBtnActive: { backgroundColor: colors.primary },
+  dayBtnText: { fontSize: 12, fontWeight: '600', color: colors.gray },
+  dayBtnTextActive: { color: colors.white },
 
   linksCard: {
     backgroundColor: CARD_BG, borderRadius: 16,

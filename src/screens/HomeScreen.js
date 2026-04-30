@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,24 +76,27 @@ function getDateRanges() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }) {
+  const { isDark } = useTheme();
   return (
-    <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${Math.min(progress, 100)}%` }]} />
+    <View style={{ height: 8, backgroundColor: isDark ? '#2A2A2A' : '#E6D8CF', borderRadius: 4, overflow: 'hidden' }}>
+      <View style={{ height: 8, backgroundColor: '#A8235A', borderRadius: 4, width: `${Math.min(progress, 100)}%` }} />
     </View>
   );
 }
 
 function StatColumn({ label, value, meta }) {
+  const { isDark } = useTheme();
   return (
-    <View style={styles.statCol}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-      {meta ? <Text style={styles.statMeta}>{meta}</Text> : null}
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 12, fontWeight: '400', color: isDark ? '#C9A8B6' : '#6B4A58', marginBottom: 5 }}>{label}</Text>
+      <Text style={{ fontSize: 22, fontWeight: '800', color: isDark ? '#F5EDE8' : '#1A0A14' }}>{value}</Text>
+      {meta ? <Text style={{ fontSize: 11, fontWeight: '400', color: isDark ? '#C9A8B6' : '#6B4A58', marginTop: 3 }}>{meta}</Text> : null}
     </View>
   );
 }
 
 function AgendamentoRow({ agendamento, showDivider }) {
+  const { isDark } = useTheme();
   const clienteNome = agendamento.clientes?.nome ?? 'Cliente';
   const servicoNome = agendamento.servicos?.nome ?? '—';
   const hora        = formatHora(agendamento.data_hora);
@@ -99,14 +104,14 @@ function AgendamentoRow({ agendamento, showDivider }) {
 
   return (
     <>
-      {showDivider && <View style={styles.agendDivider} />}
-      <View style={styles.agendRow}>
-        <View style={[styles.agendDot, { backgroundColor: dotColor }]} />
-        <View style={styles.agendInfo}>
-          <Text style={styles.agendNome} numberOfLines={1}>{clienteNome}</Text>
-          <Text style={styles.agendServico} numberOfLines={1}>{servicoNome}</Text>
+      {showDivider && <View style={{ height: 1, backgroundColor: isDark ? '#2A2A2A' : '#E6D8CF' }} />}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, marginRight: 12, flexShrink: 0, backgroundColor: dotColor }} />
+        <View style={{ flex: 1, marginRight: 10 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#F5EDE8' : '#1A0A14' }} numberOfLines={1}>{clienteNome}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '400', color: isDark ? '#C9A8B6' : '#6B4A58', marginTop: 2 }} numberOfLines={1}>{servicoNome}</Text>
         </View>
-        <Text style={styles.agendHora}>{hora}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: '#A8235A', flexShrink: 0 }}>{hora}</Text>
       </View>
     </>
   );
@@ -114,7 +119,60 @@ function AgendamentoRow({ agendamento, showDivider }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+function timeToMins(str) {
+  const [h, m] = (str || '0:0').split(':').map(Number);
+  return h * 60 + m;
+}
+
+function calcSlotsLivres(agendamentos, horario) {
+  const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+  const todayKey = weekDayMap[new Date().getDay()];
+  if (!horario.dias.includes(todayKey)) return 0;
+
+  const workStart  = timeToMins(horario.inicio);
+  const workEnd    = timeToMins(horario.fim);
+  const busy = [{ s: timeToMins(horario.almocoInicio), e: timeToMins(horario.almocoFim) }];
+
+  for (const a of agendamentos) {
+    if (a.status === 'cancelado') continue;
+    const d = new Date(a.data_hora);
+    const s = d.getHours() * 60 + d.getMinutes();
+    const dur = a.servicos?.duracao_minutos ?? 60;
+    busy.push({ s, e: s + dur });
+  }
+
+  busy.sort((a, b) => a.s - b.s);
+
+  const merged = [];
+  for (const iv of busy) {
+    if (!merged.length || iv.s > merged[merged.length - 1].e) {
+      merged.push({ ...iv });
+    } else {
+      merged[merged.length - 1].e = Math.max(merged[merged.length - 1].e, iv.e);
+    }
+  }
+
+  let slots = 0;
+  let cur = workStart;
+  for (const { s, e } of merged) {
+    const gapEnd = Math.min(s, workEnd);
+    if (gapEnd > cur && gapEnd - cur >= 90) slots++;
+    cur = Math.max(cur, Math.min(e, workEnd));
+  }
+  if (workEnd - cur >= 90) slots++;
+  return slots;
+}
+
+const DEFAULT_HORARIO = {
+  dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
+  inicio: '08:00', fim: '17:00',
+  almocoInicio: '12:00', almocoFim: '13:00',
+};
+
 export default function HomeScreen({ navigation }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
+
   const [loading,           setLoading]           = useState(true);
   const [primeiroNome,      setPrimeiroNome]      = useState('');
   const [nivelGamificacao,  setNivelGamificacao]  = useState(1);
@@ -122,6 +180,7 @@ export default function HomeScreen({ navigation }) {
   const [faturamentoSemana, setFaturamentoSemana] = useState(0);
   const [faturamentoMes,    setFaturamentoMes]    = useState(0);
   const [diasTrial,         setDiasTrial]         = useState(null);
+  const [slotsLivres,       setSlotsLivres]       = useState(null);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -171,11 +230,20 @@ export default function HomeScreen({ navigation }) {
     const semanaData = agendSemanaRes.data ?? [];
     const statusFat  = ['finalizado', 'confirmado', 'pendente'];
 
-    setAgendamentosHoje(semanaData.filter(a => a.data_hora.startsWith(hoje)));
+    const hojeAgend = semanaData.filter(a => a.data_hora.startsWith(hoje));
+    setAgendamentosHoje(hojeAgend);
 
     const soma = rows => rows.reduce((s, r) => s + Number(r.valor || 0), 0);
     setFaturamentoSemana(soma(semanaData.filter(a => statusFat.includes(a.status))));
     setFaturamentoMes(soma(agendMesRes.data ?? []));
+
+    try {
+      const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
+      const horario = storedH ? { ...DEFAULT_HORARIO, ...JSON.parse(storedH) } : DEFAULT_HORARIO;
+      setSlotsLivres(calcSlotsLivres(hojeAgend, horario));
+    } catch {
+      setSlotsLivres(null);
+    }
 
     setLoading(false);
   }, []);
@@ -341,10 +409,17 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.insightCard}>
                 <View style={styles.insightDot} />
                 <View style={styles.insightBody}>
-                  <Text style={styles.insightTitle}>Horários vagos</Text>
+                  <Text style={styles.insightTitle}>
+                    {slotsLivres !== null
+                      ? `${slotsLivres} horário${slotsLivres !== 1 ? 's' : ''} livre${slotsLivres !== 1 ? 's' : ''} hoje`
+                      : 'Horários vagos'}
+                  </Text>
                   <Text style={styles.insightText}>
-                    Você tem 2 horários abertos à tarde. Considere contatar clientes
-                    que costumam agendar nesse período para preenchê-los.
+                    {slotsLivres === 0
+                      ? 'Sua agenda está cheia hoje! Ótimo trabalho.'
+                      : slotsLivres !== null
+                      ? `Você tem ${slotsLivres} janela${slotsLivres !== 1 ? 's' : ''} disponível${slotsLivres !== 1 ? 'is' : ''} (mín. 1h30). Considere contatar clientes para preenchê-${slotsLivres !== 1 ? 'las' : 'la'}.`
+                      : 'Configure seu horário de atendimento em Configurações para ver slots livres.'}
                   </Text>
                 </View>
               </View>
@@ -372,79 +447,73 @@ export default function HomeScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const SM_SHADOW = {
-  shadowColor: '#1A0A14',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.07,
-  shadowRadius: 6,
-  elevation: 3,
-};
+function makeStyles(isDark) {
+  const bg    = isDark ? '#0E0F11' : '#F5EDE8';
+  const card  = isDark ? '#1A1B1E' : '#FFFFFF';
+  const text  = isDark ? '#F5EDE8' : '#1A0A14';
+  const sub   = isDark ? '#C9A8B6' : '#6B4A58';
+  const divBg = isDark ? '#2A2A2A' : '#E6D8CF';
 
-const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: '#F5EDE8' },
-  shell:  { flex: 1, backgroundColor: '#F5EDE8', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
-  scroll: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 44 },
+  const SM_SHADOW = {
+    shadowColor: '#0E0F11',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0 : 0.07,
+    shadowRadius: 6,
+    elevation: isDark ? 0 : 3,
+  };
 
-  logoImage: { height: 28, resizeMode: 'contain' },
+  return StyleSheet.create({
+    safe:   { flex: 1, backgroundColor: bg },
+    shell:  { flex: 1, backgroundColor: bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+    scroll: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 44 },
 
-  header:   { backgroundColor: '#1A0A14', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30 },
-  logoRow:  { marginBottom: 20 },
-  greeting: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
-  date:     { fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.42)', textTransform: 'capitalize' },
+    logoImage: { height: 28, resizeMode: 'contain' },
 
-  card:      { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 12, ...SM_SHADOW },
-  cardLabel: { fontSize: 11, fontWeight: '600', color: '#A8235A', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 14 },
+    header:   { backgroundColor: '#0E0F11', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30 },
+    logoRow:  { marginBottom: 20 },
+    greeting: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
+    date:     { fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.42)', textTransform: 'capitalize' },
 
-  cardToday:    { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#A8235A', ...SM_SHADOW },
-  todayBadge:   { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1.4, marginBottom: 12 },
-  todayValue:   { fontSize: 38, fontWeight: '800', color: '#A8235A', lineHeight: 44 },
-  todayCaption: { fontSize: 13, fontWeight: '400', color: '#6B4A58', marginTop: 4 },
+    card:      { backgroundColor: card, borderRadius: 16, padding: 18, marginBottom: 12, ...SM_SHADOW },
+    cardLabel: { fontSize: 11, fontWeight: '600', color: '#A8235A', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 14 },
 
-  agendRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  agendDot:     { width: 8, height: 8, borderRadius: 4, marginRight: 12, flexShrink: 0 },
-  agendInfo:    { flex: 1, marginRight: 10 },
-  agendNome:    { fontSize: 14, fontWeight: '700', color: '#1A0A14' },
-  agendServico: { fontSize: 12, fontWeight: '400', color: '#6B4A58', marginTop: 2 },
-  agendHora:    { fontSize: 13, fontWeight: '700', color: '#A8235A', flexShrink: 0 },
-  agendDivider: { height: 1, backgroundColor: '#E6D8CF' },
+    cardToday:    { backgroundColor: card, borderRadius: 16, padding: 18, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#A8235A', ...SM_SHADOW },
+    todayBadge:   { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1.4, marginBottom: 12 },
+    todayValue:   { fontSize: 38, fontWeight: '800', color: '#A8235A', lineHeight: 44 },
+    todayCaption: { fontSize: 13, fontWeight: '400', color: sub, marginTop: 4 },
 
-  statRow:     { flexDirection: 'row', alignItems: 'center' },
-  statCol:     { flex: 1 },
-  statDivider: { width: 1, height: 44, backgroundColor: '#E6D8CF', marginHorizontal: 18 },
-  statLabel:   { fontSize: 12, fontWeight: '400', color: '#6B4A58', marginBottom: 5 },
-  statValue:   { fontSize: 22, fontWeight: '800', color: '#1A0A14' },
-  statMeta:    { fontSize: 11, fontWeight: '400', color: '#6B4A58', marginTop: 3 },
+    statRow:     { flexDirection: 'row', alignItems: 'center' },
+    statDivider: { width: 1, height: 44, backgroundColor: divBg, marginHorizontal: 18 },
 
-  levelHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  levelTitle:    { fontSize: 20, fontWeight: '800', color: '#1A0A14', marginBottom: 14 },
-  levelPercent:  { fontSize: 22, fontWeight: '800', color: '#A8235A' },
-  progressTrack: { height: 8, backgroundColor: '#E6D8CF', borderRadius: 4, overflow: 'hidden' },
-  progressFill:  { height: 8, backgroundColor: '#A8235A', borderRadius: 4 },
+    levelHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    levelTitle:   { fontSize: 20, fontWeight: '800', color: text, marginBottom: 14 },
+    levelPercent: { fontSize: 22, fontWeight: '800', color: '#A8235A' },
 
-  trialBanner: {
-    backgroundColor: 'rgba(168,35,90,0.08)', borderRadius: 14,
-    padding: 14, marginBottom: 12, flexDirection: 'row',
-    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,35,90,0.25)',
-  },
-  trialLeft:  { flex: 1 },
-  trialTitle: { fontSize: 14, fontWeight: '700', color: '#1A0A14' },
-  trialSub:   { fontSize: 12, fontWeight: '400', color: '#6B4A58', marginTop: 2 },
-  trialArrow: { fontSize: 22, color: '#A8235A', marginLeft: 10 },
+    trialBanner: {
+      backgroundColor: 'rgba(168,35,90,0.08)', borderRadius: 14,
+      padding: 14, marginBottom: 12, flexDirection: 'row',
+      alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,35,90,0.25)',
+    },
+    trialLeft:  { flex: 1 },
+    trialTitle: { fontSize: 14, fontWeight: '700', color: text },
+    trialSub:   { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
+    trialArrow: { fontSize: 22, color: '#A8235A', marginLeft: 10 },
 
-  emptyCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 32,
-    alignItems: 'center', marginBottom: 12, ...SM_SHADOW,
-  },
-  emptyEmoji:   { fontSize: 48, marginBottom: 16 },
-  emptyTitle:   { fontSize: 18, fontWeight: '800', color: '#1A0A14', marginBottom: 8, textAlign: 'center' },
-  emptySub:     { fontSize: 13, fontWeight: '400', color: '#6B4A58', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  emptyBtn:     { backgroundColor: '#A8235A', borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
-  emptyBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+    emptyCard: {
+      backgroundColor: card, borderRadius: 20, padding: 32,
+      alignItems: 'center', marginBottom: 12, ...SM_SHADOW,
+    },
+    emptyEmoji:   { fontSize: 48, marginBottom: 16 },
+    emptyTitle:   { fontSize: 18, fontWeight: '800', color: text, marginBottom: 8, textAlign: 'center' },
+    emptySub:     { fontSize: 13, fontWeight: '400', color: sub, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+    emptyBtn:     { backgroundColor: '#A8235A', borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
+    emptyBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1A0A14', marginTop: 8, marginBottom: 12 },
-  insightCard:  { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', ...SM_SHADOW },
-  insightDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A8235A', marginTop: 5, marginRight: 12, flexShrink: 0 },
-  insightBody:  { flex: 1 },
-  insightTitle: { fontSize: 14, fontWeight: '700', color: '#1A0A14', marginBottom: 5 },
-  insightText:  { fontSize: 13, fontWeight: '400', color: '#6B4A58', lineHeight: 20 },
-});
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: text, marginTop: 8, marginBottom: 12 },
+    insightCard:  { backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', ...SM_SHADOW },
+    insightDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A8235A', marginTop: 5, marginRight: 12, flexShrink: 0 },
+    insightBody:  { flex: 1 },
+    insightTitle: { fontSize: 14, fontWeight: '700', color: text, marginBottom: 5 },
+    insightText:  { fontSize: 13, fontWeight: '400', color: sub, lineHeight: 20 },
+  });
+}

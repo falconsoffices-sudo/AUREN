@@ -14,7 +14,11 @@
       "Bash(git push *)",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__list_tables",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(sed -n '2,15p' src/screens/OnboardingScreen.js)",
+      "Bash(sed -n '2,15p' src/screens/PresentearScreen.js)",
+      "Bash(sed -n '2,12p' src/screens/SaibaMaisScreen.js)",
+      "Bash(sed -n '2,13p' src/screens/AjudaScreen.js)"
     ]
   }
 }

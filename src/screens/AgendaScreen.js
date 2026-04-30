@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 import { scheduleNotification } from '../lib/notifications';
 import { sendSMS, applyTemplate } from '../lib/sms';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,11 +26,18 @@ const DAYS_LONG  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sáb
 const MONTHS     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-const STATUS_DISPLAY = {
+const STATUS_DISPLAY_LIGHT = {
   pendente:   { label: 'Pendente',   bg: '#EFF6FF', color: '#2563EB' },
   confirmado: { label: 'Confirmada', bg: '#FEF9C3', color: '#92400E' },
   finalizado: { label: 'Finalizado', bg: '#F0FDF4', color: '#15803D' },
   cancelado:  { label: 'Cancelado',  bg: '#FEF2F2', color: '#DC2626' },
+};
+
+const STATUS_DISPLAY_DARK = {
+  pendente:   { label: 'Pendente',   bg: '#1E2D4A', color: '#60A5FA' },
+  confirmado: { label: 'Confirmada', bg: '#2D2508', color: '#FBBF24' },
+  finalizado: { label: 'Finalizado', bg: '#0A2218', color: '#4ade80' },
+  cancelado:  { label: 'Cancelado',  bg: '#3B1212', color: '#F87171' },
 };
 
 const STATUS_OPTIONS = [
@@ -352,7 +360,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
                 </View>
               ) : (
                 <>
-                  <TextInput style={modal.input} placeholder="Buscar cliente..." placeholderTextColor="#6B4A58" value={clienteSearch} onChangeText={setClienteSearch} autoCapitalize="words" />
+                  <TextInput style={modal.input} placeholder="Buscar cliente..." placeholderTextColor="#C9A8B6" value={clienteSearch} onChangeText={setClienteSearch} autoCapitalize="words" />
                   {loadingClientes ? (
                     <ActivityIndicator color="#A8235A" style={{ marginBottom: 12 }} />
                   ) : filteredClientes.length > 0 ? (
@@ -386,9 +394,9 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
 
               <Text style={modal.sectionLabel}>DATA E HORA</Text>
               <View style={modal.dateBox}><Text style={modal.dateText}>{dateLabel}</Text></View>
-              <TextInput style={modal.input} placeholder="Horário — HH:MM (ex: 14:30)" placeholderTextColor="#6B4A58" value={time} onChangeText={t => setTime(formatTimeInput(t))} keyboardType="numeric" maxLength={5} />
+              <TextInput style={modal.input} placeholder="Horário — HH:MM (ex: 14:30)" placeholderTextColor="#C9A8B6" value={time} onChangeText={t => setTime(formatTimeInput(t))} keyboardType="numeric" maxLength={5} />
 
-              <Text style={modal.sectionLabel}>LOCAL</Text>
+              <Text style={modal.sectionLabel}>LOCAL DE ATENDIMENTO</Text>
               <View style={modal.tipoRow}>
                 {TIPO_OPTIONS.map(opt => {
                   const active = tipoEndereco === opt.value;
@@ -401,7 +409,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
               </View>
 
               <Text style={modal.sectionLabel}>OBSERVAÇÕES</Text>
-              <TextInput style={[modal.input, modal.inputMulti]} placeholder="Opcional" placeholderTextColor="#6B4A58" value={observacoes} onChangeText={setObservacoes} multiline numberOfLines={3} textAlignVertical="top" />
+              <TextInput style={[modal.input, modal.inputMulti]} placeholder="Opcional" placeholderTextColor="#C9A8B6" value={observacoes} onChangeText={setObservacoes} multiline numberOfLines={3} textAlignVertical="top" />
 
               <TouchableOpacity style={[modal.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={modal.saveBtnText}>Agendar</Text>}
@@ -555,7 +563,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
                 </View>
               ) : (
                 <>
-                  <TextInput style={modal.input} placeholder="Buscar cliente..." placeholderTextColor="#6B4A58" value={clienteSearch} onChangeText={setClienteSearch} autoCapitalize="words" />
+                  <TextInput style={modal.input} placeholder="Buscar cliente..." placeholderTextColor="#C9A8B6" value={clienteSearch} onChangeText={setClienteSearch} autoCapitalize="words" />
                   {loadingClientes ? (
                     <ActivityIndicator color="#A8235A" style={{ marginBottom: 12 }} />
                   ) : filteredClientes.length > 0 ? (
@@ -593,7 +601,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
               <TextInput
                 style={modal.input}
                 placeholder="MM/DD/YYYY"
-                placeholderTextColor="#6B4A58"
+                placeholderTextColor="#C9A8B6"
                 value={dateStr}
                 onChangeText={t => setDateStr(formatDateInput(t))}
                 keyboardType="numeric"
@@ -602,7 +610,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
               <TextInput
                 style={modal.input}
                 placeholder="HH:MM AM/PM (ex: 02:30 PM)"
-                placeholderTextColor="#6B4A58"
+                placeholderTextColor="#C9A8B6"
                 value={timeStr}
                 onChangeText={t => setTimeStr(t.replace(/[^0-9:aAmMpP ]/g, '').slice(0, 8))}
                 autoCapitalize="characters"
@@ -623,7 +631,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
               </View>
 
               {/* ── Local ── */}
-              <Text style={modal.sectionLabel}>LOCAL</Text>
+              <Text style={modal.sectionLabel}>LOCAL DE ATENDIMENTO</Text>
               <View style={modal.tipoRow}>
                 {TIPO_OPTIONS.map(opt => {
                   const active = tipoEndereco === opt.value;
@@ -637,7 +645,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
 
               {/* ── Observações ── */}
               <Text style={modal.sectionLabel}>OBSERVAÇÕES</Text>
-              <TextInput style={[modal.input, modal.inputMulti]} placeholder="Opcional" placeholderTextColor="#6B4A58" value={observacoes} onChangeText={setObservacoes} multiline numberOfLines={3} textAlignVertical="top" />
+              <TextInput style={[modal.input, modal.inputMulti]} placeholder="Opcional" placeholderTextColor="#C9A8B6" value={observacoes} onChangeText={setObservacoes} multiline numberOfLines={3} textAlignVertical="top" />
 
               <TouchableOpacity style={[modal.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={modal.saveBtnText}>Salvar</Text>}
@@ -659,7 +667,10 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
 // ─── Appointment Card ─────────────────────────────────────────────────────────
 
 function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, onPress }) {
-  const s      = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.confirmado;
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  const SD     = isDark ? STATUS_DISPLAY_DARK : STATUS_DISPLAY_LIGHT;
+  const s      = SD[status] ?? SD.confirmado;
   const isNext = status === 'confirmado';
   const name   = cliente?.nome ?? '—';
 
@@ -704,6 +715,8 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function AgendaScreen() {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const [weekOffset,      setWeekOffset]      = useState(0);
   const [selected,        setSelected]        = useState(TODAY);
   const [agendamentos,    setAgendamentos]    = useState([]);
@@ -820,82 +833,89 @@ export default function AgendaScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_SHADOW = {
-  shadowColor: '#1A0A14',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.07,
-  shadowRadius: 6,
-  elevation: 3,
-};
+function makeStyles(isDark) {
+  const bg   = isDark ? '#0E0F11' : '#F5EDE8';
+  const card = isDark ? '#1A1B1E' : '#FFFFFF';
+  const text = isDark ? '#F5EDE8' : '#1A0A14';
+  const sub  = isDark ? '#C9A8B6' : '#6B4A58';
 
-const styles = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: '#F5EDE8' },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 28, marginBottom: 16 },
-  headerTitle: { fontSize: 28, fontWeight: '700', color: '#1A0A14' },
-  headerMonth: { fontSize: 14, fontWeight: '400', color: '#6B4A58', paddingBottom: 3 },
-  weekRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginBottom: 16 },
-  navBtn:      { width: 28, alignItems: 'center', justifyContent: 'center' },
-  navBtnText:  { fontSize: 26, fontWeight: '400', color: '#6B4A58', lineHeight: 30 },
-  dayItem:       { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 12 },
-  dayItemActive: { backgroundColor: '#A8235A' },
-  dayShort:      { fontSize: 10, fontWeight: '600', color: '#6B4A58', marginBottom: 5, letterSpacing: 0.3 },
-  dayNum:        { fontSize: 15, fontWeight: '700', color: '#6B4A58' },
-  dayTextActive: { color: '#FFFFFF' },
-  dayTitle:      { fontSize: 14, fontWeight: '600', color: '#1A0A14', paddingHorizontal: 20, marginBottom: 16 },
-  scroll:        { paddingHorizontal: 20, paddingBottom: 110 },
-  apptCard:           { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 10, ...CARD_SHADOW },
-  apptCardHighlight:  { borderWidth: 1, borderColor: 'rgba(168,35,90,0.35)' },
-  apptTopRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  apptTime:           { fontSize: 12, fontWeight: '600', color: '#6B4A58', letterSpacing: 0.3 },
-  statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText:         { fontSize: 11, fontWeight: '700' },
-  apptClientRow:      { flexDirection: 'row', alignItems: 'center' },
-  avatar:             { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(168,35,90,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  avatarText:         { fontSize: 14, fontWeight: '700', color: '#A8235A' },
-  apptInfo:           { flex: 1 },
-  nameRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
-  clientName:         { fontSize: 15, fontWeight: '700', color: '#1A0A14' },
-  vipBadge:           { backgroundColor: 'rgba(168,35,90,0.08)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(168,35,90,0.25)' },
-  vipText:            { fontSize: 9, fontWeight: '800', color: '#A8235A', letterSpacing: 0.8 },
-  serviceText:        { fontSize: 12, fontWeight: '400', color: '#6B4A58' },
-  apptValue:          { fontSize: 16, fontWeight: '700', color: '#1A0A14', marginLeft: 8 },
-  emptyState:         { alignItems: 'center', paddingTop: 60 },
-  emptyText:          { fontSize: 14, fontWeight: '400', color: '#6B4A58' },
-  fab:     { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', shadowColor: '#A8235A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
-  fabText: { fontSize: 30, fontWeight: '400', color: '#FFFFFF', lineHeight: 34 },
-});
+  const CARD_SHADOW = {
+    shadowColor: '#0E0F11',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0 : 0.07,
+    shadowRadius: 6,
+    elevation: isDark ? 0 : 3,
+  };
+
+  return StyleSheet.create({
+    safe:        { flex: 1, backgroundColor: bg },
+    header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 28, marginBottom: 16 },
+    headerTitle: { fontSize: 28, fontWeight: '700', color: text },
+    headerMonth: { fontSize: 14, fontWeight: '400', color: sub, paddingBottom: 3 },
+    weekRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginBottom: 16 },
+    navBtn:      { width: 28, alignItems: 'center', justifyContent: 'center' },
+    navBtnText:  { fontSize: 26, fontWeight: '400', color: sub, lineHeight: 30 },
+    dayItem:       { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 12 },
+    dayItemActive: { backgroundColor: '#A8235A' },
+    dayShort:      { fontSize: 10, fontWeight: '600', color: sub, marginBottom: 5, letterSpacing: 0.3 },
+    dayNum:        { fontSize: 15, fontWeight: '700', color: sub },
+    dayTextActive: { color: '#FFFFFF' },
+    dayTitle:      { fontSize: 14, fontWeight: '600', color: text, paddingHorizontal: 20, marginBottom: 16 },
+    scroll:        { paddingHorizontal: 20, paddingBottom: 110 },
+    apptCard:           { backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 10, ...CARD_SHADOW },
+    apptCardHighlight:  { borderWidth: 1, borderColor: 'rgba(168,35,90,0.35)' },
+    apptTopRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    apptTime:           { fontSize: 12, fontWeight: '600', color: sub, letterSpacing: 0.3 },
+    statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    statusText:         { fontSize: 11, fontWeight: '700' },
+    apptClientRow:      { flexDirection: 'row', alignItems: 'center' },
+    avatar:             { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(168,35,90,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    avatarText:         { fontSize: 14, fontWeight: '700', color: '#A8235A' },
+    apptInfo:           { flex: 1 },
+    nameRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
+    clientName:         { fontSize: 15, fontWeight: '700', color: text },
+    vipBadge:           { backgroundColor: 'rgba(168,35,90,0.08)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(168,35,90,0.25)' },
+    vipText:            { fontSize: 9, fontWeight: '800', color: '#A8235A', letterSpacing: 0.8 },
+    serviceText:        { fontSize: 12, fontWeight: '400', color: sub },
+    apptValue:          { fontSize: 16, fontWeight: '700', color: text, marginLeft: 8 },
+    emptyState:         { alignItems: 'center', paddingTop: 60 },
+    emptyText:          { fontSize: 14, fontWeight: '400', color: sub },
+    fab:     { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', shadowColor: '#A8235A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
+    fabText: { fontSize: 30, fontWeight: '400', color: '#FFFFFF', lineHeight: 34 },
+  });
+}
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
 
-const INPUT_BG = '#2D1020';
-const SUBTLE   = '#3D1A2E';
+const INPUT_BG = '#1A1B1E';
+const SUBTLE   = '#2A2A2A';
 
 const modal = StyleSheet.create({
   backdrop:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  sheet:        { backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '92%' },
+  sheet:        { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '92%' },
   handle:       { width: 40, height: 4, borderRadius: 2, backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20 },
   title:        { fontSize: 20, fontWeight: '700', color: '#F5EDE8', marginBottom: 20 },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#6B4A58', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#C9A8B6', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
   input:        { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontWeight: '400', color: '#F5EDE8', marginBottom: 12 },
   inputMulti:   { height: 80, paddingTop: 14 },
 
   selectedRow:        { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, gap: 10 },
-  selectedAvatar:     { width: 32, height: 32, borderRadius: 16, backgroundColor: '#4A1028', alignItems: 'center', justifyContent: 'center' },
+  selectedAvatar:     { width: 32, height: 32, borderRadius: 16, backgroundColor: '#252525', alignItems: 'center', justifyContent: 'center' },
   selectedAvatarText: { fontSize: 11, fontWeight: '700', color: '#F5EDE8' },
   selectedText:       { flex: 1, fontSize: 15, fontWeight: '600', color: '#F5EDE8' },
-  clearBtn:           { fontSize: 16, color: '#6B4A58', fontWeight: '600' },
+  clearBtn:           { fontSize: 16, color: '#C9A8B6', fontWeight: '600' },
 
   listBox:        { backgroundColor: INPUT_BG, borderRadius: 12, marginBottom: 12, overflow: 'hidden' },
   listItem:       { paddingHorizontal: 16, paddingVertical: 13 },
   listItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
   listItemText:   { fontSize: 14, fontWeight: '500', color: '#F5EDE8' },
-  emptyHint:      { fontSize: 13, fontWeight: '400', color: '#6B4A58', marginBottom: 12, paddingLeft: 4 },
+  emptyHint:      { fontSize: 13, fontWeight: '400', color: '#C9A8B6', marginBottom: 12, paddingLeft: 4 },
 
   servicoRow:         { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 8 },
   servicoRowSelected: { backgroundColor: 'rgba(168,35,90,0.18)', borderWidth: 1, borderColor: 'rgba(168,35,90,0.5)' },
   servicoNome:        { fontSize: 14, fontWeight: '600', color: '#C9A8B6' },
   servicoNomeSel:     { color: '#F5EDE8' },
-  servicoMeta:        { fontSize: 11, fontWeight: '400', color: '#6B4A58', marginTop: 2 },
+  servicoMeta:        { fontSize: 11, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
   servicoValor:       { fontSize: 16, fontWeight: '700', color: '#C9A8B6', marginLeft: 8 },
   servicoValorSel:    { color: '#F5EDE8' },
 
@@ -905,13 +925,13 @@ const modal = StyleSheet.create({
   statusRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   statusBtn:           { paddingVertical: 11, borderRadius: 10, width: '48%', alignItems: 'center', backgroundColor: INPUT_BG },
   statusBtnActive:     { backgroundColor: '#A8235A' },
-  statusBtnText:       { fontSize: 12, fontWeight: '600', color: '#6B4A58' },
+  statusBtnText:       { fontSize: 12, fontWeight: '600', color: '#C9A8B6' },
   statusBtnTextActive: { color: '#FFFFFF' },
 
   tipoRow:           { flexDirection: 'row', gap: 8, marginBottom: 12 },
   tipoBtn:           { flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center', backgroundColor: INPUT_BG },
   tipoBtnActive:     { backgroundColor: '#A8235A' },
-  tipoBtnText:       { fontSize: 12, fontWeight: '600', color: '#6B4A58' },
+  tipoBtnText:       { fontSize: 12, fontWeight: '600', color: '#C9A8B6' },
   tipoBtnTextActive: { color: '#FFFFFF' },
 
   saveBtn:       { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
@@ -921,11 +941,11 @@ const modal = StyleSheet.create({
 
   pickerField:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
   pickerFieldText:        { fontSize: 15, color: '#F5EDE8', flex: 1 },
-  pickerFieldPlaceholder: { fontSize: 15, color: '#6B4A58', flex: 1 },
-  pickerFieldArrow:       { fontSize: 11, color: '#6B4A58', marginLeft: 8 },
+  pickerFieldPlaceholder: { fontSize: 15, color: '#C9A8B6', flex: 1 },
+  pickerFieldArrow:       { fontSize: 11, color: '#C9A8B6', marginLeft: 8 },
   pickerItem:             { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   pickerItemBorder:       { borderBottomWidth: 1, borderBottomColor: SUBTLE },
   pickerItemNome:         { fontSize: 15, fontWeight: '600', color: '#F5EDE8' },
-  pickerItemMeta:         { fontSize: 12, color: '#6B4A58', marginTop: 2 },
+  pickerItemMeta:         { fontSize: 12, color: '#C9A8B6', marginTop: 2 },
   pickerItemValor:        { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginLeft: 12 },
 });

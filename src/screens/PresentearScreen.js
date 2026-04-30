@@ -135,11 +135,11 @@ export default function PresentearScreen({ navigation }) {
   );
 }
 
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 const CARD_BG  = '#222222';
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1A0A14' },
+  safe: { flex: 1, backgroundColor: '#0E0F11' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   opcaoPrecoAtivo: { color: '#FFFFFF' },
   opcaoPeriodo:    { fontSize: 11, color: '#6B4A58', marginTop: 1 },
 
-  radio:     { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#3D1A2E', alignItems: 'center', justifyContent: 'center' },
+  radio:     { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
   radioAtivo:{ borderColor: '#A8235A' },
   radioDot:  { width: 10, height: 10, borderRadius: 5, backgroundColor: '#A8235A' },
 

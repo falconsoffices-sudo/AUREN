@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -158,7 +158,7 @@ const CARD_BG = '#222222';
 const SUBTLE  = '#2C2C2C';
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1A0A14' },
+  safe: { flex: 1, backgroundColor: '#0E0F11' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

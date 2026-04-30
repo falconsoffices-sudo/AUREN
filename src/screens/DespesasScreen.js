@@ -603,12 +603,12 @@ const styles = StyleSheet.create({
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
 
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 const SUBTLE   = '#3D1020';
 
 const modal = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  sheet:    { backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40 },
+  sheet:    { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40 },
   handle:   { width: 40, height: 4, borderRadius: 2, backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20 },
   title:    { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
   label:    { fontSize: 10, fontWeight: '700', color: '#6B4A58', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },

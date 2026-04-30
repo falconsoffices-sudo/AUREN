@@ -311,10 +311,10 @@ export default function LoginScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: '#1A0A14' },
+  safe:   { flex: 1, backgroundColor: '#0E0F11' },
   scroll: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 48 },
 
   logo: {

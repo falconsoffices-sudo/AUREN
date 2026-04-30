@@ -493,7 +493,7 @@ export default function ServicosScreen({ navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const CARD_BG  = '#222222';
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
@@ -555,7 +555,7 @@ const modal = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1A0A14',
+    backgroundColor: '#0E0F11',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -593,7 +593,7 @@ const modal = StyleSheet.create({
     overflow: 'hidden',
   },
   dropdownItem: { paddingHorizontal: 16, paddingVertical: 13 },
-  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
   dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
   dropdownItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },

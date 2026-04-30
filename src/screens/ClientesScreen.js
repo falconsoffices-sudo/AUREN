@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -57,6 +58,8 @@ function resolveServicoOpcao(sf) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SummaryCard({ value, label }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return (
     <View style={styles.summaryCard}>
       <Text style={styles.summaryValue}>{value}</Text>
@@ -66,6 +69,8 @@ function SummaryCard({ value, label }) {
 }
 
 function ClientCard({ nome, vip, servico_favorito, telefone, total_visitas, onPress }) {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return (
     <TouchableOpacity style={styles.clientCard} activeOpacity={0.72} onPress={onPress}>
       <View style={styles.avatar}>
@@ -428,6 +433,8 @@ function EditClientModal({ visible, cliente, onClose, onSaved }) {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ClientesScreen() {
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const [clientes,        setClientes]        = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [query,           setQuery]           = useState('');
@@ -567,86 +574,92 @@ export default function ClientesScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_BG = '#222222';
+function makeStyles(isDark) {
+  const bg     = isDark ? '#0E0F11' : '#F5EDE8';
+  const cardBg = isDark ? '#1A1B1E' : '#FFFFFF';
+  const text   = isDark ? '#F5EDE8' : '#1A0A14';
+  const sub    = isDark ? '#C9A8B6' : '#6B4A58';
+  const avatar = isDark ? '#3D1020' : '#F0E4DC';
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: bg },
 
-  header: { paddingHorizontal: 20, paddingTop: 28, marginBottom: 20 },
-  headerTitle:    { fontSize: 28, fontWeight: '700', color: colors.white, marginBottom: 3 },
-  headerSubtitle: { fontSize: 13, fontWeight: '400', color: colors.gray },
+    header: { paddingHorizontal: 20, paddingTop: 28, marginBottom: 20 },
+    headerTitle:    { fontSize: 28, fontWeight: '700', color: text, marginBottom: 3 },
+    headerSubtitle: { fontSize: 13, fontWeight: '400', color: sub },
 
-  searchWrap: { paddingHorizontal: 20, marginBottom: 20 },
-  searchInput: {
-    backgroundColor: CARD_BG, borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 13,
-    fontSize: 14, fontWeight: '400', color: colors.white,
-  },
+    searchWrap: { paddingHorizontal: 20, marginBottom: 20 },
+    searchInput: {
+      backgroundColor: cardBg, borderRadius: 12,
+      paddingHorizontal: 16, paddingVertical: 13,
+      fontSize: 14, fontWeight: '400', color: text,
+    },
 
-  scroll: { paddingHorizontal: 20, paddingBottom: 110 },
+    scroll: { paddingHorizontal: 20, paddingBottom: 110 },
 
-  summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  summaryCard: {
-    flex: 1, backgroundColor: CARD_BG, borderRadius: 16,
-    paddingVertical: 18, paddingHorizontal: 16,
-  },
-  summaryValue: { fontSize: 32, fontWeight: '800', color: colors.white, marginBottom: 4 },
-  summaryLabel: { fontSize: 12, fontWeight: '400', color: colors.gray },
+    summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+    summaryCard: {
+      flex: 1, backgroundColor: cardBg, borderRadius: 16,
+      paddingVertical: 18, paddingHorizontal: 16,
+    },
+    summaryValue: { fontSize: 32, fontWeight: '800', color: text, marginBottom: 4 },
+    summaryLabel: { fontSize: 12, fontWeight: '400', color: sub },
 
-  sectionLabel: {
-    fontSize: 11, fontWeight: '600', color: colors.gray,
-    letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 12,
-  },
+    sectionLabel: {
+      fontSize: 11, fontWeight: '600', color: sub,
+      letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 12,
+    },
 
-  clientCard: {
-    backgroundColor: CARD_BG, borderRadius: 16, padding: 16,
-    marginBottom: 10, flexDirection: 'row', alignItems: 'center',
-  },
-  avatar: {
-    width: 46, height: 46, borderRadius: 23, backgroundColor: '#2E2E2E',
-    alignItems: 'center', justifyContent: 'center', marginRight: 13, flexShrink: 0,
-  },
-  avatarText:  { fontSize: 15, fontWeight: '700', color: colors.cream },
-  clientInfo:  { flex: 1, marginRight: 12 },
-  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3, flexWrap: 'wrap' },
-  clientName:  { fontSize: 15, fontWeight: '700', color: colors.white },
-  vipBadge: {
-    backgroundColor: 'rgba(232,196,160,0.14)', paddingHorizontal: 7, paddingVertical: 2,
-    borderRadius: 6, borderWidth: 1, borderColor: 'rgba(232,196,160,0.28)',
-  },
-  vipBadgeText: { fontSize: 9, fontWeight: '800', color: colors.cream, letterSpacing: 0.7 },
-  serviceText:  { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
-  phoneText:    { fontSize: 12, fontWeight: '400', color: '#555555' },
+    clientCard: {
+      backgroundColor: cardBg, borderRadius: 16, padding: 16,
+      marginBottom: 10, flexDirection: 'row', alignItems: 'center',
+    },
+    avatar: {
+      width: 46, height: 46, borderRadius: 23, backgroundColor: avatar,
+      alignItems: 'center', justifyContent: 'center', marginRight: 13, flexShrink: 0,
+    },
+    avatarText:  { fontSize: 15, fontWeight: '700', color: colors.cream },
+    clientInfo:  { flex: 1, marginRight: 12 },
+    nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3, flexWrap: 'wrap' },
+    clientName:  { fontSize: 15, fontWeight: '700', color: text },
+    vipBadge: {
+      backgroundColor: 'rgba(232,196,160,0.14)', paddingHorizontal: 7, paddingVertical: 2,
+      borderRadius: 6, borderWidth: 1, borderColor: 'rgba(232,196,160,0.28)',
+    },
+    vipBadgeText: { fontSize: 9, fontWeight: '800', color: colors.cream, letterSpacing: 0.7 },
+    serviceText:  { fontSize: 12, fontWeight: '400', color: sub, marginBottom: 3 },
+    phoneText:    { fontSize: 12, fontWeight: '400', color: sub },
 
-  visitsCol:    { alignItems: 'center', flexShrink: 0 },
-  visitsCount:  { fontSize: 20, fontWeight: '800', color: colors.white, lineHeight: 22 },
-  visitsLabel:  { fontSize: 10, fontWeight: '400', color: colors.gray, marginTop: 2 },
+    visitsCol:    { alignItems: 'center', flexShrink: 0 },
+    visitsCount:  { fontSize: 20, fontWeight: '800', color: text, lineHeight: 22 },
+    visitsLabel:  { fontSize: 10, fontWeight: '400', color: sub, marginTop: 2 },
 
-  emptyState: { alignItems: 'center', paddingTop: 48 },
-  emptyText:  { fontSize: 14, fontWeight: '400', color: colors.gray },
+    emptyState: { alignItems: 'center', paddingTop: 48 },
+    emptyText:  { fontSize: 14, fontWeight: '400', color: sub },
 
-  fab: {
-    position: 'absolute', bottom: 24, right: 20,
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
-  },
-  fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
-});
+    fab: {
+      position: 'absolute', bottom: 24, right: 20,
+      width: 56, height: 56, borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
+    },
+    fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
+  });
+}
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
 
-const INPUT_BG = '#2D1020';
+const INPUT_BG = '#1A1B1E';
 
 const modal = StyleSheet.create({
   backdrop: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1A0A14',
+    backgroundColor: '#0E0F11',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40,
   },
@@ -682,7 +695,7 @@ const modal = StyleSheet.create({
     marginTop: -8, marginBottom: 12, maxHeight: 260, overflow: 'hidden',
   },
   dropdownItem:           { paddingHorizontal: 16, paddingVertical: 13 },
-  dropdownItemBorder:     { borderBottomWidth: 1, borderBottomColor: '#2D1020' },
+  dropdownItemBorder:     { borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
   dropdownItemActive:     { backgroundColor: 'rgba(168,35,90,0.15)' },
   dropdownItemText:       { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },

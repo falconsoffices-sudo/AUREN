@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Image, StyleSheet, Animated } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { Image, StyleSheet, Animated } from 'react-native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,14 +21,28 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
+const customDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: '#0E0F11',
+    card: '#1A1B1E',
+    border: 'transparent',
+  },
+};
+
 function MainTabs() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const c = theme.colors;
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#FFFFFF', borderTopColor: '#E6D8CF', borderTopWidth: 1 },
+        tabBarStyle: {
+          backgroundColor: isDark ? '#1A1B1E' : '#FFFFFF',
+          borderTopColor: isDark ? 'transparent' : '#E6D8CF',
+          borderTopWidth: 1,
+        },
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: '#B09AA8',
       }}
@@ -52,12 +66,29 @@ async function setupPushToken() {
   } catch (_) {}
 }
 
+function AppContent() {
+  const { isDark } = useTheme();
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer theme={isDark ? customDarkTheme : undefined}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Welcome"    component={WelcomeScreen}    />
+          <Stack.Screen name="Auth"       component={AuthScreen}       />
+          <Stack.Screen name="Login"      component={LoginScreen}      />
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="SaibaMais"  component={SaibaMaisScreen}  />
+          <Stack.Screen name="Main"       component={MainTabs}         />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Começa fade-out 500ms antes do fim do splash
     const fadeTimer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -82,18 +113,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Welcome"    component={WelcomeScreen}    />
-            <Stack.Screen name="Auth"       component={AuthScreen}       />
-            <Stack.Screen name="Login"      component={LoginScreen}      />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            <Stack.Screen name="SaibaMais"  component={SaibaMaisScreen}  />
-            <Stack.Screen name="Main"       component={MainTabs}         />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </SafeAreaProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }
