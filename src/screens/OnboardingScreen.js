@@ -71,7 +71,7 @@ export default function OnboardingScreen({ navigation }) {
           profissional_id: uid,
           nome:    servicoNome.trim(),
           valor:   parseFloat(servicoValor.replace(',', '.')) || 0,
-          duracao: parseInt(servicoDuracao, 10) || 60,
+          duracao_minutos: parseInt(servicoDuracao, 10) || 60,
         });
       }
       setStep(1);
@@ -91,13 +91,15 @@ export default function OnboardingScreen({ navigation }) {
     try {
       const uid = await getUid();
       if (uid) {
-        await supabase.from('enderecos').insert({
-          profissional_id: uid,
-          logradouro: rua.trim(),
-          cidade:     cidade.trim(),
-          estado:     estado.trim().toUpperCase().slice(0, 2),
-          cep:        cep.trim(),
-        });
+        await supabase.from('profiles').update({
+          endereco_comercial: JSON.stringify({
+            rua:    rua.trim(),
+            numero: '',
+            cidade: cidade.trim(),
+            estado: estado.trim().toUpperCase().slice(0, 2),
+            zip:    cep.trim(),
+          }),
+        }).eq('id', uid);
       }
       setStep(2);
     } catch (err) {
