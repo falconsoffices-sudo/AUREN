@@ -47,6 +47,7 @@ const MENU = [
   { id: 5.5, label: 'Relatório Mensal' },
   { id: 5.6, label: 'Inteligência de Clientela' },
   { id: 5.7, label: 'Minhas Conexões' },
+  { id: 5.8, label: 'Minha Equipe' },
   { id: 6,  label: 'Despesas' },
   { id: 7,  label: 'Gamificação' },
   { id: 8,  label: 'Presentear com AUREN' },
@@ -131,6 +132,7 @@ export default function PerfilScreen({ navigation }) {
       case 'Relatório Mensal':          return () => navigation.navigate('Relatorio');
       case 'Inteligência de Clientela': return () => navigation.navigate('IntelClientela');
       case 'Minhas Conexões':           return () => navigation.navigate('Conexoes');
+      case 'Minha Equipe':              return () => navigation.navigate('Equipe');
       case 'Gamificação':          return () => navigation.navigate('Gamificacao');
       case 'Presentear com AUREN': return () => navigation.navigate('Presentear');
       case 'Ajuda':                return () => navigation.navigate('Ajuda');
