@@ -111,6 +111,23 @@ export default function AjudaScreen({ navigation }) {
           ))}
         </View>
 
+        <Text style={[styles.sectionLabel, { marginTop: 8 }]}>TUTORIAIS</Text>
+
+        <TouchableOpacity
+          style={styles.contatoCard}
+          onPress={() => navigation.navigate('Tutoriais')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.contatoIcon}>
+            <Text style={styles.contatoEmoji}>▶️</Text>
+          </View>
+          <View style={styles.contatoBody}>
+            <Text style={styles.contatoTitle}>Tutoriais AUREN</Text>
+            <Text style={styles.contatoSub}>Aprenda a usar o app em vídeo</Text>
+          </View>
+          <Text style={styles.contatoArrow}>›</Text>
+        </TouchableOpacity>
+
         <Text style={[styles.sectionLabel, { marginTop: 8 }]}>FALE CONOSCO</Text>
 
         <TouchableOpacity style={styles.contatoCard} onPress={abrirEmail} activeOpacity={0.8}>
