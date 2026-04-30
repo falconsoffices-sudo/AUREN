@@ -14,18 +14,21 @@ import CaixaScreen    from './src/screens/CaixaScreen';
 import PerfilStack    from './src/navigation/PerfilStack';
 import { supabase } from './src/lib/supabase';
 import { registerForPushNotifications } from './src/lib/notifications';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
 function MainTabs() {
+  const { theme } = useTheme();
+  const c = theme.colors;
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#1A0A14', borderTopColor: '#2D1020' },
-        tabBarActiveTintColor: '#A8235A',
-        tabBarInactiveTintColor: '#6B4A58',
+        tabBarStyle: { backgroundColor: c.background, borderTopColor: c.border },
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.textSecondary,
       }}
     >
       <Tab.Screen name="Início"   component={HomeScreen}     />
@@ -68,16 +71,18 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          <Stack.Screen name="Auth"    component={AuthScreen}    />
-          <Stack.Screen name="Login"   component={LoginScreen}   />
-          <Stack.Screen name="Main"    component={MainTabs}      />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Auth"    component={AuthScreen}    />
+            <Stack.Screen name="Login"   component={LoginScreen}   />
+            <Stack.Screen name="Main"    component={MainTabs}      />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }
 

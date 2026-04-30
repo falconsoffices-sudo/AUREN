@@ -9,11 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import theme from '../constants/theme';
 import { supabase } from '../lib/supabase';
-
-const c  = theme.colors;
-const sh = theme.shadows;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -243,7 +239,7 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
-            <ActivityIndicator color={c.magenta} style={{ marginTop: 56 }} />
+            <ActivityIndicator color="#A8235A" style={{ marginTop: 56 }} />
           ) : (
             <>
               {/* Card: Hoje */}
@@ -328,237 +324,59 @@ export default function HomeScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const SM_SHADOW = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.15,
+  shadowRadius: 3,
+  elevation: 2,
+};
+
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: c.dark,
-  },
-  shell: {
-    flex: 1,
-    backgroundColor: c.creme,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  scroll: {
-    paddingHorizontal: 18,
-    paddingTop: 22,
-    paddingBottom: 44,
-  },
+  safe:   { flex: 1, backgroundColor: '#1A0A14' },
+  shell:  { flex: 1, backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  scroll: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 44 },
 
-  logoImage: {
-    height: 28,
-    resizeMode: 'contain',
-  },
+  logoImage: { height: 28, resizeMode: 'contain' },
 
-  header: {
-    backgroundColor: c.dark,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 30,
-  },
-  logoRow: {
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: c.white,
-    marginBottom: 4,
-  },
-  date: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: 'rgba(255,255,255,0.42)',
-    textTransform: 'capitalize',
-  },
+  header:   { backgroundColor: '#1A0A14', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30 },
+  logoRow:  { marginBottom: 20 },
+  greeting: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
+  date:     { fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.42)', textTransform: 'capitalize' },
 
-  card: {
-    backgroundColor: c.white,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
-    ...sh.sm,
-  },
-  cardLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: c.fg3,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 14,
-  },
+  card:      { backgroundColor: '#2D1020', borderRadius: 16, padding: 18, marginBottom: 12, ...SM_SHADOW },
+  cardLabel: { fontSize: 11, fontWeight: '600', color: '#C9A8B6', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 14 },
 
-  /* Card: Hoje */
-  cardToday: {
-    backgroundColor: c.white,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: c.magenta,
-    ...sh.sm,
-  },
-  todayBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: c.magenta,
-    letterSpacing: 1.4,
-    marginBottom: 12,
-  },
-  todayValue: {
-    fontSize: 38,
-    fontWeight: '800',
-    color: c.magenta,
-    lineHeight: 44,
-  },
-  todayCaption: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: c.fg3,
-    marginTop: 4,
-  },
+  cardToday:    { backgroundColor: '#2D1020', borderRadius: 16, padding: 18, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#A8235A', ...SM_SHADOW },
+  todayBadge:   { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1.4, marginBottom: 12 },
+  todayValue:   { fontSize: 38, fontWeight: '800', color: '#A8235A', lineHeight: 44 },
+  todayCaption: { fontSize: 13, fontWeight: '400', color: '#C9A8B6', marginTop: 4 },
 
-  /* Agendamento rows */
-  agendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  agendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
-    flexShrink: 0,
-  },
-  agendInfo: {
-    flex: 1,
-    marginRight: 10,
-  },
-  agendNome: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: c.dark,
-  },
-  agendServico: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: c.fg3,
-    marginTop: 2,
-  },
-  agendHora: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: c.magenta,
-    flexShrink: 0,
-  },
-  agendDivider: {
-    height: 1,
-    backgroundColor: c.bege2,
-  },
+  agendRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+  agendDot:     { width: 8, height: 8, borderRadius: 4, marginRight: 12, flexShrink: 0 },
+  agendInfo:    { flex: 1, marginRight: 10 },
+  agendNome:    { fontSize: 14, fontWeight: '700', color: '#F5EDE8' },
+  agendServico: { fontSize: 12, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
+  agendHora:    { fontSize: 13, fontWeight: '700', color: '#A8235A', flexShrink: 0 },
+  agendDivider: { height: 1, backgroundColor: '#3D1A2E' },
 
-  /* StatColumn */
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statCol: {
-    flex: 1,
-  },
-  statDivider: {
-    width: 1,
-    height: 44,
-    backgroundColor: c.bege2,
-    marginHorizontal: 18,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: c.fg3,
-    marginBottom: 5,
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: c.dark,
-  },
-  statMeta: {
-    fontSize: 11,
-    fontWeight: '400',
-    color: c.fg3,
-    marginTop: 3,
-  },
+  statRow:     { flexDirection: 'row', alignItems: 'center' },
+  statCol:     { flex: 1 },
+  statDivider: { width: 1, height: 44, backgroundColor: '#3D1A2E', marginHorizontal: 18 },
+  statLabel:   { fontSize: 12, fontWeight: '400', color: '#C9A8B6', marginBottom: 5 },
+  statValue:   { fontSize: 22, fontWeight: '800', color: '#F5EDE8' },
+  statMeta:    { fontSize: 11, fontWeight: '400', color: '#C9A8B6', marginTop: 3 },
 
-  /* Card: Nível */
-  levelHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  levelTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: c.dark,
-    marginBottom: 14,
-  },
-  levelPercent: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: c.magenta,
-  },
-  progressTrack: {
-    height: 8,
-    backgroundColor: c.bege2,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 8,
-    backgroundColor: c.magenta,
-    borderRadius: 4,
-  },
+  levelHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  levelTitle:    { fontSize: 20, fontWeight: '800', color: '#F5EDE8', marginBottom: 14 },
+  levelPercent:  { fontSize: 22, fontWeight: '800', color: '#A8235A' },
+  progressTrack: { height: 8, backgroundColor: '#3D1A2E', borderRadius: 4, overflow: 'hidden' },
+  progressFill:  { height: 8, backgroundColor: '#A8235A', borderRadius: 4 },
 
-  /* Insights */
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: c.dark,
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  insightCard: {
-    backgroundColor: c.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    ...sh.sm,
-  },
-  insightDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: c.magenta,
-    marginTop: 5,
-    marginRight: 12,
-    flexShrink: 0,
-  },
-  insightBody: {
-    flex: 1,
-  },
-  insightTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: c.fg,
-    marginBottom: 5,
-  },
-  insightText: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: c.fg3,
-    lineHeight: 20,
-  },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginTop: 8, marginBottom: 12 },
+  insightCard:  { backgroundColor: '#2D1020', borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', ...SM_SHADOW },
+  insightDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A8235A', marginTop: 5, marginRight: 12, flexShrink: 0 },
+  insightBody:  { flex: 1 },
+  insightTitle: { fontSize: 14, fontWeight: '700', color: '#F5EDE8', marginBottom: 5 },
+  insightText:  { fontSize: 13, fontWeight: '400', color: '#C9A8B6', lineHeight: 20 },
 });

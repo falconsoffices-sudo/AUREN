@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
-import colors from '../constants/colors';
 import { scheduleNotification } from '../lib/notifications';
 import { sendSMS, applyTemplate } from '../lib/sms';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -159,7 +158,7 @@ function ServicoPickerModal({ visible, servicos, loadingServicos, onSelect, onCl
           <View style={modal.handle} />
           <Text style={modal.title}>Selecionar Serviço</Text>
           {loadingServicos ? (
-            <ActivityIndicator color={colors.primary} style={{ marginBottom: 20 }} />
+            <ActivityIndicator color="#A8235A" style={{ marginBottom: 20 }} />
           ) : servicos.length === 0 ? (
             <Text style={modal.emptyHint}>Cadastre seus serviços no Perfil primeiro.</Text>
           ) : (
@@ -355,7 +354,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
                 <>
                   <TextInput style={modal.input} placeholder="Buscar cliente..." placeholderTextColor="#6B4A58" value={clienteSearch} onChangeText={setClienteSearch} autoCapitalize="words" />
                   {loadingClientes ? (
-                    <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} />
+                    <ActivityIndicator color="#A8235A" style={{ marginBottom: 12 }} />
                   ) : filteredClientes.length > 0 ? (
                     <View style={modal.listBox}>
                       {filteredClientes.slice(0, 5).map((c, idx) => (
@@ -558,7 +557,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
                 <>
                   <TextInput style={modal.input} placeholder="Buscar cliente..." placeholderTextColor="#6B4A58" value={clienteSearch} onChangeText={setClienteSearch} autoCapitalize="words" />
                   {loadingClientes ? (
-                    <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} />
+                    <ActivityIndicator color="#A8235A" style={{ marginBottom: 12 }} />
                   ) : filteredClientes.length > 0 ? (
                     <View style={modal.listBox}>
                       {filteredClientes.slice(0, 5).map((c, idx) => (
@@ -693,7 +692,7 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
           </Text>
         </View>
         {valor != null && (
-          <Text style={[styles.apptValue, isNext && { color: colors.primary }]}>
+          <Text style={[styles.apptValue, isNext && { color: '#A8235A' }]}>
             ${parseFloat(valor).toFixed(2)}
           </Text>
         )}
@@ -787,7 +786,7 @@ export default function AgendaScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+          <ActivityIndicator color="#A8235A" style={{ marginTop: 40 }} />
         ) : agendamentos.length > 0 ? (
           agendamentos.map(a => <AppointmentCard key={a.id} {...a} onPress={() => openEdit(a)} />)
         ) : (
@@ -821,91 +820,89 @@ export default function AgendaScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_BG = '#222222';
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 28, marginBottom: 24 },
-  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.white },
-  headerMonth: { fontSize: 14, fontWeight: '400', color: colors.gray, paddingBottom: 3 },
-  weekRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginBottom: 20 },
-  navBtn:     { width: 28, alignItems: 'center', justifyContent: 'center' },
-  navBtnText: { fontSize: 26, fontWeight: '400', color: colors.gray, lineHeight: 30 },
+  safe:        { flex: 1, backgroundColor: '#1A0A14' },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 28, marginBottom: 24 },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: '#F5EDE8' },
+  headerMonth: { fontSize: 14, fontWeight: '400', color: '#C9A8B6', paddingBottom: 3 },
+  weekRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginBottom: 20 },
+  navBtn:      { width: 28, alignItems: 'center', justifyContent: 'center' },
+  navBtnText:  { fontSize: 26, fontWeight: '400', color: '#C9A8B6', lineHeight: 30 },
   dayItem:       { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 12 },
-  dayItemActive: { backgroundColor: colors.primary },
-  dayShort:      { fontSize: 10, fontWeight: '600', color: colors.gray, marginBottom: 5, letterSpacing: 0.3 },
-  dayNum:        { fontSize: 15, fontWeight: '700', color: colors.gray },
-  dayTextActive: { color: colors.white },
-  dayTitle:      { fontSize: 14, fontWeight: '600', color: colors.white, paddingHorizontal: 20, marginBottom: 16 },
+  dayItemActive: { backgroundColor: '#A8235A' },
+  dayShort:      { fontSize: 10, fontWeight: '600', color: '#C9A8B6', marginBottom: 5, letterSpacing: 0.3 },
+  dayNum:        { fontSize: 15, fontWeight: '700', color: '#C9A8B6' },
+  dayTextActive: { color: '#FFFFFF' },
+  dayTitle:      { fontSize: 14, fontWeight: '600', color: '#F5EDE8', paddingHorizontal: 20, marginBottom: 16 },
   scroll:        { paddingHorizontal: 20, paddingBottom: 110 },
-  apptCard:           { backgroundColor: CARD_BG, borderRadius: 16, padding: 16, marginBottom: 10 },
+  apptCard:           { backgroundColor: '#2D1020', borderRadius: 16, padding: 16, marginBottom: 10 },
   apptCardHighlight:  { borderWidth: 1, borderColor: 'rgba(168,35,90,0.45)' },
   apptTopRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  apptTime:           { fontSize: 12, fontWeight: '600', color: colors.gray, letterSpacing: 0.3 },
+  apptTime:           { fontSize: 12, fontWeight: '600', color: '#C9A8B6', letterSpacing: 0.3 },
   statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText:         { fontSize: 11, fontWeight: '700' },
   apptClientRow:      { flexDirection: 'row', alignItems: 'center' },
-  avatar:             { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2E2E2E', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  avatarText:         { fontSize: 14, fontWeight: '700', color: colors.cream },
+  avatar:             { width: 44, height: 44, borderRadius: 22, backgroundColor: '#3D1A2E', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  avatarText:         { fontSize: 14, fontWeight: '700', color: '#F5EDE8' },
   apptInfo:           { flex: 1 },
   nameRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
-  clientName:         { fontSize: 15, fontWeight: '700', color: colors.white },
+  clientName:         { fontSize: 15, fontWeight: '700', color: '#F5EDE8' },
   vipBadge:           { backgroundColor: 'rgba(232,196,160,0.15)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(232,196,160,0.3)' },
-  vipText:            { fontSize: 9, fontWeight: '800', color: colors.cream, letterSpacing: 0.8 },
-  serviceText:        { fontSize: 12, fontWeight: '400', color: colors.gray },
-  apptValue:          { fontSize: 16, fontWeight: '700', color: colors.white, marginLeft: 8 },
+  vipText:            { fontSize: 9, fontWeight: '800', color: '#F5EDE8', letterSpacing: 0.8 },
+  serviceText:        { fontSize: 12, fontWeight: '400', color: '#C9A8B6' },
+  apptValue:          { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginLeft: 8 },
   emptyState:         { alignItems: 'center', paddingTop: 60 },
-  emptyText:          { fontSize: 14, fontWeight: '400', color: colors.gray },
-  fab: { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
-  fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
+  emptyText:          { fontSize: 14, fontWeight: '400', color: '#C9A8B6' },
+  fab:     { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', shadowColor: '#A8235A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
+  fabText: { fontSize: 30, fontWeight: '400', color: '#FFFFFF', lineHeight: 34 },
 });
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
 
 const INPUT_BG = '#2D1020';
-const SUBTLE   = '#3D1020';
+const SUBTLE   = '#3D1A2E';
 
 const modal = StyleSheet.create({
-  backdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  sheet:      { backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '92%' },
-  handle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20 },
-  title:      { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
+  backdrop:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet:        { backgroundColor: '#1A0A14', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '92%' },
+  handle:       { width: 40, height: 4, borderRadius: 2, backgroundColor: SUBTLE, alignSelf: 'center', marginBottom: 20 },
+  title:        { fontSize: 20, fontWeight: '700', color: '#F5EDE8', marginBottom: 20 },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: '#6B4A58', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
-  input:      { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontWeight: '400', color: '#FFFFFF', marginBottom: 12 },
-  inputMulti: { height: 80, paddingTop: 14 },
+  input:        { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontWeight: '400', color: '#F5EDE8', marginBottom: 12 },
+  inputMulti:   { height: 80, paddingTop: 14 },
 
   selectedRow:        { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, gap: 10 },
   selectedAvatar:     { width: 32, height: 32, borderRadius: 16, backgroundColor: '#4A1028', alignItems: 'center', justifyContent: 'center' },
-  selectedAvatarText: { fontSize: 11, fontWeight: '700', color: colors.cream },
-  selectedText:       { flex: 1, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  selectedAvatarText: { fontSize: 11, fontWeight: '700', color: '#F5EDE8' },
+  selectedText:       { flex: 1, fontSize: 15, fontWeight: '600', color: '#F5EDE8' },
   clearBtn:           { fontSize: 16, color: '#6B4A58', fontWeight: '600' },
 
   listBox:        { backgroundColor: INPUT_BG, borderRadius: 12, marginBottom: 12, overflow: 'hidden' },
   listItem:       { paddingHorizontal: 16, paddingVertical: 13 },
   listItemBorder: { borderBottomWidth: 1, borderBottomColor: SUBTLE },
-  listItemText:   { fontSize: 14, fontWeight: '500', color: '#FFFFFF' },
+  listItemText:   { fontSize: 14, fontWeight: '500', color: '#F5EDE8' },
   emptyHint:      { fontSize: 13, fontWeight: '400', color: '#6B4A58', marginBottom: 12, paddingLeft: 4 },
 
   servicoRow:         { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 8 },
   servicoRowSelected: { backgroundColor: 'rgba(168,35,90,0.18)', borderWidth: 1, borderColor: 'rgba(168,35,90,0.5)' },
-  servicoNome:        { fontSize: 14, fontWeight: '600', color: '#CCCCCC' },
-  servicoNomeSel:     { color: '#FFFFFF' },
+  servicoNome:        { fontSize: 14, fontWeight: '600', color: '#C9A8B6' },
+  servicoNomeSel:     { color: '#F5EDE8' },
   servicoMeta:        { fontSize: 11, fontWeight: '400', color: '#6B4A58', marginTop: 2 },
-  servicoValor:       { fontSize: 16, fontWeight: '700', color: '#AAAAAA', marginLeft: 8 },
-  servicoValorSel:    { color: colors.cream },
+  servicoValor:       { fontSize: 16, fontWeight: '700', color: '#C9A8B6', marginLeft: 8 },
+  servicoValorSel:    { color: '#F5EDE8' },
 
   dateBox:  { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
-  dateText: { fontSize: 14, fontWeight: '500', color: '#CCCCCC' },
+  dateText: { fontSize: 14, fontWeight: '500', color: '#C9A8B6' },
 
   statusRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   statusBtn:           { paddingVertical: 11, borderRadius: 10, width: '48%', alignItems: 'center', backgroundColor: INPUT_BG },
-  statusBtnActive:     { backgroundColor: colors.primary },
+  statusBtnActive:     { backgroundColor: '#A8235A' },
   statusBtnText:       { fontSize: 12, fontWeight: '600', color: '#6B4A58' },
   statusBtnTextActive: { color: '#FFFFFF' },
 
   tipoRow:           { flexDirection: 'row', gap: 8, marginBottom: 12 },
   tipoBtn:           { flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center', backgroundColor: INPUT_BG },
-  tipoBtnActive:     { backgroundColor: colors.primary },
+  tipoBtnActive:     { backgroundColor: '#A8235A' },
   tipoBtnText:       { fontSize: 12, fontWeight: '600', color: '#6B4A58' },
   tipoBtnTextActive: { color: '#FFFFFF' },
 
@@ -915,12 +912,12 @@ const modal = StyleSheet.create({
   cancelBtnText: { fontSize: 16, fontWeight: '700', color: '#F87171' },
 
   pickerField:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
-  pickerFieldText:        { fontSize: 15, color: '#FFFFFF', flex: 1 },
+  pickerFieldText:        { fontSize: 15, color: '#F5EDE8', flex: 1 },
   pickerFieldPlaceholder: { fontSize: 15, color: '#6B4A58', flex: 1 },
   pickerFieldArrow:       { fontSize: 11, color: '#6B4A58', marginLeft: 8 },
   pickerItem:             { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-  pickerItemBorder:       { borderBottomWidth: 1, borderBottomColor: '#3D1020' },
-  pickerItemNome:         { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  pickerItemBorder:       { borderBottomWidth: 1, borderBottomColor: SUBTLE },
+  pickerItemNome:         { fontSize: 15, fontWeight: '600', color: '#F5EDE8' },
   pickerItemMeta:         { fontSize: 12, color: '#6B4A58', marginTop: 2 },
-  pickerItemValor:        { fontSize: 16, fontWeight: '700', color: colors.cream, marginLeft: 12 },
+  pickerItemValor:        { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginLeft: 12 },
 });

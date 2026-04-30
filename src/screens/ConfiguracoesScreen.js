@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -51,9 +52,10 @@ const NOTIF_OPTIONS = [
   { label: 'Desativado', value: 'off' },
 ];
 
-const MODO_OPTIONS = [
-  { label: 'Diurno',  value: 'diurno'  },
-  { label: 'Noturno', value: 'noturno' },
+const APARENCIA_OPTIONS = [
+  { label: 'Automático', value: 'auto'  },
+  { label: 'Diurno',     value: 'light' },
+  { label: 'Noturno',    value: 'dark'  },
 ];
 
 const IDIOMA_OPTIONS = [
@@ -62,12 +64,13 @@ const IDIOMA_OPTIONS = [
 ];
 
 export default function ConfiguracoesScreen({ navigation }) {
+  const { themeMode, setThemeMode } = useTheme();
+
   const [loading,          setLoading]          = useState(true);
   const [saving,           setSaving]           = useState(false);
   const [userId,           setUserId]           = useState(null);
 
   const [notificacoes,     setNotificacoes]     = useState('on');
-  const [modoApp,          setModoApp]          = useState('diurno');
   const [dataFechamento,   setDataFechamento]   = useState('28');
   const [idioma,           setIdioma]           = useState('pt');
 
@@ -85,10 +88,12 @@ export default function ConfiguracoesScreen({ navigation }) {
         .single();
 
       if (data) {
-        setNotificacoes(data.notificacoes  ?? 'on');
-        setModoApp(data.modo_app           ?? 'diurno');
+        setNotificacoes(data.notificacoes ?? 'on');
+        if (data.modo_app === 'auto' || data.modo_app === 'dark' || data.modo_app === 'light') {
+          setThemeMode(data.modo_app);
+        }
         setDataFechamento(data.data_fechamento != null ? String(data.data_fechamento) : '28');
-        setIdioma(data.idioma              ?? 'pt');
+        setIdioma(data.idioma ?? 'pt');
       } else if (error && error.code !== 'PGRST116') {
         Alert.alert('Erro ao carregar', error.message);
       }
@@ -109,7 +114,7 @@ export default function ConfiguracoesScreen({ navigation }) {
         .upsert({
           id:               userId,
           notificacoes,
-          modo_app:         modoApp,
+          modo_app:         themeMode,
           data_fechamento:  dia,
           idioma,
         });
@@ -158,12 +163,26 @@ export default function ConfiguracoesScreen({ navigation }) {
             onChange={setNotificacoes}
           />
           <View style={styles.divider} />
-          <ToggleRow
-            label="Modo do app"
-            options={MODO_OPTIONS}
-            value={modoApp}
-            onChange={setModoApp}
-          />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Aparência</Text>
+          </View>
+          <View style={styles.aparenciaRow}>
+            {APARENCIA_OPTIONS.map(opt => {
+              const active = themeMode === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.aparenciaBtn, active && styles.aparenciaBtnActive]}
+                  onPress={() => setThemeMode(opt.value)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.aparenciaText, active && styles.aparenciaTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         <SectionTitle label="FINANCEIRO" />
@@ -269,6 +288,16 @@ const styles = StyleSheet.create({
   toggleBtnActive: { backgroundColor: colors.primary },
   toggleText:       { fontSize: 12, fontWeight: '600', color: colors.gray },
   toggleTextActive: { color: colors.white },
+
+  aparenciaRow: { flexDirection: 'row', gap: 8, paddingBottom: 14 },
+  aparenciaBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 20,
+    alignItems: 'center', backgroundColor: INPUT_BG,
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  aparenciaBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  aparenciaText:       { fontSize: 13, fontWeight: '600', color: colors.gray },
+  aparenciaTextActive: { color: '#FFFFFF' },
 
   numInput: {
     backgroundColor: INPUT_BG, borderRadius: 10,
