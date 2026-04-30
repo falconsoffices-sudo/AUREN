@@ -212,6 +212,7 @@ export default function AuthScreen({ navigation }) {
   const [licencaEstado,    setLicencaEstado]    = useState('');
   const [licencaExpiracao, setLicencaExpiracao] = useState('');
   const [estadoModalVisible, setEstadoModalVisible] = useState(false);
+  const [termsAccepted,      setTermsAccepted]      = useState(false);
 
   // OTP
   const [otpCode,            setOtpCode]            = useState('');
@@ -227,6 +228,10 @@ export default function AuthScreen({ navigation }) {
 
   // ── Step 1: validate form + send email OTP ───────────────────
   const handleSendOtp = async () => {
+    if (!termsAccepted) {
+      Alert.alert('Aceite necessário', 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.');
+      return;
+    }
     if (
       !nome.trim() || !email.trim() || digits.length < 10 || !genero ||
       !licencaNumero.trim() || !licencaTipo || !licencaEstado || !licencaExpiracao.trim()
@@ -420,6 +425,25 @@ export default function AuthScreen({ navigation }) {
               )}
 
               <TouchableOpacity
+                style={styles.termsRow}
+                onPress={() => setTermsAccepted(v => !v)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                  {termsAccepted && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.termsLabel}>
+                  {'Li e aceito os '}
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() => navigation.navigate('Politicas')}
+                  >
+                    Termos de Uso e Política de Privacidade
+                  </Text>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
                 onPress={handleSendOtp}
                 disabled={loading}
@@ -580,4 +604,19 @@ const styles = StyleSheet.create({
 
   loginLink:     { alignItems: 'center', paddingVertical: 10 },
   loginLinkText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },
+
+  termsRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginBottom: 16, gap: 10,
+  },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 5,
+    borderWidth: 1.5, borderColor: '#8A8A8E',
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 1, flexShrink: 0,
+  },
+  checkboxChecked: { backgroundColor: '#A8235A', borderColor: '#A8235A' },
+  checkmark:       { fontSize: 12, fontWeight: '700', color: '#FFFFFF', lineHeight: 14 },
+  termsLabel:      { flex: 1, fontSize: 13, fontWeight: '400', color: '#8A8A8E', lineHeight: 20 },
+  termsLink:       { fontSize: 13, fontWeight: '600', color: '#A8235A', textDecorationLine: 'underline' },
 });

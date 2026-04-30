@@ -13,6 +13,7 @@ import GamificacaoScreen     from '../screens/GamificacaoScreen';
 import PresentearScreen      from '../screens/PresentearScreen';
 import AjudaScreen           from '../screens/AjudaScreen';
 import SaibaMaisScreen       from '../screens/SaibaMaisScreen';
+import PoliticasScreen       from '../screens/PoliticasScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -31,6 +32,7 @@ export default function PerfilStack() {
       <Stack.Screen name="Presentear"    component={PresentearScreen}    />
       <Stack.Screen name="Ajuda"         component={AjudaScreen}         />
       <Stack.Screen name="SaibaMais"     component={SaibaMaisScreen}     />
+      <Stack.Screen name="Politicas"     component={PoliticasScreen}     />
     </Stack.Navigator>
   );
 }

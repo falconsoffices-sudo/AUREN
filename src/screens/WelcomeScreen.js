@@ -102,6 +102,14 @@ export default function WelcomeScreen({ navigation }) {
         >
           <Text style={styles.saibaMaisBtnText}>Saiba mais sobre o AUREN</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.termsLink}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Politicas')}
+        >
+          <Text style={styles.termsLinkText}>Termos de Uso e Política de Privacidade</Text>
+        </TouchableOpacity>
       </View>
 
     </SafeAreaView>
@@ -199,4 +207,7 @@ const styles = StyleSheet.create({
 
   saibaMaisBtn: { alignItems: 'center', paddingVertical: 10 },
   saibaMaisBtnText: { fontSize: 13, fontWeight: '600', color: '#6B4A58' },
+
+  termsLink:     { alignItems: 'center', paddingVertical: 8 },
+  termsLinkText: { fontSize: 11, fontWeight: '400', color: '#555560', textDecorationLine: 'underline' },
 });

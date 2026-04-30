@@ -363,6 +363,15 @@ export default function ConfiguracoesScreen({ navigation }) {
             <Text style={styles.linkLabel}>Saiba mais sobre o AUREN</Text>
             <Text style={styles.linkArrow}>›</Text>
           </TouchableOpacity>
+          <View style={styles.linkDivider} />
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Politicas')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.linkLabel}>Termos e Privacidade</Text>
+            <Text style={styles.linkArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
       </ScrollView>
