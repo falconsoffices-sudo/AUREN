@@ -133,6 +133,7 @@ export default function PerfilScreen({ navigation }) {
       case 'Inteligência de Clientela': return () => navigation.navigate('IntelClientela');
       case 'Minhas Conexões':           return () => navigation.navigate('Conexoes');
       case 'Minha Equipe':              return () => navigation.navigate('Equipe');
+      case 'Auren Community':           return () => navigation.navigate('Community');
       case 'Gamificação':          return () => navigation.navigate('Gamificacao');
       case 'Presentear com AUREN': return () => navigation.navigate('Presentear');
       case 'Ajuda':                return () => navigation.navigate('Ajuda');
