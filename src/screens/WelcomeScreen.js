@@ -94,6 +94,14 @@ export default function WelcomeScreen({ navigation }) {
         >
           <Text style={styles.outlineBtnText}>{t.entrar}</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.saibaMaisBtn}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('SaibaMais')}
+        >
+          <Text style={styles.saibaMaisBtnText}>Saiba mais sobre o AUREN</Text>
+        </TouchableOpacity>
       </View>
 
     </SafeAreaView>
@@ -188,4 +196,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#A8235A',
   },
+
+  saibaMaisBtn: { alignItems: 'center', paddingVertical: 10 },
+  saibaMaisBtnText: { fontSize: 13, fontWeight: '600', color: '#6B4A58' },
 });

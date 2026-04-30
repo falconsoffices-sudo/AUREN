@@ -10,6 +10,9 @@ import ConfiguracoesScreen   from '../screens/ConfiguracoesScreen';
 import TemplatesSMSScreen    from '../screens/TemplatesSMSScreen';
 import MetasScreen           from '../screens/MetasScreen';
 import GamificacaoScreen     from '../screens/GamificacaoScreen';
+import PresentearScreen      from '../screens/PresentearScreen';
+import AjudaScreen           from '../screens/AjudaScreen';
+import SaibaMaisScreen       from '../screens/SaibaMaisScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +28,9 @@ export default function PerfilStack() {
       <Stack.Screen name="TemplatesSMS"  component={TemplatesSMSScreen}  />
       <Stack.Screen name="Metas"         component={MetasScreen}         />
       <Stack.Screen name="Gamificacao"   component={GamificacaoScreen}   />
+      <Stack.Screen name="Presentear"    component={PresentearScreen}    />
+      <Stack.Screen name="Ajuda"         component={AjudaScreen}         />
+      <Stack.Screen name="SaibaMais"     component={SaibaMaisScreen}     />
     </Stack.Navigator>
   );
 }

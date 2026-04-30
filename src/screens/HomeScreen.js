@@ -113,13 +113,14 @@ function AgendamentoRow({ agendamento, showDivider }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const [loading,           setLoading]           = useState(true);
   const [primeiroNome,      setPrimeiroNome]      = useState('');
   const [nivelGamificacao,  setNivelGamificacao]  = useState(1);
   const [agendamentosHoje,  setAgendamentosHoje]  = useState([]);
   const [faturamentoSemana, setFaturamentoSemana] = useState(0);
   const [faturamentoMes,    setFaturamentoMes]    = useState(0);
+  const [diasTrial,         setDiasTrial]         = useState(null);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -131,7 +132,7 @@ export default function HomeScreen() {
     const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('nome, nivel_gamificacao')
+        .select('nome, nivel_gamificacao, created_at')
         .eq('id', uid)
         .single(),
 
@@ -158,6 +159,12 @@ export default function HomeScreen() {
       if (profileRes.data.nome)
         setPrimeiroNome(profileRes.data.nome.trim().split(' ')[0]);
       setNivelGamificacao(profileRes.data.nivel_gamificacao ?? 1);
+      if (profileRes.data.created_at) {
+        const criado = new Date(profileRes.data.created_at);
+        const dias = Math.floor((Date.now() - criado.getTime()) / (1000 * 60 * 60 * 24));
+        const restantes = 30 - dias;
+        setDiasTrial(restantes > 0 ? restantes : 0);
+      }
     }
 
     const semanaData = agendSemanaRes.data ?? [];
@@ -242,6 +249,44 @@ export default function HomeScreen() {
             <ActivityIndicator color="#A8235A" style={{ marginTop: 56 }} />
           ) : (
             <>
+              {/* Banner de trial */}
+              {diasTrial !== null && diasTrial > 0 && diasTrial <= 30 && (
+                <TouchableOpacity
+                  style={styles.trialBanner}
+                  onPress={() => navigation.navigate('Perfil')}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.trialLeft}>
+                    <Text style={styles.trialTitle}>
+                      {diasTrial <= 3
+                        ? `Últimos ${diasTrial} ${diasTrial === 1 ? 'dia' : 'dias'} de trial!`
+                        : `${diasTrial} dias restantes no trial`}
+                    </Text>
+                    <Text style={styles.trialSub}>Escolha seu plano e continue crescendo</Text>
+                  </View>
+                  <Text style={styles.trialArrow}>›</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Empty state */}
+              {agendamentosHoje.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyEmoji}>📅</Text>
+                  <Text style={styles.emptyTitle}>Nenhum agendamento hoje</Text>
+                  <Text style={styles.emptySub}>
+                    Você ainda não tem clientes agendadas para hoje.{'\n'}
+                    Que tal criar seu primeiro agendamento?
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.emptyBtn}
+                    onPress={() => navigation.navigate('Agenda')}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.emptyBtnText}>Ir para a Agenda</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
               {/* Card: Hoje */}
               <View style={styles.cardToday}>
                 <Text style={styles.todayBadge}>
@@ -313,6 +358,8 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
+                </>
+              )}
             </>
           )}
         </ScrollView>
@@ -372,6 +419,26 @@ const styles = StyleSheet.create({
   levelPercent:  { fontSize: 22, fontWeight: '800', color: '#A8235A' },
   progressTrack: { height: 8, backgroundColor: '#3D1A2E', borderRadius: 4, overflow: 'hidden' },
   progressFill:  { height: 8, backgroundColor: '#A8235A', borderRadius: 4 },
+
+  trialBanner: {
+    backgroundColor: 'rgba(168,35,90,0.15)', borderRadius: 14,
+    padding: 14, marginBottom: 12, flexDirection: 'row',
+    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,35,90,0.35)',
+  },
+  trialLeft:  { flex: 1 },
+  trialTitle: { fontSize: 14, fontWeight: '700', color: '#F5EDE8' },
+  trialSub:   { fontSize: 12, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
+  trialArrow: { fontSize: 22, color: '#A8235A', marginLeft: 10 },
+
+  emptyCard: {
+    backgroundColor: '#2D1020', borderRadius: 20, padding: 32,
+    alignItems: 'center', marginBottom: 12,
+  },
+  emptyEmoji: { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#F5EDE8', marginBottom: 8, textAlign: 'center' },
+  emptySub:   { fontSize: 13, fontWeight: '400', color: '#C9A8B6', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  emptyBtn:   { backgroundColor: '#A8235A', borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
+  emptyBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginTop: 8, marginBottom: 12 },
   insightCard:  { backgroundColor: '#2D1020', borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', ...SM_SHADOW },

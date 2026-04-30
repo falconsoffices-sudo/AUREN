@@ -236,6 +236,26 @@ export default function ConfiguracoesScreen({ navigation }) {
           }
         </TouchableOpacity>
 
+        <View style={styles.linksCard}>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Ajuda')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.linkLabel}>Ajuda</Text>
+            <Text style={styles.linkArrow}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.linkDivider} />
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('SaibaMais')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.linkLabel}>Saiba mais sobre o AUREN</Text>
+            <Text style={styles.linkArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -320,4 +340,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 4,
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+
+  linksCard: {
+    backgroundColor: CARD_BG, borderRadius: 16,
+    overflow: 'hidden', marginTop: 20,
+  },
+  linkRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 18, paddingVertical: 16,
+  },
+  linkDivider: { height: 1, backgroundColor: SUBTLE, marginHorizontal: 18 },
+  linkLabel:   { fontSize: 15, fontWeight: '500', color: colors.white },
+  linkArrow:   { fontSize: 20, color: '#444444', lineHeight: 22 },
 });

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Modal,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,14 +45,16 @@ const MENU = [
   { id: 5,  label: 'Metas e Objetivos' },
   { id: 6,  label: 'Despesas' },
   { id: 7,  label: 'Gamificação' },
-  { id: 8,  label: 'Auren Community' },
-  { id: 9,  label: 'Configurações' },
-  { id: 10, label: 'Sair', danger: true },
+  { id: 8,  label: 'Presentear com AUREN' },
+  { id: 9,  label: 'Auren Community' },
+  { id: 10, label: 'Configurações' },
+  { id: 11, label: 'Ajuda' },
+  { id: 12, label: 'Sair', danger: true },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function PlanCard({ name, price, popular, items }) {
+function PlanCard({ name, price, popular, items, onEscolher }) {
   return (
     <View style={[styles.planCard, popular && styles.planCardPro]}>
       <View>
@@ -75,6 +78,7 @@ function PlanCard({ name, price, popular, items }) {
       </View>
       <TouchableOpacity
         style={[styles.planBtn, popular && styles.planBtnPro]}
+        onPress={onEscolher}
         activeOpacity={0.8}
       >
         <Text style={[styles.planBtnText, popular && styles.planBtnTextPro]}>
@@ -103,6 +107,42 @@ function MenuItem({ label, danger, last, onPress }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PerfilScreen({ navigation }) {
+  const [planModal, setPlanModal] = useState(null);
+
+  function menuPress(label) {
+    switch (label) {
+      case 'Meus Serviços':        return () => navigation.navigate('Servicos');
+      case 'Meus Dados':           return () => navigation.navigate('MeusDados');
+      case 'Endereços':            return () => navigation.navigate('Enderecos');
+      case 'Despesas':             return () => navigation.navigate('Despesas');
+      case 'Configurações':        return () => navigation.navigate('Configuracoes');
+      case 'Templates de SMS':     return () => navigation.navigate('TemplatesSMS');
+      case 'Metas e Objetivos':    return () => navigation.navigate('Metas');
+      case 'Gamificação':          return () => navigation.navigate('Gamificacao');
+      case 'Presentear com AUREN': return () => navigation.navigate('Presentear');
+      case 'Ajuda':                return () => navigation.navigate('Ajuda');
+      case 'Sair':                 return () => Alert.alert(
+        'Sair',
+        'Tem certeza que deseja sair?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Sair',
+            style: 'destructive',
+            onPress: async () => {
+              await supabase.auth.signOut();
+              navigation.getParent()?.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Welcome' }],
+              });
+            },
+          },
+        ],
+      );
+      default: return undefined;
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -115,6 +155,7 @@ export default function PerfilScreen({ navigation }) {
             style={styles.gearBtn}
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => navigation.navigate('Configuracoes')}
           >
             <GearIcon />
           </TouchableOpacity>
@@ -138,7 +179,13 @@ export default function PerfilScreen({ navigation }) {
 
         <Text style={styles.sectionTitle}>SEU PLANO</Text>
         <View style={styles.plansRow}>
-          {PLANS.map(p => <PlanCard key={p.id} {...p} />)}
+          {PLANS.map(p => (
+            <PlanCard
+              key={p.id}
+              {...p}
+              onEscolher={() => setPlanModal(p)}
+            />
+          ))}
         </View>
 
         <View style={styles.menuCard}>
@@ -147,35 +194,7 @@ export default function PerfilScreen({ navigation }) {
               key={item.id}
               {...item}
               last={i === MENU.length - 1}
-              onPress={
-                item.label === 'Meus Serviços' ? () => navigation.navigate('Servicos')  :
-                item.label === 'Meus Dados'    ? () => navigation.navigate('MeusDados') :
-                item.label === 'Endereços'     ? () => navigation.navigate('Enderecos') :
-                item.label === 'Despesas'        ? () => navigation.navigate('Despesas')      :
-                item.label === 'Configurações'    ? () => navigation.navigate('Configuracoes') :
-                item.label === 'Templates de SMS' ? () => navigation.navigate('TemplatesSMS') :
-                item.label === 'Metas e Objetivos' ? () => navigation.navigate('Metas')       :
-                item.label === 'Gamificação'       ? () => navigation.navigate('Gamificacao') :
-                item.label === 'Sair'          ? () => Alert.alert(
-                    'Sair',
-                    'Tem certeza que deseja sair?',
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      {
-                        text: 'Sair',
-                        style: 'destructive',
-                        onPress: async () => {
-                          await supabase.auth.signOut();
-                          navigation.getParent()?.getParent()?.reset({
-                            index: 0,
-                            routes: [{ name: 'Welcome' }],
-                          });
-                        },
-                      },
-                    ]
-                  ) :
-                undefined
-              }
+              onPress={menuPress(item.label)}
             />
           ))}
         </View>
@@ -183,6 +202,48 @@ export default function PerfilScreen({ navigation }) {
         <Text style={styles.version}>AUREN v1.0.0</Text>
 
       </ScrollView>
+
+      {/* ── Confirmation modal ── */}
+      <Modal
+        visible={planModal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPlanModal(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setPlanModal(null)} activeOpacity={1} />
+          {planModal && (
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>Plano {planModal.name}</Text>
+              <Text style={styles.modalPrice}>
+                {planModal.price}<Text style={styles.modalPricePer}>/mês</Text>
+              </Text>
+              <View style={styles.modalDivider} />
+              {planModal.items.map((item, i) => (
+                <View key={i} style={styles.modalItem}>
+                  <Text style={styles.modalCheck}>✓</Text>
+                  <Text style={styles.modalItemText}>{item}</Text>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={styles.modalBtn}
+                activeOpacity={0.85}
+                onPress={() => {
+                  setPlanModal(null);
+                  setTimeout(() => Alert.alert('Em breve!', 'Pagamento via Stripe em breve. Obrigada pelo interesse!'), 300);
+                }}
+              >
+                <Text style={styles.modalBtnText}>Assinar agora</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setPlanModal(null)}>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -384,4 +445,25 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
   },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#1A0A14', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40,
+  },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#3D1020', alignSelf: 'center', marginBottom: 24 },
+  modalTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
+  modalPrice: { fontSize: 32, fontWeight: '800', color: '#A8235A' },
+  modalPricePer: { fontSize: 14, fontWeight: '400', color: '#C9A8B6' },
+  modalDivider: { height: 1, backgroundColor: '#2D1020', marginVertical: 16 },
+  modalItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 },
+  modalCheck: { fontSize: 13, color: '#A8235A', fontWeight: '700', marginTop: 1 },
+  modalItemText: { fontSize: 14, color: '#C9A8B6', flex: 1 },
+  modalBtn: {
+    height: 54, borderRadius: 14, backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center', marginTop: 24,
+  },
+  modalBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  modalCancel: { alignItems: 'center', paddingVertical: 14 },
+  modalCancelText: { fontSize: 14, fontWeight: '600', color: '#6B4A58' },
 });

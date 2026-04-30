@@ -4,14 +4,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import WelcomeScreen  from './src/screens/WelcomeScreen';
-import AuthScreen     from './src/screens/AuthScreen';
-import LoginScreen    from './src/screens/LoginScreen';
-import HomeScreen     from './src/screens/HomeScreen';
-import AgendaScreen   from './src/screens/AgendaScreen';
-import ClientesScreen from './src/screens/ClientesScreen';
-import CaixaScreen    from './src/screens/CaixaScreen';
-import PerfilStack    from './src/navigation/PerfilStack';
+import WelcomeScreen    from './src/screens/WelcomeScreen';
+import AuthScreen       from './src/screens/AuthScreen';
+import LoginScreen      from './src/screens/LoginScreen';
+import HomeScreen       from './src/screens/HomeScreen';
+import AgendaScreen     from './src/screens/AgendaScreen';
+import ClientesScreen   from './src/screens/ClientesScreen';
+import CaixaScreen      from './src/screens/CaixaScreen';
+import PerfilStack      from './src/navigation/PerfilStack';
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import SaibaMaisScreen  from './src/screens/SaibaMaisScreen';
 import { supabase } from './src/lib/supabase';
 import { registerForPushNotifications } from './src/lib/notifications';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -75,10 +77,12 @@ export default function App() {
       <SafeAreaProvider>
         <NavigationContainer>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
-            <Stack.Screen name="Auth"    component={AuthScreen}    />
-            <Stack.Screen name="Login"   component={LoginScreen}   />
-            <Stack.Screen name="Main"    component={MainTabs}      />
+            <Stack.Screen name="Welcome"    component={WelcomeScreen}    />
+            <Stack.Screen name="Auth"       component={AuthScreen}       />
+            <Stack.Screen name="Login"      component={LoginScreen}      />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="SaibaMais"  component={SaibaMaisScreen}  />
+            <Stack.Screen name="Main"       component={MainTabs}         />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

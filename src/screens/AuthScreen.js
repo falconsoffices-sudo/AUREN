@@ -263,7 +263,7 @@ export default function AuthScreen({ navigation }) {
           .eq('id', data.user.id);
       }
 
-      navigation.replace('Main');
+      navigation.replace('Onboarding');
     } catch (err) {
       Alert.alert('Erro ao verificar', err.message);
     } finally {
