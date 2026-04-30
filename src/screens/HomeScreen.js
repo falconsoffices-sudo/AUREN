@@ -181,6 +181,7 @@ export default function HomeScreen({ navigation }) {
   const [faturamentoMes,    setFaturamentoMes]    = useState(0);
   const [diasTrial,         setDiasTrial]         = useState(null);
   const [slotsLivres,       setSlotsLivres]       = useState(null);
+  const [licencaDias,       setLicencaDias]       = useState(null);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -192,7 +193,7 @@ export default function HomeScreen({ navigation }) {
     const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('nome, nivel_gamificacao, created_at')
+        .select('nome, nivel_gamificacao, created_at, licenca_expiracao')
         .eq('id', uid)
         .single(),
 
@@ -224,6 +225,12 @@ export default function HomeScreen({ navigation }) {
         const dias = Math.floor((Date.now() - criado.getTime()) / (1000 * 60 * 60 * 24));
         const restantes = 30 - dias;
         setDiasTrial(restantes > 0 ? restantes : 0);
+      }
+      if (profileRes.data.licenca_expiracao) {
+        const [y, mo, d] = profileRes.data.licenca_expiracao.split('-').map(Number);
+        const exp  = new Date(y, mo - 1, d);
+        const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+        setLicencaDias(Math.round((exp.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
       }
     }
 
@@ -318,6 +325,38 @@ export default function HomeScreen({ navigation }) {
             <ActivityIndicator color="#A8235A" style={{ marginTop: 56 }} />
           ) : (
             <>
+              {/* Banner de licença */}
+              {licencaDias !== null && licencaDias <= 30 && (
+                <TouchableOpacity
+                  style={[
+                    styles.licencaBanner,
+                    licencaDias <= 0 ? styles.licencaCritical
+                    : licencaDias <= 7 ? styles.licencaUrgent
+                    : styles.licencaWarning,
+                  ]}
+                  onPress={() => licencaDias <= 0
+                    ? navigation.navigate('Perfil', { screen: 'MeusDados' })
+                    : navigation.navigate('SaibaMais')}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.trialLeft}>
+                    <Text style={styles.licencaTitle}>
+                      {licencaDias <= 0
+                        ? 'Sua licença expirou.'
+                        : `Sua licença expira em ${licencaDias} ${licencaDias === 1 ? 'dia' : 'dias'}.`}
+                    </Text>
+                    <Text style={styles.licencaSub}>
+                      {licencaDias <= 0
+                        ? 'Atualize em Meus Dados para continuar.'
+                        : 'Renove para continuar usando o AUREN.'}
+                    </Text>
+                  </View>
+                  <Text style={styles.licencaCta}>
+                    {licencaDias <= 0 ? 'Atualizar' : 'Saiba mais'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {/* Banner de trial */}
               {diasTrial !== null && diasTrial > 0 && diasTrial <= 30 && (
                 <TouchableOpacity
@@ -515,5 +554,13 @@ function makeStyles(isDark) {
     insightBody:  { flex: 1 },
     insightTitle: { fontSize: 14, fontWeight: '700', color: text, marginBottom: 5 },
     insightText:  { fontSize: 13, fontWeight: '400', color: sub, lineHeight: 20 },
+
+    licencaBanner:   { borderRadius: 14, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
+    licencaWarning:  { backgroundColor: 'rgba(245,158,11,0.10)', borderColor: 'rgba(245,158,11,0.35)' },
+    licencaUrgent:   { backgroundColor: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.40)' },
+    licencaCritical: { backgroundColor: 'rgba(220,38,38,0.15)', borderColor: 'rgba(220,38,38,0.55)' },
+    licencaTitle:    { fontSize: 14, fontWeight: '700', color: text },
+    licencaSub:      { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
+    licencaCta:      { fontSize: 13, fontWeight: '700', color: '#A8235A', marginLeft: 12 },
   });
 }

@@ -724,7 +724,8 @@ export default function AgendaScreen() {
   const [modalVisible,    setModalVisible]    = useState(false);
   const [editAgendamento, setEditAgendamento] = useState(null);
   const [editVisible,     setEditVisible]     = useState(false);
-  const [userId,          setUserId]          = useState(null);
+  const [userId,            setUserId]            = useState(null);
+  const [licencaExpiracao,  setLicencaExpiracao]  = useState(null);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
   const monthLabel = `${MONTHS[selected.getMonth()]} ${selected.getFullYear()}`;
@@ -755,7 +756,14 @@ export default function AgendaScreen() {
     (async () => {
       const { data } = await supabase.auth.getUser();
       const uid = data?.user?.id;
-      if (uid) setUserId(uid);
+      if (!uid) return;
+      setUserId(uid);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('licenca_expiracao')
+        .eq('id', uid)
+        .single();
+      if (profile?.licenca_expiracao) setLicencaExpiracao(profile.licenca_expiracao);
     })();
   }, []);
 
@@ -807,7 +815,25 @@ export default function AgendaScreen() {
         )}
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => {
+          if (licencaExpiracao) {
+            const [y, mo, d] = licencaExpiracao.split('-').map(Number);
+            const exp = new Date(y, mo - 1, d);
+            exp.setHours(23, 59, 59, 999);
+            if (exp < new Date()) {
+              Alert.alert(
+                'Licença expirada',
+                'Atualize sua licença em Perfil → Meus Dados para criar novos agendamentos.'
+              );
+              return;
+            }
+          }
+          setModalVisible(true);
+        }}
+      >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
