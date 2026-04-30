@@ -24,11 +24,13 @@ function formatPhone(raw) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-// Kept for backward-compat (accounts created before OTP migration)
-function makePassword(phone) {
+function makePassword(email, phone) {
   const digits = phone.replace(/\D/g, '');
   return `Auren_${digits}_2024!`;
 }
+
+const DEV_EMAIL = 'nettoserafim92@gmail.com';
+const DEV_PHONE = '5618750648';
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -91,12 +93,30 @@ export default function LoginScreen({ navigation }) {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
-        password: makePassword(telefone),
+        password: makePassword(email.trim(), telefone),
       });
       if (error) throw error;
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erro ao entrar', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Dev mode: login direto sem OTP ───────────────────────────
+  const handleDevLogin = async () => {
+    const devEmail = email.trim() || DEV_EMAIL;
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email:    devEmail,
+        password: makePassword(devEmail, DEV_PHONE),
+      });
+      if (error) throw error;
+      navigation.replace('Main');
+    } catch (err) {
+      Alert.alert('Dev login falhou', err.message);
     } finally {
       setLoading(false);
     }
@@ -149,6 +169,14 @@ export default function LoginScreen({ navigation }) {
                 {loading
                   ? <ActivityIndicator color="#fff" />
                   : <Text style={styles.primaryBtnText}>Receber código</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.devBtn}
+                onPress={handleDevLogin}
+                disabled={loading}
+              >
+                <Text style={styles.devBtnText}>Entrar sem código (modo dev)</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -316,6 +344,9 @@ const styles = StyleSheet.create({
 
   primaryBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 16 },
   primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+
+  devBtn:      { alignItems: 'center', paddingVertical: 10 },
+  devBtnText:  { fontSize: 12, fontWeight: '500', color: '#3D3D3D' },
 
   linkBtn:      { alignItems: 'center', paddingVertical: 10 },
   linkBtnText:  { fontSize: 14, fontWeight: '600', color: '#A8235A' },
