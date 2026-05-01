@@ -22,7 +22,7 @@ function formatExpiry(raw) {
 
 // ── Profissional: dados bancários ────────────────────────────────────────────
 
-function FormProfissional() {
+function FormProfissional({ navigation }) {
   const [titular,   setTitular]   = useState('');
   const [tipoConta, setTipoConta] = useState('checking'); // 'checking' | 'savings'
   const [numConta,  setNumConta]  = useState('');
@@ -96,6 +96,21 @@ function FormProfissional() {
 
       <TouchableOpacity style={styles.primaryBtn} onPress={salvar} activeOpacity={0.85}>
         <Text style={styles.primaryBtnText}>Salvar dados bancários</Text>
+      </TouchableOpacity>
+
+      {/* ── Plaid ── */}
+      <TouchableOpacity
+        style={styles.plaidCard}
+        onPress={() => navigation.navigate('Plaid')}
+        activeOpacity={0.85}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.plaidTitle}>Conectar conta bancária</Text>
+          <Text style={styles.plaidSub}>
+            Reconciliação automática de pagamentos via Plaid
+          </Text>
+        </View>
+        <Text style={styles.plaidArrow}>›</Text>
       </TouchableOpacity>
     </View>
   );
@@ -241,7 +256,7 @@ export default function PagamentosScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {tipoUsuario === 'cliente' ? <FormCliente /> : <FormProfissional />}
+          {tipoUsuario === 'cliente' ? <FormCliente /> : <FormProfissional navigation={navigation} />}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -289,6 +304,16 @@ const styles = StyleSheet.create({
 
   primaryBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+
+  plaidCard:  {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: INPUT_BG, borderRadius: 14,
+    padding: 16, marginTop: 16,
+    borderWidth: 1, borderColor: '#2A2A30',
+  },
+  plaidTitle: { fontSize: 14, fontWeight: '700', color: '#FFFFFF', marginBottom: 3 },
+  plaidSub:   { fontSize: 12, fontWeight: '400', color: '#6B4A58' },
+  plaidArrow: { fontSize: 22, color: '#A8235A', marginLeft: 10 },
 
   // Card preview
   cardPreview: {
