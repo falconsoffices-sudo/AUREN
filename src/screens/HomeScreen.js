@@ -129,7 +129,7 @@ function timeToMins(str) {
 function calcSlotsLivres(agendamentos, horario) {
   const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
   const todayKey = weekDayMap[new Date().getDay()];
-  if (!horario.dias.includes(todayKey)) return 0;
+  if (!horario.dias.includes(todayKey)) return null;
 
   const workStart  = timeToMins(horario.inicio);
   const workEnd    = timeToMins(horario.fim);
@@ -158,10 +158,10 @@ function calcSlotsLivres(agendamentos, horario) {
   let cur = workStart;
   for (const { s, e } of merged) {
     const gapEnd = Math.min(s, workEnd);
-    if (gapEnd > cur && gapEnd - cur >= 90) slots++;
+    if (gapEnd > cur) slots += Math.floor((gapEnd - cur) / 90);
     cur = Math.max(cur, Math.min(e, workEnd));
   }
-  if (workEnd - cur >= 90) slots++;
+  if (workEnd > cur) slots += Math.floor((workEnd - cur) / 90);
   return slots;
 }
 
@@ -204,7 +204,7 @@ export default function HomeScreen({ navigation }) {
       // Todos os agendamentos da semana — filtra hoje em JS para evitar problema de timezone
       supabase
         .from('agendamentos')
-        .select('*, clientes(nome), servicos(nome, valor)')
+        .select('*, clientes(nome), servicos(nome, valor, duracao_minutos)')
         .eq('profissional_id', uid)
         .gte('data_hora', semanaInicio)
         .lte('data_hora', semanaFim)
@@ -499,23 +499,23 @@ export default function HomeScreen({ navigation }) {
               {/* Insights */}
               <Text style={styles.sectionTitle}>Insights de hoje</Text>
 
-              <View style={styles.insightCard}>
-                <View style={styles.insightDot} />
-                <View style={styles.insightBody}>
-                  <Text style={styles.insightTitle}>
-                    {slotsLivres !== null
-                      ? `${slotsLivres} horário${slotsLivres !== 1 ? 's' : ''} livre${slotsLivres !== 1 ? 's' : ''} hoje`
-                      : 'Horários vagos'}
-                  </Text>
-                  <Text style={styles.insightText}>
-                    {slotsLivres === 0
-                      ? 'Sua agenda está cheia hoje! Ótimo trabalho.'
-                      : slotsLivres !== null
-                      ? `Você tem ${slotsLivres} janela${slotsLivres !== 1 ? 's' : ''} disponível${slotsLivres !== 1 ? 'is' : ''} (mín. 1h30). Considere contatar clientes para preenchê-${slotsLivres !== 1 ? 'las' : 'la'}.`
-                      : 'Configure seu horário de atendimento em Configurações para ver slots livres.'}
-                  </Text>
+              {slotsLivres !== null && (
+                <View style={styles.insightCard}>
+                  <View style={styles.insightDot} />
+                  <View style={styles.insightBody}>
+                    <Text style={styles.insightTitle}>
+                      {slotsLivres === 0
+                        ? 'Sua agenda está cheia hoje'
+                        : `${slotsLivres} horário${slotsLivres !== 1 ? 's' : ''} livre${slotsLivres !== 1 ? 's' : ''} hoje`}
+                    </Text>
+                    <Text style={styles.insightText}>
+                      {slotsLivres === 0
+                        ? 'Sua agenda está cheia hoje! Ótimo trabalho.'
+                        : `Você tem ${slotsLivres} janela${slotsLivres !== 1 ? 's' : ''} disponível${slotsLivres !== 1 ? 'is' : ''} (mín. 1h30). Considere contatar clientes para preenchê-${slotsLivres !== 1 ? 'las' : 'la'}.`}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              )}
 
               <View style={styles.insightCard}>
                 <View style={styles.insightDot} />
