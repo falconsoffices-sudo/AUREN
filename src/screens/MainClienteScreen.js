@@ -56,13 +56,53 @@ async function fetchAgendamentosCliente(uid) {
   const { data } = await supabase
     .from('agendamentos')
     .select(`
-      id, data_hora, status, valor,
-      servico:servicos(nome),
+      id, data_hora, status, valor, profissional_id,
+      servico:servicos(nome, duracao_minutos),
       profissional:profiles!profissional_id(nome)
     `)
     .in('cliente_id', ids)
     .order('data_hora', { ascending: false });
   return data ?? [];
+}
+
+// ── Slot calculation helpers (usa horário padrão quando profissional não configurou) ──
+
+const DEFAULT_HORARIO_PROF = {
+  dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
+  inicio: '08:00', fim: '17:00',
+  almocoInicio: '12:00', almocoFim: '13:00',
+};
+
+function toMins(str) {
+  const [h, m] = (str || '0:0').split(':').map(Number);
+  return h * 60 + m;
+}
+
+function calcSlotsProf(agendamentos) {
+  const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+  if (!DEFAULT_HORARIO_PROF.dias.includes(weekDayMap[new Date().getDay()])) return null;
+  const workStart = toMins(DEFAULT_HORARIO_PROF.inicio);
+  const workEnd   = toMins(DEFAULT_HORARIO_PROF.fim);
+  const busy = [{ s: toMins(DEFAULT_HORARIO_PROF.almocoInicio), e: toMins(DEFAULT_HORARIO_PROF.almocoFim) }];
+  for (const a of agendamentos) {
+    if (a.status === 'cancelado') continue;
+    const d = new Date(a.data_hora);
+    busy.push({ s: d.getHours() * 60 + d.getMinutes(), e: d.getHours() * 60 + d.getMinutes() + (a.servico?.duracao_minutos ?? 60) });
+  }
+  busy.sort((a, b) => a.s - b.s);
+  const merged = [];
+  for (const iv of busy) {
+    if (!merged.length || iv.s > merged[merged.length - 1].e) merged.push({ ...iv });
+    else merged[merged.length - 1].e = Math.max(merged[merged.length - 1].e, iv.e);
+  }
+  let slots = 0, cur = workStart;
+  for (const { s, e } of merged) {
+    const gapEnd = Math.min(s, workEnd);
+    if (gapEnd > cur) slots += Math.floor((gapEnd - cur) / 90);
+    cur = Math.max(cur, Math.min(e, workEnd));
+  }
+  if (workEnd > cur) slots += Math.floor((workEnd - cur) / 90);
+  return slots;
 }
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
@@ -87,12 +127,14 @@ function StatusBadge({ status }) {
 
 // ── ClienteHomeScreen ─────────────────────────────────────────────────────────
 
-function ClienteHomeScreen() {
-  const [nome,      setNome]      = useState('');
-  const [proximo,   setProximo]   = useState(null);
-  const [historico, setHistorico] = useState([]);
-  const [profs,     setProfs]     = useState([]);
-  const [loading,   setLoading]   = useState(true);
+function ClienteHomeScreen({ navigation }) {
+  const [nome,        setNome]        = useState('');
+  const [proximo,     setProximo]     = useState(null);
+  const [historico,   setHistorico]   = useState([]);
+  const [profs,       setProfs]       = useState([]);
+  const [conexoesProf, setConexoesProf] = useState([]);
+  const [nomeProfFav,  setNomeProfFav]  = useState('');
+  const [loading,     setLoading]     = useState(true);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -126,7 +168,35 @@ function ClienteHomeScreen() {
       });
       setProfs(Object.keys(profMap));
 
-      setLoading(false);
+      // Profissional favorita = a do agendamento mais recente
+      const profFavId   = todos[0]?.profissional_id ?? null;
+      const profFavNome = todos[0]?.profissional?.nome ?? '';
+      if (active) setNomeProfFav(profFavNome);
+
+      if (profFavId) {
+        const now    = new Date();
+        const pad    = n => String(n).padStart(2, '0');
+        const hoje   = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        const { data: agHoje } = await supabase
+          .from('agendamentos')
+          .select('data_hora, status, servico:servicos(duracao_minutos)')
+          .eq('profissional_id', profFavId)
+          .gte('data_hora', `${hoje}T00:00:00`)
+          .lte('data_hora', `${hoje}T23:59:59`);
+        const slotsProf = calcSlotsProf(agHoje ?? []);
+        if (slotsProf === 0) {
+          const { data: conRows } = await supabase
+            .from('conexoes')
+            .select('*, conexao:profiles!conexao_id(id, nome, cidade)')
+            .eq('profissional_id', profFavId)
+            .eq('status', 'aceita');
+          if (active) setConexoesProf(conRows ?? []);
+        } else {
+          if (active) setConexoesProf([]);
+        }
+      }
+
+      if (active) setLoading(false);
     })();
     return () => { active = false; };
   }, []));
@@ -185,6 +255,36 @@ function ClienteHomeScreen() {
             </View>
           )}
         </Card>
+
+        {/* Conexões da profissional favorita (agenda cheia) */}
+        {conexoesProf.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Agenda cheia</Text>
+            <Text style={styles.conexaoIntro}>
+              A agenda de {nomeProfFav} está cheia. Veja profissionais de confiança dela:
+            </Text>
+            {conexoesProf.slice(0, 2).map((c, i) => (
+              <View key={c.id} style={[styles.profRow, i > 0 && styles.profRowBorder]}>
+                <View style={styles.profAvatar}>
+                  <Text style={styles.profAvatarText}>{c.conexao?.nome?.[0]?.toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.profNome}>{c.conexao?.nome}</Text>
+                  {c.conexao?.cidade
+                    ? <Text style={styles.conexaoCidade}>{c.conexao.cidade}</Text>
+                    : null}
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.conexaoBtn}
+              onPress={() => navigation.navigate('Agenda')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.conexaoBtnText}>Agendar com conexão</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Histórico */}
         <Card title="Histórico">
@@ -520,4 +620,10 @@ const styles = StyleSheet.create({
   editBtns:       { gap: 0 },
   sairBtn:        { alignItems: 'center', paddingVertical: 20, marginTop: 8 },
   sairBtnText:    { fontSize: 14, fontWeight: '600', color: '#EF4444' },
+
+  // Conexões card
+  conexaoIntro:   { fontSize: 13, fontWeight: '400', color: '#C9A8B6', marginBottom: 14, lineHeight: 20 },
+  conexaoCidade:  { fontSize: 12, fontWeight: '400', color: '#6B4A58', marginTop: 2 },
+  conexaoBtn:     { marginTop: 16, height: 48, borderRadius: 12, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center' },
+  conexaoBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });

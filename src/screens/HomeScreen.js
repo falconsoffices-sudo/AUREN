@@ -183,6 +183,7 @@ export default function HomeScreen({ navigation }) {
   const [faturamentoMes,    setFaturamentoMes]    = useState(0);
   const [diasTrial,         setDiasTrial]         = useState(null);
   const [slotsLivres,       setSlotsLivres]       = useState(null);
+  const [conexoesAtivas,    setConexoesAtivas]    = useState([]);
   const [licencaDias,       setLicencaDias]       = useState(null);
   const [mostraDiaCuidado,  setMostraDiaCuidado]  = useState(false);
   const [nomeIncompleto,    setNomeIncompleto]     = useState(false);
@@ -284,9 +285,21 @@ export default function HomeScreen({ navigation }) {
     try {
       const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
       const horario = storedH ? { ...DEFAULT_HORARIO, ...JSON.parse(storedH) } : DEFAULT_HORARIO;
-      setSlotsLivres(calcSlotsLivres(hojeAgend, horario));
+      const slots = calcSlotsLivres(hojeAgend, horario);
+      setSlotsLivres(slots);
+      if (slots === 0) {
+        const { data: conRows } = await supabase
+          .from('conexoes')
+          .select('*, conexao:profiles!conexao_id(id, nome, cidade)')
+          .eq('profissional_id', uid)
+          .eq('status', 'aceita');
+        setConexoesAtivas(conRows ?? []);
+      } else {
+        setConexoesAtivas([]);
+      }
     } catch {
       setSlotsLivres(null);
+      setConexoesAtivas([]);
     }
 
     setLoading(false);
@@ -515,6 +528,30 @@ export default function HomeScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
+              )}
+
+              {slotsLivres === 0 && conexoesAtivas.length > 0 && (
+                <TouchableOpacity
+                  style={styles.insightCard}
+                  onPress={() => navigation.navigate('Perfil', { screen: 'Conexoes' })}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.insightDot} />
+                  <View style={styles.insightBody}>
+                    <Text style={styles.insightTitle}>Suas conexões podem ajudar</Text>
+                    <Text style={styles.insightText}>
+                      Sua agenda está cheia! Suas conexões podem atender suas clientes:
+                    </Text>
+                    {conexoesAtivas.slice(0, 2).map(c => (
+                      <Text key={c.id} style={[styles.insightText, { marginTop: 6, color: '#F5EDE8', fontWeight: '600' }]}>
+                        · {c.conexao?.nome}{c.conexao?.cidade ? ` — ${c.conexao.cidade}` : ''}
+                      </Text>
+                    ))}
+                    <Text style={[styles.insightText, { marginTop: 10, color: '#A8235A', fontWeight: '700' }]}>
+                      Ver conexões →
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               )}
 
               <View style={styles.insightCard}>
