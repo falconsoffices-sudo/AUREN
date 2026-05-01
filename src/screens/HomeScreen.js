@@ -187,6 +187,7 @@ export default function HomeScreen({ navigation }) {
   const [licencaDias,       setLicencaDias]       = useState(null);
   const [mostraDiaCuidado,  setMostraDiaCuidado]  = useState(false);
   const [nomeIncompleto,    setNomeIncompleto]     = useState(false);
+  const [mostrarEINBanner,  setMostrarEINBanner]  = useState(false);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -198,7 +199,7 @@ export default function HomeScreen({ navigation }) {
     const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente')
+        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein')
         .eq('id', uid)
         .single(),
 
@@ -248,6 +249,12 @@ export default function HomeScreen({ navigation }) {
       if (profileRes.data.nome_completo_pendente && profileRes.data.created_at) {
         const diasConta = Math.floor((Date.now() - new Date(profileRes.data.created_at).getTime()) / 86400000);
         if (diasConta >= 30) setNomeIncompleto(true);
+      }
+
+      // Banner EIN: após 60 dias se não tiver EIN
+      if (!profileRes.data.ein && profileRes.data.created_at) {
+        const diasConta = Math.floor((Date.now() - new Date(profileRes.data.created_at).getTime()) / 86400000);
+        if (diasConta >= 60) setMostrarEINBanner(true);
       }
     }
 
@@ -440,6 +447,21 @@ export default function HomeScreen({ navigation }) {
                     </Text>
                   </View>
                   <Text style={styles.nomeIncompletoArrow}>›</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Banner EIN */}
+              {mostrarEINBanner && (
+                <TouchableOpacity
+                  style={styles.einBanner}
+                  onPress={() => navigation.navigate('Perfil', { screen: 'MeusDados' })}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.einBannerTitle}>Regularize seu negócio</Text>
+                    <Text style={styles.einBannerSub}>Adicione seu EIN em Meus Dados.</Text>
+                  </View>
+                  <Text style={styles.einBannerArrow}>›</Text>
                 </TouchableOpacity>
               )}
 
@@ -697,6 +719,15 @@ function makeStyles(isDark) {
     nomeIncompletoTitle: { fontSize: 14, fontWeight: '700', color: '#F97316', marginBottom: 2 },
     nomeIncompletoSub:   { fontSize: 12, fontWeight: '400', color: sub, lineHeight: 18 },
     nomeIncompletoArrow: { fontSize: 22, color: '#F97316', marginLeft: 10 },
+
+    einBanner: {
+      backgroundColor: 'rgba(168,35,90,0.08)', borderRadius: 14,
+      padding: 14, marginBottom: 12, flexDirection: 'row',
+      alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,35,90,0.25)',
+    },
+    einBannerTitle: { fontSize: 14, fontWeight: '700', color: text },
+    einBannerSub:   { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
+    einBannerArrow: { fontSize: 22, color: '#A8235A', marginLeft: 10 },
 
     diaCuidadoCard: {
       backgroundColor: card, borderRadius: 16, padding: 18,

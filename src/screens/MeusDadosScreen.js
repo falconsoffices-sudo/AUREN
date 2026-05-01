@@ -87,6 +87,12 @@ function parseAddress(jsonStr) {
   } catch { return { ...EMPTY_ADDR }; }
 }
 
+function formatEIN(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 9);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+}
+
 function formatExpiracao(raw) {
   const digits = raw.replace(/\D/g, '').slice(0, 6);
   if (digits.length <= 2) return digits;
@@ -235,6 +241,9 @@ export default function MeusDadosScreen({ navigation }) {
   const [licencaEstado,    setLicencaEstado]    = useState('');
   const [licencaExpiracao, setLicencaExpiracao] = useState('');
 
+  // Negócio
+  const [ein, setEin] = useState('');
+
   // Modal visibility
   const [endStateModalVisible,      setEndStateModalVisible]      = useState(false);
   const [licencaEstadoModalVisible, setLicencaEstadoModalVisible] = useState(false);
@@ -268,6 +277,7 @@ export default function MeusDadosScreen({ navigation }) {
         setLicencaTipo(data.licenca_tipo         ?? '');
         setLicencaEstado(data.licenca_estado     ?? '');
         setLicencaExpiracao(data.licenca_expiracao ?? '');
+        setEin(data.ein ?? '');
       } else if (error && error.code !== 'PGRST116') {
         Alert.alert('Erro ao carregar', error.message);
       }
@@ -282,6 +292,10 @@ export default function MeusDadosScreen({ navigation }) {
     }
     if (endComercial.zip && !/^\d{5}$/.test(endComercial.zip)) {
       Alert.alert('ZIP Code inválido', 'O ZIP Code deve ter 5 dígitos.');
+      return;
+    }
+    if (ein && !/^\d{2}-\d{7}$/.test(ein)) {
+      Alert.alert('EIN inválido', 'O EIN deve estar no formato XX-XXXXXXX (ex: 12-3456789).');
       return;
     }
     const erroExp = validateExpiracao(licencaExpiracao);
@@ -305,6 +319,7 @@ export default function MeusDadosScreen({ navigation }) {
           licenca_tipo:      licencaTipo             || null,
           licenca_estado:    licencaEstado           || null,
           licenca_expiracao: licencaExpiracao.trim() || null,
+          ein:               ein.trim()              || null,
         });
       if (error) throw error;
       Alert.alert('Salvo!', 'Seus dados foram atualizados.');
@@ -538,6 +553,24 @@ export default function MeusDadosScreen({ navigation }) {
         >
           <Text style={styles.licencaStatusLinkText}>Ver status da licença →</Text>
         </TouchableOpacity>
+
+        {/* ── Informações do negócio ── */}
+        <View style={styles.sectionDivider} />
+        <Text style={styles.sectionTitle}>Informações do negócio</Text>
+
+        <Field label="EIN (Employer Identification Number)">
+          <TextInput
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
+            placeholder="12-3456789"
+            placeholderTextColor={colors.gray}
+            value={ein}
+            onChangeText={raw => setEin(formatEIN(raw))}
+            editable={editing}
+            keyboardType="numeric"
+            maxLength={10}
+            returnKeyType="done"
+          />
+        </Field>
 
         {editing && (
           <TouchableOpacity

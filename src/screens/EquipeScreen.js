@@ -215,17 +215,48 @@ export default function EquipeScreen({ navigation }) {
         <ActivityIndicator color="#A8235A" style={{ marginTop: 80 }} />
       ) : !isBusiness ? (
         /* ── Upsell ── */
-        <View style={styles.upsellWrap}>
+        <ScrollView contentContainerStyle={styles.upsellScroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.upsellIcon}>👥</Text>
           <Text style={styles.upsellTitle}>Plano Business</Text>
           <Text style={styles.upsellText}>
-            Adicione até {MAX_MEMBROS} profissionais à sua equipe, gerencie agenda
-            e receita em conjunto.
+            Gerencie sua equipe, unifique agendas e acompanhe o faturamento das suas profissionais parceiras em um só lugar.
           </Text>
+
+          {/* Benefit cards */}
+          <View style={styles.benefitCard}>
+            <Text style={styles.benefitEmoji}>📅</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.benefitTitle}>Agenda unificada</Text>
+              <Text style={styles.benefitSub}>Veja todos os atendimentos da equipe em um só lugar</Text>
+            </View>
+          </View>
+          <View style={styles.benefitCard}>
+            <Text style={styles.benefitEmoji}>💰</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.benefitTitle}>Faturamento centralizado</Text>
+              <Text style={styles.benefitSub}>Acompanhe receitas e despesas de cada profissional</Text>
+            </View>
+          </View>
+          <View style={styles.benefitCard}>
+            <Text style={styles.benefitEmoji}>🌱</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.benefitTitle}>Crescimento conjunto</Text>
+              <Text style={styles.benefitSub}>Indique clientes entre a equipe automaticamente</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.upgradeBtn}
+            onPress={() => navigation.navigate('Perfil')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.upgradeBtnText}>Ver planos →</Text>
+          </TouchableOpacity>
+
           <View style={styles.upsellBadge}>
             <Text style={styles.upsellBadgeText}>Disponível no plano Business</Text>
           </View>
-        </View>
+        </ScrollView>
       ) : (
         /* ── Business content ── */
         <KeyboardAvoidingView
@@ -404,15 +435,32 @@ const styles = StyleSheet.create({
   convidarBtnText:     { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 
   // ── Upsell ──
-  upsellWrap: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 40,
+  upsellScroll: {
+    flexGrow: 1, alignItems: 'center',
+    paddingHorizontal: 28, paddingTop: 32, paddingBottom: 40,
   },
   upsellIcon:  { fontSize: 52, marginBottom: 20 },
   upsellTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginBottom: 12, textAlign: 'center' },
   upsellText:  {
-    fontSize: 14, color: '#8A8A8E', textAlign: 'center', lineHeight: 22, marginBottom: 24,
+    fontSize: 14, color: '#8A8A8E', textAlign: 'center', lineHeight: 22, marginBottom: 28,
   },
+
+  benefitCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 14,
+    backgroundColor: '#1A1B1E', borderRadius: 14,
+    padding: 16, marginBottom: 10, width: '100%',
+  },
+  benefitEmoji: { fontSize: 26, marginTop: 2 },
+  benefitTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
+  benefitSub:   { fontSize: 13, color: '#8A8A8E', lineHeight: 18 },
+
+  upgradeBtn: {
+    height: 52, borderRadius: 14, backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 36, marginTop: 24, marginBottom: 20, width: '100%',
+  },
+  upgradeBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+
   upsellBadge: {
     backgroundColor: 'rgba(168,35,90,0.15)', borderWidth: 1,
     borderColor: 'rgba(168,35,90,0.40)', borderRadius: 10,

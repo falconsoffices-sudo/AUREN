@@ -20,8 +20,12 @@ create table if not exists profiles (
   endereco_comercial    text,
   endereco_residencial  text,
   taxa_deslocamento     decimal(10, 2),
+  ein                   text,
   created_at            timestamptz default now()
 );
+
+-- Migration: add ein column if upgrading from older schema
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ein text;
 
 -- Cria perfil automaticamente quando um usuário se registra.
 -- search_path = public é obrigatório em funções security definer no Supabase.

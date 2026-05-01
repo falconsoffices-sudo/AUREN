@@ -62,6 +62,7 @@ const APARENCIA_OPTIONS = [
 const IDIOMA_OPTIONS = [
   { label: 'PT-BR',    value: 'pt' },
   { label: 'ES-LATAM', value: 'es' },
+  { label: 'EN-US',    value: 'en' },
 ];
 
 const DIAS_SEMANA = [
@@ -82,6 +83,12 @@ const DEFAULT_HORARIO = {
   almocoFim: '13:00',
 };
 
+const DEFAULT_HORARIO_ESPECIAL = {
+  ativo:  false,
+  inicio: '19:00',
+  fim:    '22:00',
+};
+
 export default function ConfiguracoesScreen({ navigation }) {
   const { themeMode, setThemeMode } = useTheme();
 
@@ -89,10 +96,11 @@ export default function ConfiguracoesScreen({ navigation }) {
   const [saving,           setSaving]           = useState(false);
   const [userId,           setUserId]           = useState(null);
 
-  const [notificacoes,     setNotificacoes]     = useState('on');
-  const [dataFechamento,   setDataFechamento]   = useState('28');
-  const [idioma,           setIdioma]           = useState('pt');
-  const [horario,          setHorario]          = useState(DEFAULT_HORARIO);
+  const [notificacoes,      setNotificacoes]      = useState('on');
+  const [dataFechamento,    setDataFechamento]    = useState('28');
+  const [idioma,            setIdioma]            = useState('pt');
+  const [horario,           setHorario]           = useState(DEFAULT_HORARIO);
+  const [horarioEspecial,   setHorarioEspecial]   = useState(DEFAULT_HORARIO_ESPECIAL);
 
   useEffect(() => {
     (async () => {
@@ -120,6 +128,8 @@ export default function ConfiguracoesScreen({ navigation }) {
       try {
         const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
         if (storedH) setHorario({ ...DEFAULT_HORARIO, ...JSON.parse(storedH) });
+        const storedE = await AsyncStorage.getItem('auren:horario_especial');
+        if (storedE) setHorarioEspecial({ ...DEFAULT_HORARIO_ESPECIAL, ...JSON.parse(storedE) });
       } catch {}
       setLoading(false);
     })();
@@ -143,6 +153,7 @@ export default function ConfiguracoesScreen({ navigation }) {
     setSaving(true);
     try {
       await AsyncStorage.setItem('auren:horario_atendimento', JSON.stringify(horario));
+      await AsyncStorage.setItem('auren:horario_especial', JSON.stringify(horarioEspecial));
       const { error } = await supabase
         .from('profiles')
         .upsert({
@@ -260,6 +271,9 @@ export default function ConfiguracoesScreen({ navigation }) {
         </View>
 
         <SectionTitle label="HORÁRIO DE ATENDIMENTO" />
+
+        {/* Grupo: Horários recomendados */}
+        <Text style={styles.subSectionTitle}>Horários recomendados</Text>
         <View style={styles.card}>
           <View style={{ paddingVertical: 14 }}>
             <Text style={styles.rowLabel}>Dias de atendimento</Text>
@@ -281,7 +295,10 @@ export default function ConfiguracoesScreen({ navigation }) {
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Início</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Manhã início</Text>
+              <Text style={styles.rowHint}>Recomendado: 8AM</Text>
+            </View>
             <TextInput
               style={styles.numInput}
               value={horario.inicio}
@@ -294,20 +311,10 @@ export default function ConfiguracoesScreen({ navigation }) {
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Fim</Text>
-            <TextInput
-              style={styles.numInput}
-              value={horario.fim}
-              onChangeText={t => setHorario(h => ({ ...h, fim: t }))}
-              placeholder="17:00"
-              placeholderTextColor={colors.gray}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Almoço início</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Pausa início</Text>
+              <Text style={styles.rowHint}>Recomendado: 12PM</Text>
+            </View>
             <TextInput
               style={styles.numInput}
               value={horario.almocoInicio}
@@ -320,7 +327,10 @@ export default function ConfiguracoesScreen({ navigation }) {
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Almoço fim</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Pausa fim</Text>
+              <Text style={styles.rowHint}>Recomendado: 1PM</Text>
+            </View>
             <TextInput
               style={styles.numInput}
               value={horario.almocoFim}
@@ -331,6 +341,72 @@ export default function ConfiguracoesScreen({ navigation }) {
               maxLength={5}
             />
           </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Tarde fim</Text>
+              <Text style={styles.rowHint}>Recomendado: 5PM</Text>
+            </View>
+            <TextInput
+              style={styles.numInput}
+              value={horario.fim}
+              onChangeText={t => setHorario(h => ({ ...h, fim: t }))}
+              placeholder="17:00"
+              placeholderTextColor={colors.gray}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+          </View>
+        </View>
+
+        {/* Grupo: Horários especiais */}
+        <Text style={styles.subSectionTitle}>Horários especiais</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Bloco adicional</Text>
+              <Text style={styles.rowHint}>Ex: atendimentos noturnos</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleBtn, horarioEspecial.ativo && styles.toggleBtnActive]}
+              onPress={() => setHorarioEspecial(h => ({ ...h, ativo: !h.ativo }))}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.toggleText, horarioEspecial.ativo && styles.toggleTextActive]}>
+                {horarioEspecial.ativo ? 'Ativo' : 'Inativo'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {horarioEspecial.ativo && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>Início</Text>
+                <TextInput
+                  style={styles.numInput}
+                  value={horarioEspecial.inicio}
+                  onChangeText={t => setHorarioEspecial(h => ({ ...h, inicio: t }))}
+                  placeholder="19:00"
+                  placeholderTextColor={colors.gray}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>Fim</Text>
+                <TextInput
+                  style={styles.numInput}
+                  value={horarioEspecial.fim}
+                  onChangeText={t => setHorarioEspecial(h => ({ ...h, fim: t }))}
+                  placeholder="22:00"
+                  placeholderTextColor={colors.gray}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+              </View>
+            </>
+          )}
         </View>
 
         <TouchableOpacity

@@ -18,21 +18,24 @@ import colors from '../constants/colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SERVICOS_OPCOES = [
-  'Manicure Básica',
-  'Gel Manicure',
-  'Acrylic Nails',
-  'Dip Powder',
-  'Nail Art',
-  'Pedicure',
-  'Spa/Deluxe Manicure & Pedicure',
-  'Remoção e Manutenção',
-  'Outro',
+const CATALOGO = [
+  { nome: 'Manicure Básica',                refValor: 35,  refDuracao: 60  },
+  { nome: 'Gel Manicure',                   refValor: 55,  refDuracao: 90  },
+  { nome: 'Acrylic Nails',                  refValor: 85,  refDuracao: 120 },
+  { nome: 'Dip Powder',                     refValor: 65,  refDuracao: 90  },
+  { nome: 'Nail Art',                       refValor: 75,  refDuracao: 90  },
+  { nome: 'Pedicure',                       refValor: 45,  refDuracao: 60  },
+  { nome: 'Spa/Deluxe Manicure & Pedicure', refValor: 95,  refDuracao: 120 },
+  { nome: 'Remoção e Manutenção',           refValor: 40,  refDuracao: 60  },
 ];
+
+const CATALOGO_NOMES = CATALOGO.map(c => c.nome);
+
+const SERVICOS_OPCOES = [...CATALOGO_NOMES, 'Outro'];
 
 // ─── Add Servico Modal ────────────────────────────────────────────────────────
 
-function AddServicoModal({ visible, onClose, onSaved }) {
+function AddServicoModal({ visible, onClose, onSaved, initialValues = null }) {
   const [nomeOpcao,   setNomeOpcao]   = useState('');
   const [nomeOutro,   setNomeOutro]   = useState('');
   const [opcaoAberta, setOpcaoAberta] = useState(false);
@@ -45,6 +48,20 @@ function AddServicoModal({ visible, onClose, onSaved }) {
     setNomeOpcao(''); setNomeOutro(''); setOpcaoAberta(false);
     setValor(''); setDuracao(''); setDescricao('');
   };
+
+  useEffect(() => {
+    if (visible && initialValues) {
+      setNomeOpcao(initialValues.nome);
+      setValor(String(initialValues.refValor));
+      setDuracao(String(initialValues.refDuracao));
+      setNomeOutro('');
+      setOpcaoAberta(false);
+      setDescricao('');
+    } else if (!visible) {
+      reset();
+    }
+  }, [visible]);
+
   const handleClose = () => { reset(); onClose(); };
 
   const handleSave = async () => {
@@ -115,7 +132,16 @@ function AddServicoModal({ visible, onClose, onSaved }) {
                           idx < SERVICOS_OPCOES.length - 1 && modal.dropdownItemBorder,
                           nomeOpcao === opt && modal.dropdownItemActive,
                         ]}
-                        onPress={() => { setNomeOpcao(opt); setOpcaoAberta(false); }}
+                        onPress={() => {
+                          setNomeOpcao(opt);
+                          setOpcaoAberta(false);
+                          // Pre-fill reference value when selecting from catalog
+                          const cat = CATALOGO.find(c => c.nome === opt);
+                          if (cat && !valor) {
+                            setValor(String(cat.refValor));
+                            setDuracao(String(cat.refDuracao));
+                          }
+                        }}
                         activeOpacity={0.7}
                       >
                         <Text style={[modal.dropdownItemText, nomeOpcao === opt && modal.dropdownItemTextActive]}>
@@ -137,6 +163,12 @@ function AddServicoModal({ visible, onClose, onSaved }) {
                   autoCapitalize="words"
                   returnKeyType="next"
                 />
+              )}
+
+              {initialValues && (
+                <Text style={modal.refHint}>
+                  Valor de referência: ${initialValues.refValor} · {initialValues.refDuracao} min
+                </Text>
               )}
 
               <View style={modal.row}>
@@ -377,7 +409,42 @@ function EditServicoModal({ visible, servico, onClose, onSaved }) {
   );
 }
 
-// ─── Servico Card ─────────────────────────────────────────────────────────────
+// ─── Catalog Card ─────────────────────────────────────────────────────────────
+
+function CatalogCard({ catalogItem, servicoAtivo, onPress }) {
+  const ativo = !!servicoAtivo;
+  return (
+    <TouchableOpacity
+      style={[styles.card, !ativo && styles.cardInativo]}
+      onPress={onPress}
+      activeOpacity={ativo ? 0.75 : 0.6}
+    >
+      <View style={styles.cardTop}>
+        <Text style={[styles.cardName, !ativo && styles.cardNameInativo]} numberOfLines={1}>
+          {catalogItem.nome}
+        </Text>
+        {ativo && servicoAtivo.valor != null ? (
+          <Text style={styles.cardPrice}>${parseFloat(servicoAtivo.valor).toFixed(2)}</Text>
+        ) : (
+          <Text style={styles.cardPriceRef}>${catalogItem.refValor}</Text>
+        )}
+      </View>
+      {ativo && servicoAtivo.duracao_minutos != null ? (
+        <Text style={styles.cardMeta}>{servicoAtivo.duracao_minutos} min</Text>
+      ) : (
+        <Text style={[styles.cardMeta, styles.cardMetaRef]}>{catalogItem.refDuracao} min · referência</Text>
+      )}
+      {!ativo && (
+        <View style={styles.inativoBadge}>
+          <Text style={styles.inativoBadgeText}>NÃO HABILITADO</Text>
+        </View>
+      )}
+      {ativo && servicoAtivo.descricao ? (
+        <Text style={styles.cardDesc} numberOfLines={2}>{servicoAtivo.descricao}</Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
 
 function ServicoCard({ nome, valor, duracao_minutos, descricao, onPress }) {
   return (
@@ -407,6 +474,7 @@ export default function ServicosScreen({ navigation }) {
   const [editServico,   setEditServico]   = useState(null);
   const [editVisible,   setEditVisible]   = useState(false);
   const [userId,        setUserId]        = useState(null);
+  const [initialValues, setInitialValues] = useState(null);
 
   const fetchServicos = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -432,6 +500,36 @@ export default function ServicosScreen({ navigation }) {
     })();
   }, []);
 
+  // Map catalog items to their active service (if enabled)
+  const servicoByNome = Object.fromEntries(servicos.map(s => [s.nome, s]));
+  const customServicos = servicos.filter(s => !CATALOGO_NOMES.includes(s.nome));
+
+  function handleCatalogPress(catalogItem) {
+    const ativo = servicoByNome[catalogItem.nome];
+    if (ativo) {
+      setEditServico(ativo);
+      setEditVisible(true);
+    } else {
+      Alert.alert(
+        'Serviço não habilitado',
+        'Habilite este serviço em Meus Serviços para usá-lo.',
+        [
+          { text: 'Agora não', style: 'cancel' },
+          {
+            text: 'Habilitar',
+            onPress: () => {
+              setInitialValues(catalogItem);
+              setModalVisible(true);
+            },
+          },
+        ]
+      );
+    }
+  }
+
+  const handleModalClose = () => { setInitialValues(null); setModalVisible(false); };
+  const handleModalSaved = () => { setInitialValues(null); setModalVisible(false); fetchServicos(); };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
@@ -449,34 +547,47 @@ export default function ServicosScreen({ navigation }) {
       >
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
-        ) : servicos.length > 0 ? (
-          servicos.map(s => (
-            <ServicoCard
-              key={s.id}
-              {...s}
-              onPress={() => { setEditServico(s); setEditVisible(true); }}
-            />
-          ))
         ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>Nenhum serviço cadastrado ainda.</Text>
-            <Text style={styles.emptyHint}>Toque no + para adicionar.</Text>
-          </View>
+          <>
+            <Text style={styles.sectionLabel}>CATÁLOGO AUREN</Text>
+            {CATALOGO.map(cat => (
+              <CatalogCard
+                key={cat.nome}
+                catalogItem={cat}
+                servicoAtivo={servicoByNome[cat.nome] ?? null}
+                onPress={() => handleCatalogPress(cat)}
+              />
+            ))}
+
+            {customServicos.length > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { marginTop: 12 }]}>PERSONALIZADOS</Text>
+                {customServicos.map(s => (
+                  <ServicoCard
+                    key={s.id}
+                    {...s}
+                    onPress={() => { setEditServico(s); setEditVisible(true); }}
+                  />
+                ))}
+              </>
+            )}
+          </>
         )}
       </ScrollView>
 
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.85}
-        onPress={() => setModalVisible(true)}
+        onPress={() => { setInitialValues(null); setModalVisible(true); }}
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
       <AddServicoModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSaved={() => { setModalVisible(false); fetchServicos(); }}
+        onClose={handleModalClose}
+        onSaved={handleModalSaved}
+        initialValues={initialValues}
       />
 
       <EditServicoModal
@@ -506,12 +617,17 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     marginBottom: 20,
   },
-  backBtn: { width: 32, alignItems: 'center' },
-  backArrow: { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
-  headerRight: { width: 32 },
+  backBtn:    { width: 32, alignItems: 'center' },
+  backArrow:  { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
+  headerTitle:{ fontSize: 20, fontWeight: '700', color: colors.white },
+  headerRight:{ width: 32 },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 110 },
+
+  sectionLabel: {
+    fontSize: 10, fontWeight: '700', color: colors.gray,
+    letterSpacing: 1.3, marginBottom: 10,
+  },
 
   card: {
     backgroundColor: CARD_BG,
@@ -519,20 +635,30 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
   },
+  cardInativo: { opacity: 0.4 },
+
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  cardName:  { fontSize: 16, fontWeight: '700', color: colors.white, flex: 1, marginRight: 8 },
-  cardPrice: { fontSize: 18, fontWeight: '800', color: colors.cream },
-  cardMeta:  { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 4 },
-  cardDesc:  { fontSize: 13, fontWeight: '400', color: '#555555', marginTop: 4 },
+  cardName:       { fontSize: 16, fontWeight: '700', color: colors.white, flex: 1, marginRight: 8 },
+  cardNameInativo:{ color: colors.gray },
+  cardPrice:      { fontSize: 18, fontWeight: '800', color: colors.cream },
+  cardPriceRef:   { fontSize: 16, fontWeight: '600', color: colors.gray },
+  cardMeta:       { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 4 },
+  cardMetaRef:    { fontStyle: 'italic' },
+  cardDesc:       { fontSize: 13, fontWeight: '400', color: '#555555', marginTop: 4 },
 
-  empty: { alignItems: 'center', paddingTop: 80 },
-  emptyText: { fontSize: 15, fontWeight: '500', color: colors.gray, marginBottom: 6 },
-  emptyHint: { fontSize: 13, fontWeight: '400', color: '#444444' },
+  inativoBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  inativoBadgeText: { fontSize: 9, fontWeight: '700', color: '#666666', letterSpacing: 0.8 },
 
   fab: {
     position: 'absolute', bottom: 24, right: 20,
@@ -568,6 +694,12 @@ const modal = StyleSheet.create({
     alignSelf: 'center', marginBottom: 20,
   },
   title: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 20 },
+
+  refHint: {
+    fontSize: 12, fontWeight: '500', color: '#A8235A',
+    marginTop: -8, marginBottom: 12,
+  },
+
   input: {
     backgroundColor: INPUT_BG, borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 14,
@@ -581,8 +713,8 @@ const modal = StyleSheet.create({
   dropdownTrigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  dropdownArrow: { fontSize: 11, color: '#6B4A58' },
-  dropdownValueText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownArrow:           { fontSize: 11, color: '#6B4A58' },
+  dropdownValueText:       { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   dropdownPlaceholderText: { fontSize: 15, fontWeight: '400', color: '#6B4A58' },
   dropdownList: {
     backgroundColor: '#150810',
@@ -592,10 +724,10 @@ const modal = StyleSheet.create({
     maxHeight: 260,
     overflow: 'hidden',
   },
-  dropdownItem: { paddingHorizontal: 16, paddingVertical: 13 },
-  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
-  dropdownItemActive: { backgroundColor: 'rgba(168,35,90,0.15)' },
-  dropdownItemText: { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
+  dropdownItem:           { paddingHorizontal: 16, paddingVertical: 13 },
+  dropdownItemBorder:     { borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
+  dropdownItemActive:     { backgroundColor: 'rgba(168,35,90,0.15)' },
+  dropdownItemText:       { fontSize: 15, fontWeight: '400', color: '#FFFFFF' },
   dropdownItemTextActive: { fontWeight: '700', color: '#A8235A' },
 
   saveBtn: {

@@ -21,7 +21,8 @@
       "Bash(sed -n '2,13p' src/screens/AjudaScreen.js)",
       "Bash(npx supabase *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Flavi\\\\auren\\\\src\\\\screens\" -File)",
-      "Bash(Select-Object Name, FullName)"
+      "Bash(Select-Object Name, FullName)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ]
   }
 }
