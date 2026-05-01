@@ -1,25 +1,122 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PlaidLink, LinkSuccess, LinkExit } from 'react-native-plaid-link-sdk';
+import { supabase } from '../lib/supabase';
+import { createLinkToken, exchangePublicToken } from '../lib/plaid';
 
 export default function PlaidScreen({ navigation }) {
+  const [linkToken,  setLinkToken]  = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const [userId,     setUserId]     = useState(null);
+  const [connected,  setConnected]  = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const uid = authData?.user?.id;
+      if (!uid) { setLoading(false); return; }
+      setUserId(uid);
+
+      // check if already connected
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plaid_access_token')
+        .eq('id', uid)
+        .single();
+
+      if (profile?.plaid_access_token) {
+        setConnected(true);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const token = await createLinkToken(uid);
+        setLinkToken(token);
+      } catch (err) {
+        Alert.alert('Erro', err.message ?? 'Não foi possível iniciar a conexão.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  async function handleSuccess(success) {
+    setConnecting(true);
+    try {
+      await exchangePublicToken(success.publicToken, userId);
+      setConnected(true);
+    } catch (err) {
+      Alert.alert('Erro', err.message ?? 'Não foi possível salvar a conexão.');
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  function handleExit(exit) {
+    if (exit?.error?.errorCode) {
+      Alert.alert('Conexão cancelada', exit.error.displayMessage ?? 'Tente novamente.');
+    }
+  }
+
+  // ── Already connected ─────────────────────────────────────────────────────
+  if (connected) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backArrow}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.content}>
+          <View style={styles.iconWrapper}>
+            <View style={styles.iconRoof} />
+            <View style={styles.iconBase}>
+              <View style={styles.iconColumn} />
+              <View style={styles.iconColumn} />
+              <View style={styles.iconColumn} />
+            </View>
+            <View style={styles.iconFoundation} />
+          </View>
+          <Text style={styles.title}>Conta conectada</Text>
+          <Text style={styles.subtitle}>
+            Sua conta bancária está vinculada. A reconciliação automática de pagamentos está ativa.
+          </Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()} activeOpacity={0.85}>
+            <Text style={styles.primaryBtnText}>Voltar</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Loading / connecting ──────────────────────────────────────────────────
+  if (loading || connecting) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.centered}>
+          <ActivityIndicator color="#A8235A" size="large" />
+          <Text style={styles.loadingText}>{connecting ? 'Salvando conexão…' : 'Preparando…'}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Main ──────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-
-      {/* ── Back + Header ── */}
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
 
       <View style={styles.content}>
-
-        {/* ── Bank icon ── */}
         <View style={styles.iconWrapper}>
           <View style={styles.iconRoof} />
           <View style={styles.iconBase}>
@@ -30,36 +127,35 @@ export default function PlaidScreen({ navigation }) {
           <View style={styles.iconFoundation} />
         </View>
 
-        {/* ── Texts ── */}
         <Text style={styles.title}>Conectar Conta Bancária</Text>
         <Text style={styles.subtitle}>
           Conecte sua conta bancária para reconciliação automática de pagamentos e relatórios financeiros precisos.
         </Text>
 
-        {/* ── Buttons ── */}
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() =>
-            Alert.alert(
-              'Em breve',
-              'Integração Plaid em configuração. Disponível em breve.',
-            )
-          }
-          activeOpacity={0.85}
-        >
-          <Text style={styles.primaryBtnText}>Conectar conta</Text>
-        </TouchableOpacity>
+        {linkToken ? (
+          <PlaidLink
+            tokenConfig={{ token: linkToken }}
+            onSuccess={handleSuccess}
+            onExit={handleExit}
+          >
+            <View style={styles.primaryBtn}>
+              <Text style={styles.primaryBtnText}>Conectar conta</Text>
+            </View>
+          </PlaidLink>
+        ) : (
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => Alert.alert('Erro', 'Token indisponível. Tente novamente.')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryBtnText}>Conectar conta</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={styles.skipBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.skipBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Text style={styles.skipBtnText}>Pular por enquanto</Text>
         </TouchableOpacity>
-
       </View>
-
     </SafeAreaView>
   );
 }
@@ -68,6 +164,8 @@ export default function PlaidScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: '#0E0F11' },
+  centered:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { marginTop: 16, fontSize: 14, color: '#6B4A58' },
 
   backBtn:   { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, alignSelf: 'flex-start' },
   backArrow: { fontSize: 24, fontWeight: 'bold', color: '#A8235A' },
@@ -80,8 +178,7 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
 
-  // Bank icon built from Views
-  iconWrapper: { alignItems: 'center', marginBottom: 36 },
+  iconWrapper:    { alignItems: 'center', marginBottom: 36 },
   iconRoof: {
     width: 0, height: 0,
     borderLeftWidth: 36, borderRightWidth: 36, borderBottomWidth: 22,
@@ -89,52 +186,31 @@ const styles = StyleSheet.create({
     borderBottomColor: '#A8235A',
   },
   iconBase: {
-    flexDirection: 'row',
-    gap: 6,
+    flexDirection: 'row', gap: 6,
     backgroundColor: '#1A1B1E',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
     borderRadius: 2,
   },
-  iconColumn: {
-    width: 10, height: 40,
-    backgroundColor: '#A8235A',
-    borderRadius: 2,
-  },
-  iconFoundation: {
-    width: 80, height: 8,
-    backgroundColor: '#A8235A',
-    borderRadius: 2,
-    marginTop: 4,
-  },
+  iconColumn:     { width: 10, height: 40, backgroundColor: '#A8235A', borderRadius: 2 },
+  iconFoundation: { width: 80, height: 8, backgroundColor: '#A8235A', borderRadius: 2, marginTop: 4 },
 
   title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 14,
+    fontSize: 24, fontWeight: '800', color: '#FFFFFF',
+    textAlign: 'center', marginBottom: 14,
   },
   subtitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#6B4A58',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
+    fontSize: 15, fontWeight: '400', color: '#6B4A58',
+    textAlign: 'center', lineHeight: 24, marginBottom: 40,
   },
 
   primaryBtn: {
-    width: '100%',
-    height: 52,
-    borderRadius: 14,
+    width: '100%', height: 52, borderRadius: 14,
     backgroundColor: '#A8235A',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     marginBottom: 14,
   },
   primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 
-  skipBtn: { paddingVertical: 12 },
+  skipBtn:     { paddingVertical: 12 },
   skipBtnText: { fontSize: 14, fontWeight: '600', color: '#6B4A58' },
 });
