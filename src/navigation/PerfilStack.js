@@ -22,6 +22,7 @@ import ConexoesScreen        from '../screens/ConexoesScreen';
 import EquipeScreen          from '../screens/EquipeScreen';
 import CommunityScreen       from '../screens/CommunityScreen';
 import PagamentosScreen      from '../screens/PagamentosScreen';
+import LicencaScreen         from '../screens/LicencaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -49,6 +50,7 @@ export default function PerfilStack() {
       <Stack.Screen name="Equipe"         component={EquipeScreen}         />
       <Stack.Screen name="Community"      component={CommunityScreen}      />
       <Stack.Screen name="Pagamentos"     component={PagamentosScreen}     />
+      <Stack.Screen name="Licenca"        component={LicencaScreen}        />
     </Stack.Navigator>
   );
 }

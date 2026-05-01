@@ -641,6 +641,14 @@ export default function MeusDadosScreen({ navigation }) {
           )}
         </Field>
 
+        <TouchableOpacity
+          style={styles.licencaStatusLink}
+          onPress={() => navigation.navigate('Licenca')}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.licencaStatusLinkText}>Ver status da licença →</Text>
+        </TouchableOpacity>
+
         {editing && (
           <TouchableOpacity
             style={[styles.saveBtn, saving && { opacity: 0.7 }]}
@@ -760,6 +768,9 @@ const styles = StyleSheet.create({
     fontSize: 11, fontWeight: '600', color: '#EF4444',
     marginTop: 6, letterSpacing: 0.2,
   },
+
+  licencaStatusLink:     { paddingVertical: 12, alignItems: 'flex-end' },
+  licencaStatusLinkText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 
   voltarListaBtn: { paddingTop: 6, paddingBottom: 2 },
   voltarListaText: { fontSize: 12, fontWeight: '600', color: colors.primary },
