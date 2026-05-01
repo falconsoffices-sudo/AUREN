@@ -163,6 +163,7 @@ function CelebrationModal({ visible, marco, onClose }) {
 export default function MetasScreen({ navigation }) {
   const [loading,        setLoading]        = useState(true);
   const [saving,         setSaving]         = useState(false);
+  const [editing,        setEditing]        = useState(false);
   const [userId,         setUserId]         = useState(null);
 
   const [metaMensal,     setMetaMensal]     = useState('');
@@ -283,7 +284,7 @@ export default function MetasScreen({ navigation }) {
         meta_anual:     parseFloat(metaAnual)     || 0,
         meta_motivacao: metaMotivacao,
       }));
-      Alert.alert('Salvo!', 'Metas atualizadas.');
+      setEditing(false);
     } catch {
       Alert.alert('Erro ao salvar', 'Não foi possível salvar as metas.');
     } finally {
@@ -310,7 +311,17 @@ export default function MetasScreen({ navigation }) {
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Metas e Objetivos</Text>
-        <View style={styles.headerRight} />
+        <TouchableOpacity
+          style={[styles.editBtn, saving && { opacity: 0.6 }]}
+          onPress={editing ? handleSave : () => setEditing(true)}
+          disabled={saving}
+          activeOpacity={0.8}
+        >
+          {saving && editing
+            ? <ActivityIndicator color={colors.primary} size="small" />
+            : <Text style={styles.editBtnText}>{editing ? 'Salvar' : 'Editar'}</Text>
+          }
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -324,6 +335,7 @@ export default function MetasScreen({ navigation }) {
           accent={colors.primary}
           value={metaMensal}
           onChange={handleMetaMensalChange}
+          readonly={!editing}
           wordsLabel={wordsMonthly}
         >
           <ProgressBar current={receitaMensal} target={parseFloat(metaMensal) || 0} />
@@ -334,6 +346,7 @@ export default function MetasScreen({ navigation }) {
           accent="#3B5BA5"
           value={metaSemestral}
           onChange={setMetaSemestral}
+          readonly={!editing}
           wordsLabel={amountToWords(metaSemestral)}
         >
           <ProgressBar current={receitaSemestral} target={parseFloat(metaSemestral) || 0} />
@@ -344,6 +357,7 @@ export default function MetasScreen({ navigation }) {
           accent="#2A7A4B"
           value={metaAnual}
           onChange={setMetaAnual}
+          readonly={!editing}
           wordsLabel={amountToWords(metaAnual)}
         >
           <ProgressBar current={receitaAnual} target={parseFloat(metaAnual) || 0} />
@@ -353,7 +367,7 @@ export default function MetasScreen({ navigation }) {
         <View style={styles.motivacaoCard}>
           <Text style={styles.motivacaoLabel}>POR QUE VOCÊ QUER ATINGIR ESSA META?</Text>
           <TextInput
-            style={styles.motivacaoInput}
+            style={[styles.motivacaoInput, !editing && styles.motivacaoInputReadonly]}
             placeholder="Ex: Quero expandir meu salão e contratar uma assistente..."
             placeholderTextColor={colors.gray}
             value={metaMotivacao}
@@ -362,20 +376,23 @@ export default function MetasScreen({ navigation }) {
             numberOfLines={4}
             textAlignVertical="top"
             returnKeyType="done"
+            editable={editing}
           />
         </View>
 
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.85}
-        >
-          {saving
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.saveBtnText}>Salvar metas</Text>
-          }
-        </TouchableOpacity>
+        {editing && (
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.saveBtnText}>Salvar metas</Text>
+            }
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
 
@@ -404,7 +421,8 @@ const styles = StyleSheet.create({
   backBtn:     { width: 32, alignItems: 'center' },
   backArrow:   { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
   headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
-  headerRight: { width: 32 },
+  editBtn:     { width: 64, alignItems: 'flex-end' },
+  editBtnText: { fontSize: 15, fontWeight: '700', color: colors.primary },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
 
@@ -464,6 +482,7 @@ const styles = StyleSheet.create({
     fontSize: 14, fontWeight: '400', color: colors.white,
     minHeight: 90,
   },
+  motivacaoInputReadonly: { opacity: 0.7 },
 
   saveBtn: {
     height: 54, borderRadius: 14, backgroundColor: colors.primary,

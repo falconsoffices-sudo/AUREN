@@ -19,6 +19,27 @@ import { supabase } from '../lib/supabase';
 
 const MAX_MEMBROS = 5;
 
+const BENEFITS = [
+  {
+    emoji: '📅',
+    title: 'Agenda unificada',
+    sub: 'Veja todos os atendimentos da equipe em um só lugar',
+    detail: 'Visualize em tempo real os agendamentos de cada profissional da sua equipe, evite conflitos e maximize o aproveitamento da agenda.',
+  },
+  {
+    emoji: '💰',
+    title: 'Faturamento centralizado',
+    sub: 'Acompanhe receitas e despesas de cada profissional',
+    detail: 'Acompanhe receitas, despesas e lucro de cada profissional separadamente ou consolidado.',
+  },
+  {
+    emoji: '🌱',
+    title: 'Crescimento conjunto',
+    sub: 'Indique clientes entre a equipe automaticamente',
+    detail: 'Quando sua agenda estiver cheia, o AUREN indica automaticamente clientes para profissionais da sua equipe.',
+  },
+];
+
 const STATUS_COLOR = {
   ativa:    '#34D399',
   pendente: '#FBBF24',
@@ -101,12 +122,13 @@ function MembroCard({ item, onRemover, isOwner }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function EquipeScreen({ navigation }) {
-  const [loading,   setLoading]   = useState(true);
-  const [plano,     setPlano]     = useState(null);
-  const [uid,       setUid]       = useState(null);
-  const [membros,   setMembros]   = useState([]);
-  const [email,     setEmail]     = useState('');
-  const [enviando,  setEnviando]  = useState(false);
+  const [loading,      setLoading]      = useState(true);
+  const [plano,        setPlano]        = useState(null);
+  const [uid,          setUid]          = useState(null);
+  const [membros,      setMembros]      = useState([]);
+  const [email,        setEmail]        = useState('');
+  const [enviando,     setEnviando]     = useState(false);
+  const [expandedCard, setExpandedCard] = useState(null);
 
   const isBusiness = plano === 'business';
   const ativos     = membros.filter(m => m.status !== 'removida');
@@ -222,32 +244,30 @@ export default function EquipeScreen({ navigation }) {
             Gerencie sua equipe, unifique agendas e acompanhe o faturamento das suas profissionais parceiras em um só lugar.
           </Text>
 
-          {/* Benefit cards */}
-          <View style={styles.benefitCard}>
-            <Text style={styles.benefitEmoji}>📅</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.benefitTitle}>Agenda unificada</Text>
-              <Text style={styles.benefitSub}>Veja todos os atendimentos da equipe em um só lugar</Text>
-            </View>
-          </View>
-          <View style={styles.benefitCard}>
-            <Text style={styles.benefitEmoji}>💰</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.benefitTitle}>Faturamento centralizado</Text>
-              <Text style={styles.benefitSub}>Acompanhe receitas e despesas de cada profissional</Text>
-            </View>
-          </View>
-          <View style={styles.benefitCard}>
-            <Text style={styles.benefitEmoji}>🌱</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.benefitTitle}>Crescimento conjunto</Text>
-              <Text style={styles.benefitSub}>Indique clientes entre a equipe automaticamente</Text>
-            </View>
-          </View>
+          {/* Benefit cards — accordion */}
+          {BENEFITS.map((b, idx) => {
+            const isOpen = expandedCard === idx;
+            return (
+              <TouchableOpacity
+                key={idx}
+                style={styles.benefitCard}
+                onPress={() => setExpandedCard(isOpen ? null : idx)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.benefitEmoji}>{b.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.benefitTitle}>{b.title}</Text>
+                  <Text style={styles.benefitSub}>{b.sub}</Text>
+                  {isOpen && <Text style={styles.benefitDetail}>{b.detail}</Text>}
+                </View>
+                <Text style={styles.benefitChevron}>{isOpen ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+            );
+          })}
 
           <TouchableOpacity
             style={styles.upgradeBtn}
-            onPress={() => navigation.navigate('Perfil')}
+            onPress={() => navigation.navigate('Plans')}
             activeOpacity={0.85}
           >
             <Text style={styles.upgradeBtnText}>Ver planos →</Text>
@@ -450,9 +470,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1B1E', borderRadius: 14,
     padding: 16, marginBottom: 10, width: '100%',
   },
-  benefitEmoji: { fontSize: 26, marginTop: 2 },
-  benefitTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
-  benefitSub:   { fontSize: 13, color: '#8A8A8E', lineHeight: 18 },
+  benefitEmoji:   { fontSize: 26, marginTop: 2, marginRight: 0 },
+  benefitTitle:   { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
+  benefitSub:     { fontSize: 13, color: '#8A8A8E', lineHeight: 18 },
+  benefitDetail:  { fontSize: 13, color: '#C9A8B6', lineHeight: 19, marginTop: 10 },
+  benefitChevron: { fontSize: 10, color: '#555560', alignSelf: 'center', marginLeft: 10 },
 
   upgradeBtn: {
     height: 52, borderRadius: 14, backgroundColor: '#A8235A',

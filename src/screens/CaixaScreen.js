@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -354,6 +354,15 @@ export default function CaixaScreen() {
   useFocusEffect(
     useCallback(() => { carregarDados(); }, [carregarDados])
   );
+
+  useEffect(() => {
+    const ch = supabase
+      .channel('caixa_financeiro')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'financeiro' },
+        () => { carregarDados(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [carregarDados]);
 
   const monthName = MONTHS[new Date().getMonth()];
   const monthPct  = pct(ganhosMes, metaMensal);
