@@ -151,6 +151,9 @@ export default function OnboardingScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, alignSelf: 'flex-start' }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#A8235A' }}>←</Text>
+          </TouchableOpacity>
           <ProgressDots current={step} />
 
           {/* ── Step 0: Primeiro serviço ── */}

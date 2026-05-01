@@ -23,28 +23,6 @@ function formatPhone(raw) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-function ToggleGroup({ options, value, onChange }) {
-  return (
-    <View style={styles.toggleRow}>
-      {options.map(opt => {
-        const active = value === opt.value;
-        return (
-          <TouchableOpacity
-            key={opt.value}
-            style={[styles.toggleBtn, active && styles.toggleActive]}
-            onPress={() => onChange(opt.value)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function AuthClienteScreen({ navigation }) {
   const { idioma } = useTheme();
   const [step, setStep] = useState('form');
@@ -122,6 +100,9 @@ export default function AuthClienteScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, alignSelf: 'flex-start' }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#A8235A' }}>←</Text>
+          </TouchableOpacity>
           <Image
             source={require('../../assets/images/logo.png')}
             style={styles.logo}
@@ -273,15 +254,6 @@ const styles = StyleSheet.create({
   phonePrefix:     { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, marginRight: 8 },
   phonePrefixText: { fontSize: 15, fontWeight: '600', color: '#C9A8B6' },
   phoneInput:      { flex: 1, marginBottom: 0 },
-
-  toggleRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  toggleBtn: {
-    flex: 1, paddingVertical: 13, borderRadius: 12,
-    alignItems: 'center', backgroundColor: INPUT_BG,
-  },
-  toggleActive:     { backgroundColor: '#A8235A' },
-  toggleText:       { fontSize: 13, fontWeight: '600', color: '#6B4A58' },
-  toggleTextActive: { color: '#FFFFFF' },
 
   primaryBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 16 },
   primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },

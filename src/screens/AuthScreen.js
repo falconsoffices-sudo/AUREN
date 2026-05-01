@@ -21,6 +21,18 @@ import { useTheme } from '../context/ThemeContext';
 
 const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
 
+const IDIOMAS = [
+  { key: 'pt', label: 'PT-BR'  },
+  { key: 'es', label: 'ES-419' },
+  { key: 'en', label: 'EN-US'  },
+];
+
+const IDIOMA_COPY = {
+  pt: { title: 'Escolha seu idioma',    sub: 'Você pode alterar isso depois nas configurações.',   btn: 'Continuar' },
+  es: { title: 'Elige tu idioma',       sub: 'Puedes cambiarlo más tarde en la configuración.',    btn: 'Continuar' },
+  en: { title: 'Choose your language',  sub: 'You can change this later in settings.',             btn: 'Continue'  },
+};
+
 const US_STATES = [
   { sigla: 'AL', nome: 'Alabama' },
   { sigla: 'AK', nome: 'Alaska' },
@@ -200,8 +212,8 @@ function EstadoLicencaModal({ visible, value, onSelect, onClose }) {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function AuthScreen({ navigation }) {
-  const { idioma } = useTheme();
-  const [step, setStep] = useState('tipo'); // 'tipo' | 'form' | 'otp'
+  const { idioma, setIdioma } = useTheme();
+  const [step, setStep] = useState('idioma'); // 'idioma' | 'tipo' | 'form' | 'otp'
 
   // Form fields
   const [nome,             setNome]             = useState('');
@@ -329,6 +341,44 @@ export default function AuthScreen({ navigation }) {
             style={styles.logo}
           />
 
+          {/* ══ STEP: idioma ══ */}
+          {step === 'idioma' && (
+            <>
+              <Text style={styles.title}>{IDIOMA_COPY[idioma].title}</Text>
+              <Text style={styles.subtitle}>{IDIOMA_COPY[idioma].sub}</Text>
+
+              <View style={styles.idiomaChips}>
+                {IDIOMAS.map(({ key, label }) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.idiomaChip, idioma === key && styles.idiomaChipActive]}
+                    onPress={() => setIdioma(key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.idiomaChipText, idioma === key && styles.idiomaChipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => setStep('tipo')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.primaryBtnText}>{IDIOMA_COPY[idioma].btn}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={styles.backBtnText}>← Voltar</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
           {/* ══ STEP: tipo ══ */}
           {step === 'tipo' && (
             <>
@@ -360,7 +410,7 @@ export default function AuthScreen({ navigation }) {
 
               <TouchableOpacity
                 style={styles.backBtn}
-                onPress={() => navigation.goBack()}
+                onPress={() => setStep('idioma')}
               >
                 <Text style={styles.backBtnText}>← Voltar</Text>
               </TouchableOpacity>
@@ -676,11 +726,11 @@ const styles = StyleSheet.create({
   termsLink:       { fontSize: 13, fontWeight: '600', color: '#A8235A', textDecorationLine: 'underline' },
 
   // Idioma step
-  idiomaChips:         { flexDirection: 'row', gap: 10, marginVertical: 28, justifyContent: 'center' },
-  idiomaChip:          { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5, borderColor: '#A8235A' },
-  idiomaChipActive:    { backgroundColor: '#A8235A' },
-  idiomaChipText:      { fontSize: 13, fontWeight: '700', color: '#A8235A', letterSpacing: 0.4 },
-  idiomaChipTextActive:{ color: '#FFFFFF' },
+  idiomaChips:          { flexDirection: 'row', gap: 10, marginVertical: 28, justifyContent: 'center' },
+  idiomaChip:           { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5, borderColor: '#A8235A' },
+  idiomaChipActive:     { backgroundColor: '#A8235A' },
+  idiomaChipText:       { fontSize: 13, fontWeight: '700', color: '#A8235A', letterSpacing: 0.4 },
+  idiomaChipTextActive: { color: '#FFFFFF' },
 
   // Tipo step
   tipoCard: {

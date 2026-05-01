@@ -1,17 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../context/ThemeContext';
-
-const IDIOMAS = [
-  { key: 'pt', label: 'PT-BR'  },
-  { key: 'es', label: 'ES-419' },
-  { key: 'en', label: 'EN-US'  },
-];
 
 export default function WelcomeScreen({ navigation }) {
-  const { idioma, setIdioma } = useTheme();
-
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
 
@@ -28,22 +19,6 @@ export default function WelcomeScreen({ navigation }) {
       <View style={styles.spacer} />
 
       <View style={styles.buttons}>
-        <Text style={styles.idiomaLabel}>Escolha o idioma do seu app</Text>
-        <View style={styles.chips}>
-          {IDIOMAS.map(({ key, label }) => (
-            <TouchableOpacity
-              key={key}
-              style={[styles.chip, idioma === key && styles.chipActive]}
-              onPress={() => setIdioma(key)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.chipText, idioma === key && styles.chipTextActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
         <TouchableOpacity
           style={styles.primaryBtn}
           activeOpacity={0.85}
@@ -116,32 +91,6 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     gap: 12,
   },
-
-  idiomaLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B4A58',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginBottom: 2,
-  },
-
-  chips: {
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#A8235A',
-  },
-  chipActive:     { backgroundColor: '#A8235A' },
-  chipText:       { fontSize: 12, fontWeight: '700', color: '#A8235A', letterSpacing: 0.4 },
-  chipTextActive: { color: '#FFFFFF' },
 
   primaryBtn: {
     height: 56,
