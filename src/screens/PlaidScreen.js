@@ -8,12 +8,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { PlaidLink, LinkSuccess, LinkExit } from 'react-native-plaid-link-sdk';
 import { supabase } from '../lib/supabase';
-import { createLinkToken, exchangePublicToken } from '../lib/plaid';
+import { createLinkToken } from '../lib/plaid';
 
 export default function PlaidScreen({ navigation }) {
-  const [linkToken,  setLinkToken]  = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [userId,     setUserId]     = useState(null);
@@ -26,45 +24,31 @@ export default function PlaidScreen({ navigation }) {
       if (!uid) { setLoading(false); return; }
       setUserId(uid);
 
-      // check if already connected
       const { data: profile } = await supabase
         .from('profiles')
         .select('plaid_access_token')
         .eq('id', uid)
         .single();
 
-      if (profile?.plaid_access_token) {
-        setConnected(true);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const token = await createLinkToken(uid);
-        setLinkToken(token);
-      } catch (err) {
-        Alert.alert('Erro', err.message ?? 'Não foi possível iniciar a conexão.');
-      } finally {
-        setLoading(false);
-      }
+      if (profile?.plaid_access_token) setConnected(true);
+      setLoading(false);
     })();
   }, []);
 
-  async function handleSuccess(success) {
+  async function handleConnect() {
+    if (!userId) return;
     setConnecting(true);
     try {
-      await exchangePublicToken(success.publicToken, userId);
-      setConnected(true);
+      const token = await createLinkToken(userId);
+      Alert.alert(
+        'Link Token gerado',
+        `Plaid Link funciona apenas em build EAS.\n\nToken: ${token}`,
+        [{ text: 'OK' }],
+      );
     } catch (err) {
-      Alert.alert('Erro', err.message ?? 'Não foi possível salvar a conexão.');
+      Alert.alert('Erro', err.message ?? 'Não foi possível gerar o token.');
     } finally {
       setConnecting(false);
-    }
-  }
-
-  function handleExit(exit) {
-    if (exit?.error?.errorCode) {
-      Alert.alert('Conexão cancelada', exit.error.displayMessage ?? 'Tente novamente.');
     }
   }
 
@@ -132,25 +116,16 @@ export default function PlaidScreen({ navigation }) {
           Conecte sua conta bancária para reconciliação automática de pagamentos e relatórios financeiros precisos.
         </Text>
 
-        {linkToken ? (
-          <PlaidLink
-            tokenConfig={{ token: linkToken }}
-            onSuccess={handleSuccess}
-            onExit={handleExit}
-          >
-            <View style={styles.primaryBtn}>
-              <Text style={styles.primaryBtnText}>Conectar conta</Text>
-            </View>
-          </PlaidLink>
-        ) : (
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => Alert.alert('Erro', 'Token indisponível. Tente novamente.')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryBtnText}>Conectar conta</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={handleConnect}
+          activeOpacity={0.85}
+          disabled={connecting}
+        >
+          <Text style={styles.primaryBtnText}>
+            {connecting ? 'Aguarde…' : 'Conectar conta'}
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.skipBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Text style={styles.skipBtnText}>Pular por enquanto</Text>

@@ -8,19 +8,58 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const US_STATES = [
+  { sigla: 'AL', nome: 'Alabama' },       { sigla: 'AK', nome: 'Alaska' },
+  { sigla: 'AZ', nome: 'Arizona' },       { sigla: 'AR', nome: 'Arkansas' },
+  { sigla: 'CA', nome: 'California' },    { sigla: 'CO', nome: 'Colorado' },
+  { sigla: 'CT', nome: 'Connecticut' },   { sigla: 'DE', nome: 'Delaware' },
+  { sigla: 'FL', nome: 'Florida' },       { sigla: 'GA', nome: 'Georgia' },
+  { sigla: 'HI', nome: 'Hawaii' },        { sigla: 'ID', nome: 'Idaho' },
+  { sigla: 'IL', nome: 'Illinois' },      { sigla: 'IN', nome: 'Indiana' },
+  { sigla: 'IA', nome: 'Iowa' },          { sigla: 'KS', nome: 'Kansas' },
+  { sigla: 'KY', nome: 'Kentucky' },      { sigla: 'LA', nome: 'Louisiana' },
+  { sigla: 'ME', nome: 'Maine' },         { sigla: 'MD', nome: 'Maryland' },
+  { sigla: 'MA', nome: 'Massachusetts' }, { sigla: 'MI', nome: 'Michigan' },
+  { sigla: 'MN', nome: 'Minnesota' },     { sigla: 'MS', nome: 'Mississippi' },
+  { sigla: 'MO', nome: 'Missouri' },      { sigla: 'MT', nome: 'Montana' },
+  { sigla: 'NE', nome: 'Nebraska' },      { sigla: 'NV', nome: 'Nevada' },
+  { sigla: 'NH', nome: 'New Hampshire' }, { sigla: 'NJ', nome: 'New Jersey' },
+  { sigla: 'NM', nome: 'New Mexico' },    { sigla: 'NY', nome: 'New York' },
+  { sigla: 'NC', nome: 'North Carolina' },{ sigla: 'ND', nome: 'North Dakota' },
+  { sigla: 'OH', nome: 'Ohio' },          { sigla: 'OK', nome: 'Oklahoma' },
+  { sigla: 'OR', nome: 'Oregon' },        { sigla: 'PA', nome: 'Pennsylvania' },
+  { sigla: 'RI', nome: 'Rhode Island' },  { sigla: 'SC', nome: 'South Carolina' },
+  { sigla: 'SD', nome: 'South Dakota' },  { sigla: 'TN', nome: 'Tennessee' },
+  { sigla: 'TX', nome: 'Texas' },         { sigla: 'UT', nome: 'Utah' },
+  { sigla: 'VT', nome: 'Vermont' },       { sigla: 'VA', nome: 'Virginia' },
+  { sigla: 'WA', nome: 'Washington' },    { sigla: 'WV', nome: 'West Virginia' },
+  { sigla: 'WI', nome: 'Wisconsin' },     { sigla: 'WY', nome: 'Wyoming' },
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const EMPTY_ADDRESS = { rua: '', numero: '', cidade: '', estado: '', zip: '' };
+const EMPTY_ADDRESS = { street: '', apt: '', city: '', state: '', zip: '' };
 
 function parseAddress(jsonStr) {
   if (!jsonStr) return { ...EMPTY_ADDRESS };
-  try { return { ...EMPTY_ADDRESS, ...JSON.parse(jsonStr) }; }
-  catch { return { ...EMPTY_ADDRESS }; }
+  try {
+    const raw = JSON.parse(jsonStr);
+    return {
+      street: raw.street ?? raw.rua    ?? '',
+      apt:    raw.apt    ?? raw.numero  ?? '',
+      city:   raw.city   ?? raw.cidade  ?? '',
+      state:  raw.state  ?? raw.estado  ?? '',
+      zip:    raw.zip    ?? '',
+    };
+  } catch { return { ...EMPTY_ADDRESS }; }
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -45,59 +84,92 @@ function Field({ label, children }) {
 }
 
 function AddressFields({ value, onChange }) {
+  const [pickerVisible, setPickerVisible] = useState(false);
   const set = (key) => (text) => onChange({ ...value, [key]: text });
+
   return (
     <>
-      <View style={styles.row}>
-        <TextInput
-          style={[styles.input, { flex: 1, marginRight: 8 }]}
-          placeholder="Rua / Avenida"
-          placeholderTextColor={colors.gray}
-          value={value.rua}
-          onChangeText={set('rua')}
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-        <TextInput
-          style={[styles.input, { width: 72 }]}
-          placeholder="Nº"
-          placeholderTextColor={colors.gray}
-          value={value.numero}
-          onChangeText={set('numero')}
-          returnKeyType="next"
-        />
-      </View>
-      <View style={styles.row}>
-        <TextInput
-          style={[styles.input, { flex: 1, marginRight: 8 }]}
-          placeholder="Cidade"
-          placeholderTextColor={colors.gray}
-          value={value.cidade}
-          onChangeText={set('cidade')}
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-        <TextInput
-          style={[styles.input, { width: 52 }]}
-          placeholder="UF"
-          placeholderTextColor={colors.gray}
-          value={value.estado}
-          onChangeText={set('estado')}
-          autoCapitalize="characters"
-          maxLength={2}
-          returnKeyType="next"
-        />
-      </View>
       <TextInput
         style={styles.input}
-        placeholder="ZIP Code"
+        placeholder="Street Address *"
+        placeholderTextColor={colors.gray}
+        value={value.street}
+        onChangeText={set('street')}
+        autoCapitalize="words"
+        returnKeyType="next"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Apt / Suite / Unit (opcional)"
+        placeholderTextColor={colors.gray}
+        value={value.apt}
+        onChangeText={set('apt')}
+        autoCapitalize="words"
+        returnKeyType="next"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="City"
+        placeholderTextColor={colors.gray}
+        value={value.city}
+        onChangeText={set('city')}
+        autoCapitalize="words"
+        returnKeyType="next"
+      />
+      <TouchableOpacity
+        style={[styles.input, styles.stateField]}
+        onPress={() => setPickerVisible(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={value.state ? styles.inputText : styles.inputPlaceholder}>
+          {value.state || 'State'}
+        </Text>
+        <Text style={styles.stateArrow}>▼</Text>
+      </TouchableOpacity>
+      <TextInput
+        style={styles.input}
+        placeholder="ZIP Code *"
         placeholderTextColor={colors.gray}
         value={value.zip}
-        onChangeText={set('zip')}
+        onChangeText={t => onChange({ ...value, zip: t.replace(/\D/g, '').slice(0, 5) })}
         keyboardType="numeric"
-        maxLength={10}
+        maxLength={5}
         returnKeyType="done"
       />
+
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={styles.pickerBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setPickerVisible(false)} activeOpacity={1} />
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.pickerTitle}>Selecionar Estado</Text>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+              {US_STATES.map((st, idx) => (
+                <TouchableOpacity
+                  key={st.sigla}
+                  style={[
+                    styles.pickerItem,
+                    idx < US_STATES.length - 1 && styles.pickerItemBorder,
+                    value.state === st.sigla && styles.pickerItemActive,
+                  ]}
+                  onPress={() => { onChange({ ...value, state: st.sigla }); setPickerVisible(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.pickerItemText, value.state === st.sigla && styles.pickerItemTextActive]}>
+                    {st.sigla} — {st.nome}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -105,13 +177,13 @@ function AddressFields({ value, onChange }) {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function EnderecosScreen({ navigation }) {
-  const [loading,       setLoading]       = useState(true);
-  const [saving,        setSaving]        = useState(false);
-  const [userId,        setUserId]        = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [userId,       setUserId]       = useState(null);
 
-  const [comercial,    setComercial]    = useState({ ...EMPTY_ADDRESS });
-  const [residencial,  setResidencial]  = useState({ ...EMPTY_ADDRESS });
-  const [taxa,         setTaxa]         = useState('');
+  const [comercial,   setComercial]   = useState({ ...EMPTY_ADDRESS });
+  const [residencial, setResidencial] = useState({ ...EMPTY_ADDRESS });
+  const [taxa,        setTaxa]        = useState('');
 
   useEffect(() => {
     (async () => {
@@ -259,8 +331,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, marginBottom: 16, marginLeft: 8,
   },
 
-  row: { flexDirection: 'row', marginBottom: 0 },
-
   fieldWrap:  { marginBottom: 12 },
   fieldLabel: {
     fontSize: 11, fontWeight: '700', color: colors.gray,
@@ -273,6 +343,32 @@ const styles = StyleSheet.create({
     fontSize: 14, fontWeight: '400', color: colors.white,
     marginBottom: 10,
   },
+  inputText:        { color: colors.white },
+  inputPlaceholder: { color: colors.gray },
+
+  stateField: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  stateArrow: { fontSize: 11, color: colors.gray, marginLeft: 8 },
+
+  pickerBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 24, paddingTop: 12, maxHeight: '75%',
+  },
+  pickerHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: '#2A2A2A', alignSelf: 'center', marginBottom: 20,
+  },
+  pickerTitle:         { fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 16 },
+  pickerItem:          { paddingVertical: 14 },
+  pickerItemBorder:    { borderBottomWidth: 1, borderBottomColor: '#2A2A2A' },
+  pickerItemActive:    { backgroundColor: 'rgba(168,35,90,0.08)' },
+  pickerItemText:      { fontSize: 15, fontWeight: '400', color: colors.white },
+  pickerItemTextActive:{ fontWeight: '700', color: colors.primary },
 
   saveBtn: {
     height: 54, borderRadius: 14, backgroundColor: colors.primary,

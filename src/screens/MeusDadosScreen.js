@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,56 +17,31 @@ import colors from '../constants/colors';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const US_STATES = [
-  { sigla: 'AL', nome: 'Alabama' },
-  { sigla: 'AK', nome: 'Alaska' },
-  { sigla: 'AZ', nome: 'Arizona' },
-  { sigla: 'AR', nome: 'Arkansas' },
-  { sigla: 'CA', nome: 'California' },
-  { sigla: 'CO', nome: 'Colorado' },
-  { sigla: 'CT', nome: 'Connecticut' },
-  { sigla: 'DE', nome: 'Delaware' },
-  { sigla: 'FL', nome: 'Florida' },
-  { sigla: 'GA', nome: 'Georgia' },
-  { sigla: 'HI', nome: 'Hawaii' },
-  { sigla: 'ID', nome: 'Idaho' },
-  { sigla: 'IL', nome: 'Illinois' },
-  { sigla: 'IN', nome: 'Indiana' },
-  { sigla: 'IA', nome: 'Iowa' },
-  { sigla: 'KS', nome: 'Kansas' },
-  { sigla: 'KY', nome: 'Kentucky' },
-  { sigla: 'LA', nome: 'Louisiana' },
-  { sigla: 'ME', nome: 'Maine' },
-  { sigla: 'MD', nome: 'Maryland' },
-  { sigla: 'MA', nome: 'Massachusetts' },
-  { sigla: 'MI', nome: 'Michigan' },
-  { sigla: 'MN', nome: 'Minnesota' },
-  { sigla: 'MS', nome: 'Mississippi' },
-  { sigla: 'MO', nome: 'Missouri' },
-  { sigla: 'MT', nome: 'Montana' },
-  { sigla: 'NE', nome: 'Nebraska' },
-  { sigla: 'NV', nome: 'Nevada' },
-  { sigla: 'NH', nome: 'New Hampshire' },
-  { sigla: 'NJ', nome: 'New Jersey' },
-  { sigla: 'NM', nome: 'New Mexico' },
-  { sigla: 'NY', nome: 'New York' },
-  { sigla: 'NC', nome: 'North Carolina' },
-  { sigla: 'ND', nome: 'North Dakota' },
-  { sigla: 'OH', nome: 'Ohio' },
-  { sigla: 'OK', nome: 'Oklahoma' },
-  { sigla: 'OR', nome: 'Oregon' },
-  { sigla: 'PA', nome: 'Pennsylvania' },
-  { sigla: 'RI', nome: 'Rhode Island' },
-  { sigla: 'SC', nome: 'South Carolina' },
-  { sigla: 'SD', nome: 'South Dakota' },
-  { sigla: 'TN', nome: 'Tennessee' },
-  { sigla: 'TX', nome: 'Texas' },
-  { sigla: 'UT', nome: 'Utah' },
-  { sigla: 'VT', nome: 'Vermont' },
-  { sigla: 'VA', nome: 'Virginia' },
-  { sigla: 'WA', nome: 'Washington' },
-  { sigla: 'WV', nome: 'West Virginia' },
-  { sigla: 'WI', nome: 'Wisconsin' },
-  { sigla: 'WY', nome: 'Wyoming' },
+  { sigla: 'AL', nome: 'Alabama' },       { sigla: 'AK', nome: 'Alaska' },
+  { sigla: 'AZ', nome: 'Arizona' },       { sigla: 'AR', nome: 'Arkansas' },
+  { sigla: 'CA', nome: 'California' },    { sigla: 'CO', nome: 'Colorado' },
+  { sigla: 'CT', nome: 'Connecticut' },   { sigla: 'DE', nome: 'Delaware' },
+  { sigla: 'FL', nome: 'Florida' },       { sigla: 'GA', nome: 'Georgia' },
+  { sigla: 'HI', nome: 'Hawaii' },        { sigla: 'ID', nome: 'Idaho' },
+  { sigla: 'IL', nome: 'Illinois' },      { sigla: 'IN', nome: 'Indiana' },
+  { sigla: 'IA', nome: 'Iowa' },          { sigla: 'KS', nome: 'Kansas' },
+  { sigla: 'KY', nome: 'Kentucky' },      { sigla: 'LA', nome: 'Louisiana' },
+  { sigla: 'ME', nome: 'Maine' },         { sigla: 'MD', nome: 'Maryland' },
+  { sigla: 'MA', nome: 'Massachusetts' }, { sigla: 'MI', nome: 'Michigan' },
+  { sigla: 'MN', nome: 'Minnesota' },     { sigla: 'MS', nome: 'Mississippi' },
+  { sigla: 'MO', nome: 'Missouri' },      { sigla: 'MT', nome: 'Montana' },
+  { sigla: 'NE', nome: 'Nebraska' },      { sigla: 'NV', nome: 'Nevada' },
+  { sigla: 'NH', nome: 'New Hampshire' }, { sigla: 'NJ', nome: 'New Jersey' },
+  { sigla: 'NM', nome: 'New Mexico' },    { sigla: 'NY', nome: 'New York' },
+  { sigla: 'NC', nome: 'North Carolina' },{ sigla: 'ND', nome: 'North Dakota' },
+  { sigla: 'OH', nome: 'Ohio' },          { sigla: 'OK', nome: 'Oklahoma' },
+  { sigla: 'OR', nome: 'Oregon' },        { sigla: 'PA', nome: 'Pennsylvania' },
+  { sigla: 'RI', nome: 'Rhode Island' },  { sigla: 'SC', nome: 'South Carolina' },
+  { sigla: 'SD', nome: 'South Dakota' },  { sigla: 'TN', nome: 'Tennessee' },
+  { sigla: 'TX', nome: 'Texas' },         { sigla: 'UT', nome: 'Utah' },
+  { sigla: 'VT', nome: 'Vermont' },       { sigla: 'VA', nome: 'Virginia' },
+  { sigla: 'WA', nome: 'Washington' },    { sigla: 'WV', nome: 'West Virginia' },
+  { sigla: 'WI', nome: 'Wisconsin' },     { sigla: 'WY', nome: 'Wyoming' },
 ];
 
 const IDIOMAS = [
@@ -81,51 +56,35 @@ const GENEROS = [
 
 const LICENCA_TIPOS = ['Nail Specialist', 'Cosmetologist', 'Esthetician', 'Outro'];
 
-const CIDADES = [
-  // Florida
-  'Miami, FL', 'Orlando, FL', 'Tampa, FL', 'Jacksonville, FL', 'Fort Lauderdale, FL',
-  'St. Petersburg, FL', 'Hialeah, FL', 'Tallahassee, FL', 'Port St. Lucie, FL',
-  'Cape Coral, FL', 'Fort Myers, FL', 'Boca Raton, FL', 'Pembroke Pines, FL',
-  'Hollywood, FL', 'Miramar, FL', 'Coral Springs, FL', 'Gainesville, FL',
-  'Clearwater, FL', 'Palm Bay, FL', 'West Palm Beach, FL',
-  // Texas
-  'Houston, TX', 'San Antonio, TX', 'Dallas, TX', 'Austin, TX', 'Fort Worth, TX',
-  'El Paso, TX', 'Arlington, TX', 'Corpus Christi, TX', 'Plano, TX', 'Laredo, TX',
-  'Lubbock, TX', 'Irving, TX', 'McAllen, TX', 'Garland, TX', 'Frisco, TX',
-  // California
-  'Los Angeles, CA', 'San Diego, CA', 'San Jose, CA', 'San Francisco, CA',
-  'Fresno, CA', 'Sacramento, CA', 'Long Beach, CA', 'Oakland, CA',
-  'Bakersfield, CA', 'Anaheim, CA', 'Santa Ana, CA', 'Riverside, CA',
-  'Stockton, CA', 'Irvine, CA', 'Chula Vista, CA',
-  // New York
-  'New York City, NY', 'Buffalo, NY', 'Rochester, NY', 'Yonkers, NY', 'Syracuse, NY',
-  'Albany, NY', 'New Rochelle, NY',
-  // New Jersey
-  'Newark, NJ', 'Jersey City, NJ', 'Paterson, NJ', 'Elizabeth, NJ',
-  'Edison, NJ', 'Trenton, NJ', 'Woodbridge, NJ',
-  // Georgia
-  'Atlanta, GA', 'Columbus, GA', 'Savannah, GA', 'Athens, GA',
-  'Augusta, GA', 'Sandy Springs, GA', 'Roswell, GA',
-  // North Carolina
-  'Charlotte, NC', 'Raleigh, NC', 'Greensboro, NC', 'Durham, NC',
-  'Winston-Salem, NC', 'Fayetteville, NC', 'Cary, NC',
-  // Illinois
-  'Chicago, IL', 'Aurora, IL', 'Rockford, IL', 'Joliet, IL',
-  'Naperville, IL', 'Springfield, IL', 'Peoria, IL',
-  // Arizona
-  'Phoenix, AZ', 'Tucson, AZ', 'Mesa, AZ', 'Chandler, AZ',
-  'Scottsdale, AZ', 'Glendale, AZ', 'Tempe, AZ', 'Gilbert, AZ',
-  // Nevada
-  'Las Vegas, NV', 'Henderson, NV', 'Reno, NV', 'North Las Vegas, NV',
-  'Sparks, NV',
-];
+const EMPTY_ADDR = { street: '', apt: '', city: '', state: '', zip: '' };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatPhone(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 function stateLabel(sigla) {
   if (!sigla) return '';
   const found = US_STATES.find(s => s.sigla === sigla);
   return found ? `${found.sigla} — ${found.nome}` : sigla;
+}
+
+function parseAddress(jsonStr) {
+  if (!jsonStr) return { ...EMPTY_ADDR };
+  try {
+    const raw = JSON.parse(jsonStr);
+    return {
+      street: raw.street ?? raw.rua    ?? '',
+      apt:    raw.apt    ?? raw.numero  ?? '',
+      city:   raw.city   ?? raw.cidade  ?? '',
+      state:  raw.state  ?? raw.estado  ?? '',
+      zip:    raw.zip    ?? '',
+    };
+  } catch { return { ...EMPTY_ADDR }; }
 }
 
 function formatExpiracao(raw) {
@@ -181,66 +140,6 @@ function Toggle({ options, value, onChange, editing }) {
   );
 }
 
-function CidadePickerModal({ visible, value, cidades, onSelect, onOutra, onClose }) {
-  const [busca, setBusca] = useState('');
-
-  React.useEffect(() => { if (!visible) setBusca(''); }, [visible]);
-
-  const filtradas = busca.trim()
-    ? cidades.filter(c => c.toLowerCase().includes(busca.trim().toLowerCase()))
-    : cidades;
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
-        <View style={styles.cidadeModalSheet}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Selecione a cidade</Text>
-          <TextInput
-            style={styles.cidadeSearch}
-            placeholder="Buscar cidade..."
-            placeholderTextColor={colors.gray}
-            value={busca}
-            onChangeText={setBusca}
-            autoCapitalize="words"
-            returnKeyType="search"
-          />
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ marginBottom: 32 }}>
-            {filtradas.map((cidade, idx) => (
-              <TouchableOpacity
-                key={cidade}
-                style={[
-                  styles.modalItem,
-                  idx < filtradas.length - 1 && styles.modalItemBorder,
-                  value === cidade && styles.modalItemActive,
-                ]}
-                onPress={() => { onSelect(cidade); onClose(); }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.modalItemText, value === cidade && styles.modalItemTextActive]}>
-                  {cidade}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {filtradas.length > 0 && <View style={styles.modalItemBorder} />}
-            <TouchableOpacity
-              style={styles.modalItem}
-              onPress={() => { onOutra(); onClose(); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modalItemText, { color: colors.primary, fontWeight: '600' }]}>
-                Outra cidade...
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// Shared modal for picking any US state
 function StatePickerModal({ visible, title, value, onSelect, onClose }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -324,13 +223,11 @@ export default function MeusDadosScreen({ navigation }) {
   const [email, setEmail] = useState('');
 
   // Dados pessoais
-  const [nome,     setNome]     = useState('');
-  const [telefone, setTelefone] = useState('');
-  const [cidade,   setCidade]   = useState('');
-  const [estado,   setEstado]   = useState('');
-  const [zipCode,  setZipCode]  = useState('');
-  const [idioma,   setIdioma]   = useState('pt');
-  const [genero,   setGenero]   = useState('feminino');
+  const [nome,        setNome]        = useState('');
+  const [telefone,    setTelefone]    = useState('');
+  const [endComercial, setEndComercial] = useState({ ...EMPTY_ADDR });
+  const [idioma,      setIdioma]      = useState('pt');
+  const [genero,      setGenero]      = useState('feminino');
 
   // Licença
   const [licencaNumero,    setLicencaNumero]    = useState('');
@@ -339,25 +236,11 @@ export default function MeusDadosScreen({ navigation }) {
   const [licencaExpiracao, setLicencaExpiracao] = useState('');
 
   // Modal visibility
-  const [cidadeModalVisible,        setCidadeModalVisible]        = useState(false);
-  const [cidadeIsCustom,            setCidadeIsCustom]            = useState(false);
-  const [estadoModalVisible,        setEstadoModalVisible]        = useState(false);
+  const [endStateModalVisible,      setEndStateModalVisible]      = useState(false);
   const [licencaEstadoModalVisible, setLicencaEstadoModalVisible] = useState(false);
 
   // Validation errors
   const [expiracaoErro, setExpiracaoErro] = useState(null);
-
-  const cidadesFiltradas = useMemo(() => {
-    if (!estado) return CIDADES;
-    return CIDADES.filter(c => c.endsWith(`, ${estado}`));
-  }, [estado]);
-
-  useEffect(() => {
-    if (cidade && estado && !cidade.endsWith(`, ${estado}`)) {
-      setCidade('');
-      setCidadeIsCustom(false);
-    }
-  }, [estado]);
 
   useEffect(() => {
     (async () => {
@@ -374,15 +257,13 @@ export default function MeusDadosScreen({ navigation }) {
         .single();
 
       if (data) {
-        setNome(data.nome                        ?? '');
-        setTelefone(data.telefone                ?? '');
-        const cidadeVal = data.cidade ?? '';
-        setCidade(cidadeVal);
-        setCidadeIsCustom(cidadeVal !== '' && !CIDADES.includes(cidadeVal));
-        setEstado(data.estado                    ?? '');
-        setZipCode(data.zip_code                 ?? '');
-        setIdioma(data.idioma                    ?? 'pt');
-        setGenero(data.genero                    ?? 'feminino');
+        setNome(data.nome ?? '');
+        const rawPhone = data.telefone ?? '';
+        const digits = rawPhone.replace(/\D/g, '').slice(-10);
+        setTelefone(digits ? formatPhone(digits) : '');
+        setEndComercial(parseAddress(data.endereco_comercial));
+        setIdioma(data.idioma   ?? 'pt');
+        setGenero(data.genero   ?? 'feminino');
         setLicencaNumero(data.licenca_numero     ?? '');
         setLicencaTipo(data.licenca_tipo         ?? '');
         setLicencaEstado(data.licenca_estado     ?? '');
@@ -399,8 +280,8 @@ export default function MeusDadosScreen({ navigation }) {
       Alert.alert('Campo obrigatório', 'Informe o nome completo.');
       return;
     }
-    if (zipCode && !/^\d{5}$/.test(zipCode)) {
-      Alert.alert('Zip Code inválido', 'O Zip Code deve ter 5 dígitos.');
+    if (endComercial.zip && !/^\d{5}$/.test(endComercial.zip)) {
+      Alert.alert('ZIP Code inválido', 'O ZIP Code deve ter 5 dígitos.');
       return;
     }
     const erroExp = validateExpiracao(licencaExpiracao);
@@ -416,10 +297,8 @@ export default function MeusDadosScreen({ navigation }) {
         .upsert({
           id:                userId,
           nome:              nome.trim(),
-          telefone:          telefone.trim()         || null,
-          cidade:            cidade.trim()           || null,
-          estado:            estado                  || null,
-          zip_code:          zipCode.trim()          || null,
+          telefone:          telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
+          endereco_comercial: JSON.stringify(endComercial),
           idioma,
           genero,
           licenca_numero:    licencaNumero.trim()    || null,
@@ -501,72 +380,83 @@ export default function MeusDadosScreen({ navigation }) {
         </Field>
 
         <Field label="Telefone">
+          <View style={styles.phoneRow}>
+            <View style={[styles.phonePrefix, !editing && styles.phonePrefixReadonly]}>
+              <Text style={styles.phonePrefixText}>+1</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.inputText, styles.phoneInput, !editing && styles.inputReadonly]}
+              placeholder="(305) 555-0100"
+              placeholderTextColor={colors.gray}
+              value={telefone}
+              onChangeText={raw => setTelefone(formatPhone(raw))}
+              editable={editing}
+              keyboardType="phone-pad"
+              returnKeyType="next"
+            />
+          </View>
+        </Field>
+
+        {/* ── Endereço comercial ── */}
+        <Field label="Street Address">
           <TextInput
             style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
-            placeholder="+1 (305) 555-0100"
+            placeholder="Ex: 123 Collins Ave"
             placeholderTextColor={colors.gray}
-            value={telefone}
-            onChangeText={setTelefone}
+            value={endComercial.street}
+            onChangeText={t => setEndComercial(a => ({ ...a, street: t }))}
             editable={editing}
-            keyboardType="phone-pad"
+            autoCapitalize="words"
             returnKeyType="next"
           />
         </Field>
 
-        <Field label="Estado">
+        <Field label="Apt / Suite / Unit">
+          <TextInput
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
+            placeholder="Opcional"
+            placeholderTextColor={colors.gray}
+            value={endComercial.apt}
+            onChangeText={t => setEndComercial(a => ({ ...a, apt: t }))}
+            editable={editing}
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+        </Field>
+
+        <Field label="City">
+          <TextInput
+            style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
+            placeholder="Ex: Miami"
+            placeholderTextColor={colors.gray}
+            value={endComercial.city}
+            onChangeText={t => setEndComercial(a => ({ ...a, city: t }))}
+            editable={editing}
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+        </Field>
+
+        <Field label="State">
           <TouchableOpacity
             style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
-            onPress={() => editing && setEstadoModalVisible(true)}
+            onPress={() => editing && setEndStateModalVisible(true)}
             activeOpacity={editing ? 0.8 : 1}
           >
-            <Text style={estado ? styles.inputText : styles.inputPlaceholder}>
-              {stateLabel(estado) || 'Selecione o estado'}
+            <Text style={endComercial.state ? styles.inputText : styles.inputPlaceholder}>
+              {stateLabel(endComercial.state) || 'Selecione o estado'}
             </Text>
             {editing && <Text style={styles.dropdownArrow}>▼</Text>}
           </TouchableOpacity>
         </Field>
 
-        <Field label="Cidade">
-          {editing && cidadeIsCustom ? (
-            <View>
-              <TextInput
-                style={[styles.input, styles.inputText]}
-                placeholder="Digite a cidade"
-                placeholderTextColor={colors.gray}
-                value={cidade}
-                onChangeText={setCidade}
-                autoCapitalize="words"
-                returnKeyType="next"
-                autoFocus
-              />
-              <TouchableOpacity
-                style={styles.voltarListaBtn}
-                onPress={() => { setCidade(''); setCidadeIsCustom(false); setCidadeModalVisible(true); }}
-              >
-                <Text style={styles.voltarListaText}>← Escolher da lista</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.input, styles.dropdownTrigger, !editing && styles.inputReadonly]}
-              onPress={() => editing && setCidadeModalVisible(true)}
-              activeOpacity={editing ? 0.8 : 1}
-            >
-              <Text style={cidade ? styles.inputText : styles.inputPlaceholder}>
-                {cidade || 'Selecione a cidade'}
-              </Text>
-              {editing && <Text style={styles.dropdownArrow}>▼</Text>}
-            </TouchableOpacity>
-          )}
-        </Field>
-
-        <Field label="Zip Code">
+        <Field label="ZIP Code">
           <TextInput
             style={[styles.input, styles.inputText, !editing && styles.inputReadonly]}
             placeholder="33101"
             placeholderTextColor={colors.gray}
-            value={zipCode}
-            onChangeText={t => setZipCode(t.replace(/\D/g, '').slice(0, 5))}
+            value={endComercial.zip}
+            onChangeText={t => setEndComercial(a => ({ ...a, zip: t.replace(/\D/g, '').slice(0, 5) }))}
             editable={editing}
             keyboardType="numeric"
             maxLength={5}
@@ -665,21 +555,12 @@ export default function MeusDadosScreen({ navigation }) {
         <View style={{ height: 16 }} />
       </ScrollView>
 
-      <CidadePickerModal
-        visible={cidadeModalVisible}
-        value={cidade}
-        cidades={cidadesFiltradas}
-        onSelect={c => { setCidade(c); setCidadeIsCustom(false); }}
-        onOutra={() => { setCidade(''); setCidadeIsCustom(true); }}
-        onClose={() => setCidadeModalVisible(false)}
-      />
-
       <StatePickerModal
-        visible={estadoModalVisible}
-        title="Estado"
-        value={estado}
-        onSelect={setEstado}
-        onClose={() => setEstadoModalVisible(false)}
+        visible={endStateModalVisible}
+        title="Estado (Endereço)"
+        value={endComercial.state}
+        onSelect={s => setEndComercial(a => ({ ...a, state: s }))}
+        onClose={() => setEndStateModalVisible(false)}
       />
 
       <StatePickerModal
@@ -708,10 +589,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 20, marginBottom: 24,
   },
-  backBtn:    { width: 48, alignItems: 'flex-start' },
-  backArrow:  { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
+  backBtn:     { width: 48, alignItems: 'flex-start' },
+  backArrow:   { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
   headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
-  editBtn:    { width: 64, alignItems: 'flex-end' },
+  editBtn:     { width: 64, alignItems: 'flex-end' },
   editBtnText: { fontSize: 15, fontWeight: '700', color: colors.primary },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
@@ -739,6 +620,18 @@ const styles = StyleSheet.create({
   inputPlaceholder: { color: colors.gray,  fontWeight: '400' },
   inputReadonly:    { backgroundColor: '#1A1A1A' },
 
+  phoneRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  phonePrefix: {
+    backgroundColor: INPUT_BG, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 14,
+    flexShrink: 0,
+  },
+  phonePrefixReadonly: { backgroundColor: '#1A1A1A' },
+  phonePrefixText:     { fontSize: 15, fontWeight: '600', color: colors.gray },
+  phoneInput:          { flex: 1 },
+
   dropdownTrigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
@@ -757,10 +650,10 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: 13, borderRadius: 12,
     alignItems: 'center', backgroundColor: INPUT_BG,
   },
-  toggleBtnActive:  { backgroundColor: colors.primary },
+  toggleBtnActive:   { backgroundColor: colors.primary },
   toggleBtnReadonly: { backgroundColor: '#1A1A1A' },
-  toggleText:       { fontSize: 14, fontWeight: '600', color: colors.gray },
-  toggleTextActive: { color: colors.white },
+  toggleText:        { fontSize: 14, fontWeight: '600', color: colors.gray },
+  toggleTextActive:  { color: colors.white },
 
   inputError: { borderWidth: 1.5, borderColor: '#EF4444' },
 
@@ -772,24 +665,6 @@ const styles = StyleSheet.create({
   licencaStatusLink:     { paddingVertical: 12, alignItems: 'flex-end' },
   licencaStatusLinkText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 
-  voltarListaBtn: { paddingTop: 6, paddingBottom: 2 },
-  voltarListaText: { fontSize: 12, fontWeight: '600', color: colors.primary },
-
-  // City picker modal (taller than state picker — needs search bar)
-  cidadeModalSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 24, paddingTop: 12,
-    maxHeight: '85%',
-  },
-  cidadeSearch: {
-    backgroundColor: '#1A1B1E', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, color: colors.white,
-    marginBottom: 14,
-  },
-
-  // State picker modal
   modalBackdrop: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
   },

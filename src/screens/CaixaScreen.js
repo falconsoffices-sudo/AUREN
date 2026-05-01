@@ -6,6 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -63,6 +68,25 @@ function getDateRanges() {
   return { hoje, semanaInicio, semanaFim, mesInicio, mesFim };
 }
 
+function todayMMDDYYYY() {
+  const n = new Date();
+  return `${String(n.getMonth() + 1).padStart(2,'0')}/${String(n.getDate()).padStart(2,'0')}/${n.getFullYear()}`;
+}
+
+function formatDateInput(text) {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function mmddyyyyToISO(str) {
+  const parts = str.split('/');
+  const mm = parts[0], dd = parts[1], yyyy = parts[2];
+  if (!mm || !dd || !yyyy || yyyy.length < 4) return new Date().toISOString();
+  return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}T12:00:00`;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }) {
@@ -107,19 +131,152 @@ function MetaBar({ label, current, total }) {
   );
 }
 
+// ─── EntradaManualModal ───────────────────────────────────────────────────────
+
+function EntradaManualModal({ visible, onClose, onSaved }) {
+  const [descricao, setDescricao] = useState('');
+  const [valor,     setValor]     = useState('');
+  const [metodo,    setMetodo]    = useState('zelle');
+  const [data,      setData]      = useState(todayMMDDYYYY());
+  const [saving,    setSaving]    = useState(false);
+
+  function reset() {
+    setDescricao(''); setValor(''); setMetodo('zelle'); setData(todayMMDDYYYY());
+  }
+
+  function handleClose() { reset(); onClose(); }
+
+  async function handleSalvar() {
+    const valorNum = parseFloat(valor.replace(',', '.'));
+    if (!valorNum || valorNum <= 0) {
+      Alert.alert('Campo obrigatório', 'Informe um valor válido.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+      if (!uid) return;
+
+      const { error } = await supabase.from('financeiro').insert({
+        profissional_id:  uid,
+        valor:            valorNum,
+        metodo_pagamento: metodo,
+        tipo:             'receita',
+        categoria:        descricao.trim() || 'entrada_manual',
+        created_at:       mmddyyyyToISO(data),
+      });
+      if (error) throw error;
+
+      reset();
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <View style={mstyles.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={handleClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={mstyles.sheet}>
+            <View style={mstyles.handle} />
+            <Text style={mstyles.title}>Registrar Entrada</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+              <Text style={mstyles.label}>DESCRIÇÃO</Text>
+              <TextInput
+                style={mstyles.input}
+                placeholder="Ex: Gorjeta, adiantamento..."
+                placeholderTextColor="#C9A8B6"
+                value={descricao}
+                onChangeText={setDescricao}
+                autoCapitalize="sentences"
+                returnKeyType="next"
+              />
+
+              <Text style={mstyles.label}>VALOR (USD)</Text>
+              <View style={mstyles.prefixRow}>
+                <View style={mstyles.prefix}><Text style={mstyles.prefixText}>$</Text></View>
+                <TextInput
+                  style={[mstyles.input, mstyles.prefixInput]}
+                  placeholder="0.00"
+                  placeholderTextColor="#C9A8B6"
+                  value={valor}
+                  onChangeText={setValor}
+                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <Text style={mstyles.label}>MÉTODO DE PAGAMENTO</Text>
+              <View style={mstyles.metodoGrid}>
+                {PAYMENT_META.map(p => {
+                  const active = metodo === p.key;
+                  return (
+                    <TouchableOpacity
+                      key={p.key}
+                      style={[mstyles.metodoBtn, active && mstyles.metodoBtnActive]}
+                      onPress={() => setMetodo(p.key)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[mstyles.metodoBtnText, active && mstyles.metodoBtnTextActive]}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={mstyles.label}>DATA</Text>
+              <TextInput
+                style={mstyles.input}
+                placeholder="MM/DD/YYYY"
+                placeholderTextColor="#C9A8B6"
+                value={data}
+                onChangeText={t => setData(formatDateInput(t))}
+                keyboardType="numeric"
+                maxLength={10}
+                returnKeyType="done"
+              />
+
+              <TouchableOpacity
+                style={[mstyles.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleSalvar}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={mstyles.saveBtnText}>Registrar</Text>}
+              </TouchableOpacity>
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CaixaScreen() {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
-  const [loading,         setLoading]         = useState(true);
-  const [ganhosMes,       setGanhosMes]       = useState(0);
-  const [ganhosHoje,      setGanhosHoje]      = useState(0);
-  const [ganhosHojeCount, setGanhosHojeCount] = useState(0);
-  const [ganhosSemana,    setGanhosSemana]    = useState(0);
-  const [metaMensal,      setMetaMensal]      = useState(0);
-  const [despesasMes,     setDespesasMes]     = useState(0);
-  const [pagamentos,      setPagamentos]      = useState({});
+  const [loading,           setLoading]           = useState(true);
+  const [ganhosMes,         setGanhosMes]         = useState(0);
+  const [ganhosHoje,        setGanhosHoje]        = useState(0);
+  const [ganhosHojeCount,   setGanhosHojeCount]   = useState(0);
+  const [ganhosSemana,      setGanhosSemana]      = useState(0);
+  const [metaMensal,        setMetaMensal]        = useState(0);
+  const [despesasMes,       setDespesasMes]       = useState(0);
+  const [pagamentos,        setPagamentos]        = useState({});
+  const [entradaModalVisible, setEntradaModalVisible] = useState(false);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -298,9 +455,22 @@ export default function CaixaScreen() {
 
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => setEntradaModalVisible(true)}
+      >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      <EntradaManualModal
+        visible={entradaModalVisible}
+        onClose={() => setEntradaModalVisible(false)}
+        onSaved={() => {
+          setEntradaModalVisible(false);
+          carregarDados();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -369,3 +539,31 @@ function makeStyles(isDark) {
     fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
   });
 }
+
+// ─── Modal styles (static dark) ───────────────────────────────────────────────
+
+const MINPUT_BG = '#1A1B1E';
+const MSUBTLE   = '#2A2A2A';
+
+const mstyles = StyleSheet.create({
+  backdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet:     { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, maxHeight: '88%' },
+  handle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: MSUBTLE, alignSelf: 'center', marginBottom: 20 },
+  title:     { fontSize: 20, fontWeight: '700', color: '#F5EDE8', marginBottom: 20 },
+  label:     { fontSize: 10, fontWeight: '700', color: '#C9A8B6', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+  input:     { backgroundColor: MINPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#F5EDE8', marginBottom: 14 },
+
+  prefixRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  prefix:      { backgroundColor: MINPUT_BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, marginRight: 8 },
+  prefixText:  { fontSize: 15, fontWeight: '600', color: '#C9A8B6' },
+  prefixInput: { flex: 1, marginBottom: 0 },
+
+  metodoGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  metodoBtn:          { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: MINPUT_BG },
+  metodoBtnActive:    { backgroundColor: '#A8235A' },
+  metodoBtnText:      { fontSize: 13, fontWeight: '600', color: '#C9A8B6' },
+  metodoBtnTextActive:{ color: '#FFFFFF' },
+
+  saveBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+});

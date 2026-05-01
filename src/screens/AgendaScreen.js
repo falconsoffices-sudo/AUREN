@@ -54,6 +54,8 @@ const TIPO_OPTIONS = [
   { label: 'A domicílio', value: 'domicilio'   },
 ];
 
+const TIPO_LABELS = { comercial: 'Comercial', residencial: 'Residencial', domicilio: 'A domicílio' };
+
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
 
@@ -700,7 +702,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
 
 // ─── Appointment Card ─────────────────────────────────────────────────────────
 
-function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, onPress }) {
+function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress }) {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const SD     = isDark ? STATUS_DISPLAY_DARK : STATUS_DISPLAY_LIGHT;
@@ -735,6 +737,9 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
             {servico?.nome ?? '—'}
             {servico?.duracao_minutos ? ` · ${formatDuration(servico.duracao_minutos)}` : ''}
           </Text>
+          {tipo_endereco && (
+            <Text style={styles.locationTag}>📍 {TIPO_LABELS[tipo_endereco] ?? tipo_endereco}</Text>
+          )}
         </View>
         {valor != null && (
           <Text style={[styles.apptValue, isNext && { color: '#A8235A' }]}>
@@ -945,6 +950,7 @@ function makeStyles(isDark) {
     vipBadge:           { backgroundColor: 'rgba(168,35,90,0.08)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(168,35,90,0.25)' },
     vipText:            { fontSize: 9, fontWeight: '800', color: '#A8235A', letterSpacing: 0.8 },
     serviceText:        { fontSize: 12, fontWeight: '400', color: sub },
+    locationTag:        { fontSize: 11, fontWeight: '400', color: '#8A8A8E', marginTop: 3 },
     apptValue:          { fontSize: 16, fontWeight: '700', color: text, marginLeft: 8 },
     emptyState:         { alignItems: 'center', paddingTop: 60 },
     emptyText:          { fontSize: 14, fontWeight: '400', color: sub },
