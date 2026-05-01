@@ -44,7 +44,6 @@ interface ReportData {
   topClientes: Array<{ nome: string; count: number; valor: number }>
   mensagem: string
   nivelNome: string
-  nivelEmoji: string
   nivelNum: number
 }
 
@@ -141,7 +140,7 @@ function buildHTML(d: ReportData): string {
         <tr>
           <td style="padding:28px 32px 16px;">
             <p style="margin:0 0 8px;font-size:20px;font-weight:800;color:#1A0A14;">
-              Olá, ${d.primeiroNome}! 👋
+              Olá, ${d.primeiroNome}!
             </p>
             <p style="margin:0;font-size:14px;color:#6B4A58;line-height:1.6;">
               Aqui está um resumo completo do seu mês. Cada número representa dedicação, talento e muito trabalho.
@@ -210,7 +209,6 @@ function buildHTML(d: ReportData): string {
           <td style="padding:0 32px 28px;">
             <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#1A0A14" style="border-radius:14px;">
               <tr><td style="padding:24px 24px;">
-                <p style="margin:0 0 4px;font-size:26px;">${d.nivelEmoji}</p>
                 <p style="margin:0 0 8px;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#A8235A;">
                   Nível ${d.nivelNum} — ${d.nivelNome}
                 </p>
@@ -316,9 +314,8 @@ serve(async (req) => {
 
     // ── Metadados de nível ────────────────────────────────────────────────────
     const nivel = profileRes.data?.nivel_gamificacao ?? 1
-    const NIVEL_NOMES   = ['Começando', 'Em Ritmo', 'Agenda Cheia', 'Profissional', 'Elite AUREN']
-    const NIVEL_EMOJIS  = ['🌱', '⚡', '📅', '💎', '👑']
-    const MENSAGENS     = [
+    const NIVEL_NOMES = ['Começando', 'Em Ritmo', 'Agenda Cheia', 'Profissional', 'Elite AUREN']
+    const MENSAGENS   = [
       'Cada atendimento é um passo em direção ao seu sonho. Continue crescendo!',
       'Você está no ritmo certo. Esse mês mostrou sua dedicação!',
       'Agenda cheia, futuro brilhante. Você está arrasando!',
@@ -336,10 +333,9 @@ serve(async (req) => {
       primeiroNome, nomeMes, ano,
       totalAtendimentos, faturamentoBruto, totalDespesas, lucroReal,
       topServicos, topClientes,
-      mensagem:   MENSAGENS[idx],
-      nivelNome:  NIVEL_NOMES[idx],
-      nivelEmoji: NIVEL_EMOJIS[idx],
-      nivelNum:   nivel,
+      mensagem:  MENSAGENS[idx],
+      nivelNome: NIVEL_NOMES[idx],
+      nivelNum:  nivel,
     })
 
     const resendRes = await fetch('https://api.resend.com/emails', {

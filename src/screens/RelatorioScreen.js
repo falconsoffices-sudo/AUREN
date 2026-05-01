@@ -7,10 +7,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Share,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { gerarRelatorioMensal } from '../lib/relatorio';
+import { dispararRelatorio } from '../lib/emailRelatorio';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -58,9 +60,10 @@ export default function RelatorioScreen({ navigation }) {
   const agora = new Date();
   const [mes,     setMes]     = useState(agora.getMonth() + 1); // 1–12
   const [ano,     setAno]     = useState(agora.getFullYear());
-  const [loading, setLoading] = useState(false);
-  const [dados,   setDados]   = useState(null);
-  const [userId,  setUserId]  = useState(null);
+  const [loading,        setLoading]        = useState(false);
+  const [dados,          setDados]          = useState(null);
+  const [userId,         setUserId]         = useState(null);
+  const [enviandoEmail,  setEnviandoEmail]  = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -219,6 +222,28 @@ export default function RelatorioScreen({ navigation }) {
               <Text style={styles.shareBtnText}>Compartilhar relatório</Text>
             </TouchableOpacity>
 
+            {/* ── TEST: enviar por email ── */}
+            <TouchableOpacity
+              style={[styles.shareBtn, styles.emailTestBtn, enviandoEmail && { opacity: 0.6 }]}
+              onPress={async () => {
+                if (!userId) return;
+                setEnviandoEmail(true);
+                const result = await dispararRelatorio(userId, mes, ano);
+                setEnviandoEmail(false);
+                if (result.ok) {
+                  Alert.alert('Sucesso', `Relatório de ${MESES[mes - 1]} ${ano} enviado por e-mail.`);
+                } else {
+                  Alert.alert('Erro', result.error?.message ?? String(result.error ?? 'Erro desconhecido'));
+                }
+              }}
+              disabled={enviandoEmail}
+              activeOpacity={0.8}
+            >
+              {enviandoEmail
+                ? <ActivityIndicator color="#A8235A" />
+                : <Text style={[styles.shareBtnText, { color: '#A8235A' }]}>Enviar relatório por email (teste)</Text>}
+            </TouchableOpacity>
+
             <View style={{ height: 48 }} />
           </>
         )}
@@ -295,5 +320,6 @@ const styles = StyleSheet.create({
     height: 50, alignItems: 'center', justifyContent: 'center',
     marginTop: 20,
   },
-  shareBtnText: { fontSize: 14, fontWeight: '700', color: '#A8235A' },
+  shareBtnText:  { fontSize: 14, fontWeight: '700', color: '#A8235A' },
+  emailTestBtn:  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#A8235A', borderStyle: 'dashed', marginTop: 10 },
 });

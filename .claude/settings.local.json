@@ -18,7 +18,8 @@
       "Bash(sed -n '2,15p' src/screens/OnboardingScreen.js)",
       "Bash(sed -n '2,15p' src/screens/PresentearScreen.js)",
       "Bash(sed -n '2,12p' src/screens/SaibaMaisScreen.js)",
-      "Bash(sed -n '2,13p' src/screens/AjudaScreen.js)"
+      "Bash(sed -n '2,13p' src/screens/AjudaScreen.js)",
+      "Bash(npx supabase *)"
     ]
   }
 }
