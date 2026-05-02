@@ -405,8 +405,16 @@ export default function HomeScreen({ navigation }) {
             style={styles.logoImage}
           />
         </View>
-        <Text style={styles.greeting}>Olá, {primeiroNome || '—'}</Text>
-        <Text style={styles.date}>{today}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={styles.greeting}>Olá, {primeiroNome || '—'}</Text>
+            <Text style={styles.date}>{today}</Text>
+          </View>
+          <Image
+            source={require('../../assets/images/emblema.png')}
+            style={{ width: 45, height: 45, resizeMode: 'contain' }}
+          />
+        </View>
       </View>
 
       {/* ── Cream content shell ── */}
