@@ -242,10 +242,10 @@ export default function OnboardingScreen({ navigation }) {
           }))
         );
         if (usouImportacao) {
-          await supabase.from('profiles')
+          const { error: agendaError } = await supabase
+            .from('profiles')
             .update({ agenda_conectada: true })
-            .eq('id', uid)
-            .catch(() => {});
+            .eq('id', uid);
         }
         await finalizarOnboarding(uid);
       } else {
