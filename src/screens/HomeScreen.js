@@ -707,7 +707,7 @@ export default function HomeScreen({ navigation }) {
                 >
                   <View style={styles.insightDot} />
                   <View style={styles.insightBody}>
-                    <Text style={styles.insightTitle}>Seu dia de cuidado</Text>
+                    <Text style={styles.insightTitle}>Seu dia de cuidado ✨</Text>
                     <Text style={styles.insightText}>
                       Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.
                     </Text>
@@ -789,7 +789,7 @@ export default function HomeScreen({ navigation }) {
           style={styles.modalOverlay}
         >
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Seu dia de cuidado</Text>
+            <Text style={styles.modalTitle}>Seu dia de cuidado ✨</Text>
 
             {diaCuidadoStep === 'main' && (
               <>
