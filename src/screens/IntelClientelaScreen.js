@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { BarChart } from 'react-native-chart-kit';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,6 +90,56 @@ function Bar({ pct, height = 6 }) {
   );
 }
 
+function GraficoServicos({ topSvcCount }) {
+  const labels = topSvcCount.map(s =>
+    s.nome.length > 10 ? s.nome.slice(0, 10) + '...' : s.nome
+  );
+  const values = topSvcCount.map(s => s.count);
+  return (
+    <View style={styles.graficoCard}>
+      <Text style={styles.graficoTitle}>Serviços mais realizados</Text>
+      <BarChart
+        data={{
+          labels,
+          datasets: [{
+            data: values,
+            colors: values.map((_, i) =>
+              i === 0
+                ? (opacity) => `rgba(168,35,90,${opacity})`
+                : (opacity) => `rgba(58,42,46,${opacity})`
+            ),
+          }],
+        }}
+        width={Dimensions.get('window').width - 40}
+        height={200}
+        fromZero
+        withInnerLines={false}
+        withCustomBarColorFromData
+        flatColor
+        chartConfig={{
+          backgroundColor: 'transparent',
+          backgroundGradientFrom: '#1A1B1E',
+          backgroundGradientTo: '#1A1B1E',
+          decimalPlaces: 0,
+          color: () => '#C8C8CE',
+          labelColor: () => '#8A8A8E',
+          propsForLabels: { fontSize: 10 },
+          paddingRight: 40,
+        }}
+        style={{ borderRadius: 12 }}
+      />
+      <View style={styles.graficoList}>
+        {topSvcCount.map((s, i) => (
+          <View key={i} style={styles.graficoListRow}>
+            <Text style={styles.graficoListNome}>{s.nome}</Text>
+            <Text style={styles.graficoListValor}>{formatMoeda(s.valor)}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function RankRow({ rank, title, sub, right, pct, isLast }) {
   return (
     <>
@@ -156,6 +208,10 @@ export default function IntelClientelaScreen({ navigation }) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+          {dados.topSvcCount.length > 0 && (
+            <GraficoServicos topSvcCount={dados.topSvcCount} />
+          )}
 
           {/* ── Serviços mais realizados ── */}
           <SectionLabel text="SEUS SERVIÇOS MAIS REALIZADOS" />
@@ -281,6 +337,13 @@ const styles = StyleSheet.create({
   headerRight:  { width: 32 },
 
   scroll: { paddingHorizontal: 18, paddingTop: 4 },
+
+  graficoCard:     { marginBottom: 18 },
+  graficoTitle:    { fontSize: 11, fontWeight: '700', color: '#8A8A8E', letterSpacing: 1.2, marginBottom: 8 },
+  graficoList:     { paddingHorizontal: 4, marginTop: 4 },
+  graficoListRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#2A2A2A' },
+  graficoListNome: { fontSize: 13, fontWeight: '500', color: '#FFFFFF' },
+  graficoListValor:{ fontSize: 13, fontWeight: '700', color: '#C8C8CE' },
 
   sectionLabel: {
     fontSize: 11, fontWeight: '700', color: '#8A8A8E',
