@@ -314,6 +314,7 @@ export default function CaixaScreen() {
   const [chartMonths, setChartMonths] = useState(() => groupByMonth([]));
   const [roiModal,    setRoiModal]    = useState(false);
   const [roiSubtitle, setRoiSubtitle] = useState('');
+  const [roiMarco,    setRoiMarco]    = useState(null);
   const roiShownRef = useRef(false);
 
   const carregarDados = useCallback(async () => {
@@ -405,10 +406,7 @@ export default function CaixaScreen() {
     const lucroCheck = soma(mesRes.data) - soma(despesasDoMes);
     const mesKey = `${mesAtual.getFullYear()}-${String(mesAtualNum + 1).padStart(2, '0')}`;
 
-    const [storedMeta, storedRoi] = await Promise.all([
-      AsyncStorage.getItem('auren:metas').catch(() => null),
-      AsyncStorage.getItem(`auren:roi_indicacao_${mesKey}`).catch(() => null),
-    ]);
+    const storedMeta = await AsyncStorage.getItem('auren:metas').catch(() => null);
 
     let metaMensalLocal = 0;
     try {
@@ -416,21 +414,36 @@ export default function CaixaScreen() {
     } catch {}
     setMetaMensal(metaMensalLocal);
 
-    if (lucroCheck > 0 && !storedRoi && !roiShownRef.current) {
-      roiShownRef.current = true;
-      let subtitle = '';
+    if (!roiShownRef.current && lucroCheck > 0) {
+      let marcoAtingido = null;
       if (metaMensalLocal > 0) {
-        const roiPct = Math.round((lucroCheck / metaMensalLocal) * 100);
-        if (lucroCheck >= metaMensalLocal) {
-          subtitle = 'Você superou a meta este mês. Que tal ajudar outras profissionais a chegarem onde você chegou?';
-        } else {
-          subtitle = `${roiPct}% da sua meta mensal já está garantida. Conhece alguém que merece o mesmo resultado?`;
+        const roiPct = (lucroCheck / metaMensalLocal) * 100;
+        for (const marco of [100, 75, 50, 25]) {
+          if (roiPct >= marco) {
+            const stored = await AsyncStorage.getItem(`auren:roi_indicacao_${mesKey}-${marco}`).catch(() => null);
+            if (!stored) marcoAtingido = marco;
+            break;
+          }
         }
       } else {
-        subtitle = 'Você fechou o mês no lucro. Conhece alguma profissional que merece o mesmo resultado?';
+        const stored = await AsyncStorage.getItem(`auren:roi_indicacao_${mesKey}`).catch(() => null);
+        if (!stored) marcoAtingido = 0;
       }
-      setRoiSubtitle(subtitle);
-      setRoiModal(true);
+
+      if (marcoAtingido !== null) {
+        roiShownRef.current = true;
+        let subtitle = '';
+        if (marcoAtingido === 100) {
+          subtitle = 'Você atingiu 100% da meta este mês. Que tal ajudar outras profissionais a chegarem onde você chegou?';
+        } else if (marcoAtingido > 0) {
+          subtitle = `Você atingiu ${marcoAtingido}% da sua meta mensal. Conhece alguém que merece o mesmo resultado?`;
+        } else {
+          subtitle = 'Você fechou o mês no lucro. Conhece alguma profissional que merece o mesmo resultado?';
+        }
+        setRoiMarco(marcoAtingido);
+        setRoiSubtitle(subtitle);
+        setRoiModal(true);
+      }
     }
 
     const byMethod = {};
@@ -613,12 +626,17 @@ export default function CaixaScreen() {
         momento="roi"
         title="Você está no lucro!"
         subtitle={roiSubtitle}
+        showImport
         onClose={async (enviou) => {
           setRoiModal(false);
           if (enviou) {
             const now = new Date();
             const mk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            await AsyncStorage.setItem(`auren:roi_indicacao_${mk}`, '1');
+            if (roiMarco > 0) {
+              await AsyncStorage.setItem(`auren:roi_indicacao_${mk}-${roiMarco}`, '1');
+            } else {
+              await AsyncStorage.setItem(`auren:roi_indicacao_${mk}`, '1');
+            }
           }
         }}
       />
