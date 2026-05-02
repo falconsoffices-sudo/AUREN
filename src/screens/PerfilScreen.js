@@ -20,24 +20,18 @@ import colors from '../constants/colors';
 
 const PLANS = [
   {
-    id: 1,
-    name: 'Básico',
-    price: '$59',
+    id: 'pro',
+    name: 'AUREN PRO',
+    price: '$29',
     popular: false,
-    items: ['Agenda ilimitada', 'Até 50 clientes', 'SMS manual'],
+    items: ['Agenda ilimitada', 'SMS automático', 'Relatório mensal', 'Inteligência de clientela', 'Conexões', 'Gamificação'],
   },
   {
-    id: 2,
-    name: 'Pro',
-    price: '$89',
+    id: 'business',
+    name: 'AUREN BUSINESS',
+    price: '$79',
     popular: true,
-    items: [
-      'Tudo do Básico',
-      'Clientes ilimitadas',
-      'SMS automático + recuperação',
-      'Insights inteligentes',
-      'Relatórios de ganhos',
-    ],
+    items: ['Tudo do PRO', 'Equipe de até 10 profissionais', 'Dashboard consolidado', 'Faturamento unificado', 'Suporte prioritário'],
   },
 ];
 
@@ -86,6 +80,7 @@ const MENU_SECTIONS = [
   {
     title: 'Conta',
     items: [
+      { label: 'Ver Planos' },
       { label: 'Configurações' },
       { label: 'Sair', danger: true },
     ],
@@ -160,6 +155,8 @@ export default function PerfilScreen({ navigation }) {
   const [nome,            setNome]            = useState('');
   const [fotoUrl,         setFotoUrl]         = useState(null);
   const [uploadingPhoto,  setUploadingPhoto]  = useState(false);
+  const [plano,           setPlano]           = useState(null);
+  const [diasConta,       setDiasConta]       = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -169,12 +166,17 @@ export default function PerfilScreen({ navigation }) {
       setUserId(uid);
       const { data } = await supabase
         .from('profiles')
-        .select('nome, foto_url')
+        .select('nome, foto_url, plano, created_at')
         .eq('id', uid)
         .single();
       if (data) {
         setNome(data.nome ?? '');
         setFotoUrl(data.foto_url ?? null);
+        setPlano(data.plano ?? 'trial');
+        if (data.created_at) {
+          const dias = Math.floor((Date.now() - new Date(data.created_at).getTime()) / 86400000);
+          setDiasConta(dias);
+        }
       }
     })();
   }, []);
@@ -278,6 +280,7 @@ export default function PerfilScreen({ navigation }) {
       case 'Presentear com AUREN':     return () => navigation.navigate('Presentear');
       case 'Licença Profissional':     return () => navigation.navigate('Licenca');
       case 'EIN':                      return () => navigation.navigate('MeusDados');
+      case 'Ver Planos':               return () => navigation.navigate('Plans');
       case 'Sair': return () => Alert.alert(
         'Sair',
         'Tem certeza que deseja sair?',
@@ -356,17 +359,21 @@ export default function PerfilScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ── Plans ── */}
-        <Text style={[styles.sectionTitle, { color: isDark ? '#C9A8B6' : '#6B4A58' }]}>SEU PLANO</Text>
-        <View style={styles.plansRow}>
-          {PLANS.map(p => (
-            <PlanCard
-              key={p.id}
-              {...p}
-              onEscolher={() => setPlanModal(p)}
-            />
-          ))}
-        </View>
+        {/* ── Plans — só no trial com menos de 30 dias ── */}
+        {plano === 'trial' && diasConta !== null && diasConta < 30 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#C9A8B6' : '#6B4A58' }]}>SEU PLANO</Text>
+            <View style={styles.plansRow}>
+              {PLANS.map(p => (
+                <PlanCard
+                  key={p.id}
+                  {...p}
+                  onEscolher={() => setPlanModal(p)}
+                />
+              ))}
+            </View>
+          </>
+        )}
 
         {/* ── Menu sections ── */}
         {MENU_SECTIONS.map((section, si) => {

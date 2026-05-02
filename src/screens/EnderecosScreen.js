@@ -83,12 +83,12 @@ function Field({ label, children }) {
   );
 }
 
-function AddressFields({ value, onChange }) {
+function AddressFields({ value, onChange, disabled = false }) {
   const [pickerVisible, setPickerVisible] = useState(false);
-  const set = (key) => (text) => onChange({ ...value, [key]: text });
+  const set = (key) => (text) => { if (!disabled) onChange({ ...value, [key]: text }); };
 
   return (
-    <>
+    <View style={disabled && styles.disabledBlock}>
       <TextInput
         style={styles.input}
         placeholder="Street Address *"
@@ -97,6 +97,7 @@ function AddressFields({ value, onChange }) {
         onChangeText={set('street')}
         autoCapitalize="words"
         returnKeyType="next"
+        editable={!disabled}
       />
       <TextInput
         style={styles.input}
@@ -106,6 +107,7 @@ function AddressFields({ value, onChange }) {
         onChangeText={set('apt')}
         autoCapitalize="words"
         returnKeyType="next"
+        editable={!disabled}
       />
       <TextInput
         style={styles.input}
@@ -115,26 +117,28 @@ function AddressFields({ value, onChange }) {
         onChangeText={set('city')}
         autoCapitalize="words"
         returnKeyType="next"
+        editable={!disabled}
       />
       <TouchableOpacity
         style={[styles.input, styles.stateField]}
-        onPress={() => setPickerVisible(true)}
-        activeOpacity={0.8}
+        onPress={() => !disabled && setPickerVisible(true)}
+        activeOpacity={disabled ? 1 : 0.8}
       >
         <Text style={value.state ? styles.inputText : styles.inputPlaceholder}>
           {value.state || 'State'}
         </Text>
-        <Text style={styles.stateArrow}>▼</Text>
+        {!disabled && <Text style={styles.stateArrow}>▼</Text>}
       </TouchableOpacity>
       <TextInput
         style={styles.input}
         placeholder="ZIP Code *"
         placeholderTextColor={colors.gray}
         value={value.zip}
-        onChangeText={t => onChange({ ...value, zip: t.replace(/\D/g, '').slice(0, 5) })}
+        onChangeText={t => { if (!disabled) onChange({ ...value, zip: t.replace(/\D/g, '').slice(0, 5) }); }}
         keyboardType="numeric"
         maxLength={5}
         returnKeyType="done"
+        editable={!disabled}
       />
 
       <Modal
@@ -170,7 +174,7 @@ function AddressFields({ value, onChange }) {
           </View>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
@@ -181,9 +185,10 @@ export default function EnderecosScreen({ navigation }) {
   const [saving,       setSaving]       = useState(false);
   const [userId,       setUserId]       = useState(null);
 
-  const [comercial,   setComercial]   = useState({ ...EMPTY_ADDRESS });
-  const [residencial, setResidencial] = useState({ ...EMPTY_ADDRESS });
-  const [taxa,        setTaxa]        = useState('');
+  const [comercial,     setComercial]     = useState({ ...EMPTY_ADDRESS });
+  const [residencial,   setResidencial]   = useState({ ...EMPTY_ADDRESS });
+  const [taxa,          setTaxa]          = useState('');
+  const [mesmoEndereco, setMesmoEndereco] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -260,8 +265,32 @@ export default function EnderecosScreen({ navigation }) {
           <AddressFields value={comercial} onChange={setComercial} />
         </SectionCard>
 
+        <TouchableOpacity
+          style={styles.checkboxRow}
+          onPress={() => {
+            if (!mesmoEndereco) {
+              setResidencial({ ...comercial });
+            } else {
+              setResidencial({ ...EMPTY_ADDRESS });
+            }
+            setMesmoEndereco(v => !v);
+          }}
+          activeOpacity={0.75}
+        >
+          <View style={[styles.checkbox, mesmoEndereco && styles.checkboxChecked]}>
+            {mesmoEndereco && <Text style={styles.checkboxMark}>✓</Text>}
+          </View>
+          <Text style={styles.checkboxLabel}>
+            Meu endereço residencial é o mesmo que o comercial
+          </Text>
+        </TouchableOpacity>
+
         <SectionCard title="Residencial" accent="#3B5BA5">
-          <AddressFields value={residencial} onChange={setResidencial} />
+          <AddressFields
+            value={residencial}
+            onChange={setResidencial}
+            disabled={mesmoEndereco}
+          />
         </SectionCard>
 
         <SectionCard title="A domicílio" accent="#2A7A4B">
@@ -369,6 +398,21 @@ const styles = StyleSheet.create({
   pickerItemActive:    { backgroundColor: 'rgba(168,35,90,0.08)' },
   pickerItemText:      { fontSize: 15, fontWeight: '400', color: colors.white },
   pickerItemTextActive:{ fontWeight: '700', color: colors.primary },
+
+  checkboxRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginBottom: 14, paddingHorizontal: 2,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+    borderColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  checkboxChecked: { backgroundColor: colors.primary },
+  checkboxMark:    { fontSize: 13, fontWeight: '800', color: colors.white, lineHeight: 15 },
+  checkboxLabel:   { fontSize: 13, fontWeight: '500', color: colors.white, flex: 1, lineHeight: 18 },
+
+  disabledBlock: { opacity: 0.45 },
 
   saveBtn: {
     height: 54, borderRadius: 14, backgroundColor: colors.primary,

@@ -44,11 +44,6 @@ const US_STATES = [
   { sigla: 'WI', nome: 'Wisconsin' },     { sigla: 'WY', nome: 'Wyoming' },
 ];
 
-const IDIOMAS = [
-  { label: 'PT-BR',    value: 'pt' },
-  { label: 'ES-LATAM', value: 'es' },
-];
-
 const GENEROS = [
   { label: 'Feminino',  value: 'feminino'  },
   { label: 'Masculino', value: 'masculino' },
@@ -232,7 +227,6 @@ export default function MeusDadosScreen({ navigation }) {
   const [nome,        setNome]        = useState('');
   const [telefone,    setTelefone]    = useState('');
   const [endComercial, setEndComercial] = useState({ ...EMPTY_ADDR });
-  const [idioma,      setIdioma]      = useState('pt');
   const [genero,      setGenero]      = useState('feminino');
 
   // Licença
@@ -271,7 +265,6 @@ export default function MeusDadosScreen({ navigation }) {
         const digits = rawPhone.replace(/\D/g, '').slice(-10);
         setTelefone(digits ? formatPhone(digits) : '');
         setEndComercial(parseAddress(data.endereco_comercial));
-        setIdioma(data.idioma   ?? 'pt');
         setGenero(data.genero   ?? 'feminino');
         setLicencaNumero(data.licenca_numero     ?? '');
         setLicencaTipo(data.licenca_tipo         ?? '');
@@ -313,7 +306,6 @@ export default function MeusDadosScreen({ navigation }) {
           nome:              nome.trim(),
           telefone:          telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
           endereco_comercial: JSON.stringify(endComercial),
-          idioma,
           genero,
           licenca_numero:    licencaNumero.trim()    || null,
           licenca_tipo:      licencaTipo             || null,
@@ -477,10 +469,6 @@ export default function MeusDadosScreen({ navigation }) {
             maxLength={5}
             returnKeyType="next"
           />
-        </Field>
-
-        <Field label="Idioma">
-          <Toggle options={IDIOMAS} value={idioma} onChange={setIdioma} editing={editing} />
         </Field>
 
         <Field label="Gênero">
