@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
+import VendaModal from '../components/VendaModal';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,8 @@ export default function PerfilScreen({ navigation }) {
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
 
   const [planModal,       setPlanModal]       = useState(null);
+  const [vendaModal,      setVendaModal]      = useState(false);
+  const [planVendido,     setPlanVendido]     = useState('');
   const [photoModal,      setPhotoModal]      = useState(false);
   const [expandedSection, setExpandedSection] = useState(null);
   const [selectedPlan,    setSelectedPlan]    = useState('business');
@@ -394,7 +397,14 @@ export default function PerfilScreen({ navigation }) {
                 <PlanCard
                   key={p.id}
                   {...p}
-                  onEscolher={() => setPlanModal(p)}
+                  onEscolher={() => Alert.alert(
+                    'Confirmar assinatura',
+                    `Deseja assinar o ${p.name} por ${p.price}/mês?`,
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      { text: 'Confirmar', onPress: () => { setPlanVendido(p.name); setVendaModal(true); } },
+                    ]
+                  )}
                   selectedPlan={selectedPlan}
                   onSelect={setSelectedPlan}
                 />
@@ -473,6 +483,15 @@ export default function PerfilScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <VendaModal
+        visible={vendaModal}
+        planName={planVendido}
+        onClose={enviou => {
+          setVendaModal(false);
+          if (enviou) Alert.alert('Obrigada!', 'Suas indicações foram enviadas. Você está ajudando o AUREN a crescer!');
+        }}
+      />
 
       {/* ── Plan confirmation modal ── */}
       <Modal
