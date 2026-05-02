@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { scheduleNotification } from '../lib/notifications';
 import colors from '../constants/colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -50,12 +51,10 @@ function formatDate(isoStr) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
-// Date object → "MM/DD/YYYY"
 function dateToMDY(d) {
   return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
-// Auto-format MM/DD/YYYY as digits are typed
 function formatDateInput(text) {
   const digits = text.replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 2) return digits;
@@ -63,11 +62,26 @@ function formatDateInput(text) {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
-// "MM/DD/YYYY" → "YYYY-MM-DD" for Postgres DATE column
 function mdyToISO(str) {
   const [mm, dd, yyyy] = str.split('/');
   if (!yyyy || yyyy.length < 4) return null;
   return `${yyyy}-${(mm||'01').padStart(2,'0')}-${(dd||'01').padStart(2,'0')}`;
+}
+
+// "YYYY-MM-DD" → same day next month
+function addOneMonth(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setMonth(d.getMonth() + 1);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Today as "YYYY-MM-DD"
+function todayISO() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function startOfMonth() {
@@ -141,6 +155,7 @@ function AddDespesaModal({ visible, onClose, onSaved, userId }) {
         descricao:        descricao.trim() || null,
         recorrencia,
         status_pagamento: statusPagamento,
+        data_despesa:     todayISO(),
         parcela_atual:    recorrencia === 'parcelada' ? (parseInt(parcelaAtual, 10) || null) : null,
         total_parcelas:   recorrencia === 'parcelada' ? (parseInt(totalParcelas, 10) || null) : null,
       });
@@ -261,7 +276,6 @@ function EditDespesaModal({ visible, despesa, onClose, onSaved }) {
       setCategoria(despesa.categoria ?? '');
       setValor(despesa.valor ? String(parseFloat(despesa.valor).toFixed(2)) : '');
       setDescricao(despesa.descricao ?? '');
-      // data_despesa is DATE-only (no time); add noon to avoid UTC shift on parsing
       const baseDate = despesa.data_despesa
         ? new Date(`${despesa.data_despesa}T12:00:00`)
         : new Date(despesa.created_at);
@@ -433,7 +447,12 @@ function EditDespesaModal({ visible, despesa, onClose, onSaved }) {
 
 // ─── Despesa Card ─────────────────────────────────────────────────────────────
 
-function DespesaCard({ categoria, valor, descricao, created_at, recorrencia, status_pagamento, parcela_atual, total_parcelas, onPress }) {
+function DespesaCard({ categoria, valor, descricao, data_despesa, created_at, recorrencia, status_pagamento, parcela_atual, total_parcelas, onPress, onPagar }) {
+  const canPagar = status_pagamento === 'em_aberto' || status_pagamento === 'em_atraso';
+  const dataRef  = data_despesa
+    ? formatDate(`${data_despesa}T12:00:00`)
+    : formatDate(created_at);
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.cardLeft}>
@@ -462,9 +481,16 @@ function DespesaCard({ categoria, valor, descricao, created_at, recorrencia, sta
           <Text style={styles.cardParcelas}>{parcela_atual}/{total_parcelas} parcelas</Text>
         )}
         {descricao ? <Text style={styles.cardDescricao} numberOfLines={1}>{descricao}</Text> : null}
-        <Text style={styles.cardDate}>{formatDate(created_at)}</Text>
+        <Text style={styles.cardDate}>{dataRef}</Text>
       </View>
-      <Text style={styles.cardValor}>{formatCurrency(valor)}</Text>
+      <View style={styles.cardRight}>
+        <Text style={styles.cardValor}>{formatCurrency(valor)}</Text>
+        {canPagar && onPagar && (
+          <TouchableOpacity style={styles.pagarBtn} onPress={onPagar} activeOpacity={0.8}>
+            <Text style={styles.pagarBtnText}>Pagar ✓</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -472,12 +498,13 @@ function DespesaCard({ categoria, valor, descricao, created_at, recorrencia, sta
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function DespesasScreen({ navigation }) {
-  const [despesas,        setDespesas]        = useState([]);
-  const [loading,         setLoading]         = useState(true);
-  const [addVisible,      setAddVisible]      = useState(false);
-  const [editVisible,     setEditVisible]     = useState(false);
-  const [selectedDespesa, setSelectedDespesa] = useState(null);
-  const [userId,          setUserId]          = useState(null);
+  const [despesas,          setDespesas]          = useState([]);
+  const [loading,           setLoading]           = useState(true);
+  const [addVisible,        setAddVisible]        = useState(false);
+  const [editVisible,       setEditVisible]       = useState(false);
+  const [selectedDespesa,   setSelectedDespesa]   = useState(null);
+  const [userId,            setUserId]            = useState(null);
+  const [concluidasVisible, setConcluidasVisible] = useState(false);
 
   const fetchDespesas = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -488,27 +515,134 @@ export default function DespesasScreen({ navigation }) {
       .select('*')
       .eq('profissional_id', id)
       .eq('tipo', 'despesa')
-      .order('created_at', { ascending: false });
+      .order('data_despesa', { ascending: false, nullsFirst: false });
     if (!error && data) setDespesas(data);
     setLoading(false);
+    return data ?? [];
   }, [userId]);
+
+  // Checks em_aberto with past data_despesa → updates to em_atraso + push notification
+  const verificarAtrasos = useCallback(async (uid, lista) => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const atrasadas = lista.filter(d =>
+      d.status_pagamento === 'em_aberto' &&
+      d.data_despesa &&
+      new Date(`${d.data_despesa}T12:00:00`) < hoje
+    );
+    if (atrasadas.length === 0) return;
+
+    for (const d of atrasadas) {
+      const { error } = await supabase
+        .from('financeiro')
+        .update({ status_pagamento: 'em_atraso' })
+        .eq('id', d.id);
+      if (!error) {
+        scheduleNotification(
+          'Despesa em atraso',
+          `Você tem uma despesa em atraso: ${d.categoria} de ${formatCurrency(d.valor)}`,
+          1,
+        ).catch(() => {});
+      }
+    }
+    await fetchDespesas(uid);
+  }, [fetchDespesas]);
+
+  // Marks a despesa as paid and runs recorrência automation
+  const marcarComoPaga = useCallback(async (d) => {
+    const rec = d.recorrencia ?? 'variavel';
+    try {
+      if (rec === 'fixa') {
+        const { error: updErr } = await supabase
+          .from('financeiro')
+          .update({ status_pagamento: 'paga' })
+          .eq('id', d.id);
+        if (updErr) throw updErr;
+
+        const proximaData = addOneMonth(d.data_despesa);
+        const { error: insErr } = await supabase.from('financeiro').insert({
+          profissional_id:  d.profissional_id,
+          tipo:             'despesa',
+          categoria:        d.categoria,
+          valor:            d.valor,
+          recorrencia:      'fixa',
+          status_pagamento: 'em_aberto',
+          data_despesa:     proximaData,
+          descricao:        d.descricao ?? null,
+        });
+        if (insErr) throw insErr;
+
+      } else if (rec === 'parcelada') {
+        const novaParcelaAtual = (d.parcela_atual ?? 1) + 1;
+        const total = d.total_parcelas ?? 1;
+
+        if (novaParcelaAtual >= total) {
+          const { error } = await supabase
+            .from('financeiro')
+            .update({ status_pagamento: 'concluida', parcela_atual: novaParcelaAtual })
+            .eq('id', d.id);
+          if (error) throw error;
+        } else {
+          const proximaData = addOneMonth(d.data_despesa);
+          const { error } = await supabase
+            .from('financeiro')
+            .update({
+              parcela_atual:    novaParcelaAtual,
+              status_pagamento: 'em_aberto',
+              data_despesa:     proximaData,
+            })
+            .eq('id', d.id);
+          if (error) throw error;
+        }
+
+      } else {
+        const { error } = await supabase
+          .from('financeiro')
+          .update({ status_pagamento: 'paga' })
+          .eq('id', d.id);
+        if (error) throw error;
+      }
+
+      await fetchDespesas(userId);
+    } catch (err) {
+      Alert.alert('Erro ao registrar pagamento', err.message);
+    }
+  }, [userId, fetchDespesas]);
 
   useEffect(() => {
     (async () => {
       const { data: authData } = await supabase.auth.getUser();
       const uid = authData?.user?.id;
-      if (uid) { setUserId(uid); await fetchDespesas(uid); }
-      else setLoading(false);
+      if (uid) {
+        setUserId(uid);
+        const lista = await fetchDespesas(uid);
+        if (lista) await verificarAtrasos(uid, lista);
+      } else {
+        setLoading(false);
+      }
     })();
   }, []);
+
+  const despesasAtivas = useMemo(() =>
+    despesas.filter(d => d.status_pagamento !== 'concluida'),
+  [despesas]);
+
+  const despesasConcluidas = useMemo(() =>
+    despesas.filter(d => d.status_pagamento === 'concluida'),
+  [despesas]);
 
   const totalMes = useMemo(() => {
     const start = startOfMonth();
     const end   = endOfMonth();
-    return despesas
-      .filter(d => { const dt = new Date(d.created_at); return dt >= start && dt <= end; })
+    return despesasAtivas
+      .filter(d => {
+        const ref = d.data_despesa
+          ? new Date(`${d.data_despesa}T12:00:00`)
+          : new Date(d.created_at);
+        return ref >= start && ref <= end;
+      })
       .reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0);
-  }, [despesas]);
+  }, [despesasAtivas]);
 
   const mesLabel = `${MONTHS[new Date().getMonth()]} ${new Date().getFullYear()}`;
 
@@ -534,14 +668,42 @@ export default function DespesasScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
-        ) : despesas.length > 0 ? (
-          despesas.map(d => <DespesaCard key={d.id} {...d} onPress={() => openEdit(d)} />)
+        ) : despesasAtivas.length > 0 ? (
+          despesasAtivas.map(d => (
+            <DespesaCard
+              key={d.id}
+              {...d}
+              onPress={() => openEdit(d)}
+              onPagar={() => marcarComoPaga(d)}
+            />
+          ))
         ) : (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Nenhuma despesa registrada ainda.</Text>
             <Text style={styles.emptyHint}>Toque no + para adicionar.</Text>
           </View>
         )}
+
+        {despesasConcluidas.length > 0 && (
+          <TouchableOpacity
+            style={styles.concluidasHeader}
+            onPress={() => setConcluidasVisible(v => !v)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.concluidasHeaderText}>
+              Concluídas ({despesasConcluidas.length})
+            </Text>
+            <Text style={styles.concluidasArrow}>{concluidasVisible ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+        )}
+
+        {concluidasVisible && despesasConcluidas.map(d => (
+          <DespesaCard
+            key={d.id}
+            {...d}
+            onPress={() => openEdit(d)}
+          />
+        ))}
       </ScrollView>
 
       <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => setAddVisible(true)}>
@@ -583,6 +745,7 @@ const styles = StyleSheet.create({
   scroll:      { paddingHorizontal: 20, paddingBottom: 110 },
   card:        { backgroundColor: CARD_BG, borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardLeft:    { flex: 1, marginRight: 12 },
+  cardRight:   { alignItems: 'flex-end', justifyContent: 'center', gap: 8 },
   cardTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' },
   cardCategoria:   { fontSize: 15, fontWeight: '600', color: colors.white },
   badge:           { backgroundColor: 'rgba(168,35,90,0.2)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(168,35,90,0.4)' },
@@ -594,10 +757,15 @@ const styles = StyleSheet.create({
   cardDescricao:   { fontSize: 12, fontWeight: '400', color: colors.gray, marginBottom: 3 },
   cardDate:        { fontSize: 11, fontWeight: '400', color: '#444444' },
   cardValor:       { fontSize: 17, fontWeight: '800', color: '#F87171' },
-  empty:     { alignItems: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 15, fontWeight: '500', color: colors.gray, marginBottom: 6 },
-  emptyHint: { fontSize: 13, fontWeight: '400', color: '#444444' },
-  fab: { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
+  pagarBtn:        { backgroundColor: 'rgba(74,222,128,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(74,222,128,0.3)' },
+  pagarBtnText:    { fontSize: 11, fontWeight: '700', color: '#4ade80' },
+  empty:           { alignItems: 'center', paddingTop: 60 },
+  emptyText:       { fontSize: 15, fontWeight: '500', color: colors.gray, marginBottom: 6 },
+  emptyHint:       { fontSize: 13, fontWeight: '400', color: '#444444' },
+  concluidasHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, marginTop: 8, marginBottom: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)' },
+  concluidasHeaderText: { fontSize: 13, fontWeight: '700', color: colors.gray, letterSpacing: 0.4 },
+  concluidasArrow:      { fontSize: 11, color: colors.gray },
+  fab:     { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
   fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
 });
 
