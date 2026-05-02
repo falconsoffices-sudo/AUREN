@@ -137,18 +137,16 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
                   {rows.length > 1 && (
                     <Text style={s.rowNum}>INDICAÇÃO {i + 1}</Text>
                   )}
-                  {showImport && (
-                    <TouchableOpacity
-                      style={[s.importBtn, carregandoContatos && contatoRowIdx === i && { opacity: 0.6 }]}
-                      onPress={() => importarParaLinha(i)}
-                      disabled={carregandoContatos}
-                      activeOpacity={0.8}
-                    >
-                      {carregandoContatos && contatoRowIdx === i
-                        ? <ActivityIndicator color="#A8235A" size="small" />
-                        : <Text style={s.importBtnText}>Importar da agenda</Text>}
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={[s.importBtn, carregandoContatos && contatoRowIdx === i && { opacity: 0.6 }]}
+                    onPress={() => importarParaLinha(i)}
+                    disabled={carregandoContatos}
+                    activeOpacity={0.8}
+                  >
+                    {carregandoContatos && contatoRowIdx === i
+                      ? <ActivityIndicator color="#A8235A" size="small" />
+                      : <Text style={s.importBtnText}>Importar da agenda</Text>}
+                  </TouchableOpacity>
                   <TextInput
                     style={s.input}
                     placeholder="Nome"
@@ -214,8 +212,7 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
         </KeyboardAvoidingView>
       </View>
 
-      {showImport && (
-        <Modal visible={contatoModal} transparent animationType="slide" onRequestClose={() => setContatoModal(false)}>
+      <Modal visible={contatoModal} transparent animationType="slide" onRequestClose={() => setContatoModal(false)}>
           <View style={s.ctBackdrop}>
             <View style={s.ctContainer}>
               <View style={s.ctHeader}>
@@ -247,8 +244,7 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
               />
             </View>
           </View>
-        </Modal>
-      )}
+      </Modal>
     </Modal>
   );
 }

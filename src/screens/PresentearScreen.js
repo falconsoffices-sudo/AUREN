@@ -5,12 +5,16 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  FlatList,
   StyleSheet,
   Alert,
+  Modal,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Contacts from 'expo-contacts';
 
 const OPCOES = [
   { id: 1, plano: 'Básico', meses: 1, preco: '$59',  label: 'Básico · 1 mês',   economia: null },
@@ -19,10 +23,54 @@ const OPCOES = [
   { id: 4, plano: 'Pro',    meses: 6, preco: '$450', label: 'Pro · 6 meses',     economia: 'Economize $84' },
 ];
 
+function formatPhone(raw) {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 export default function PresentearScreen({ navigation }) {
-  const [opcaoSelecionada, setOpcaoSelecionada] = useState(null);
+  const [opcaoSelecionada,  setOpcaoSelecionada]  = useState(null);
+  const [nomeDestinatario,  setNomeDestinatario]  = useState('');
+  const [telefoneDestinatario, setTelefoneDestinatario] = useState('');
   const [emailDestinatario, setEmailDestinatario] = useState('');
-  const [mensagem, setMensagem] = useState('');
+  const [mensagem,          setMensagem]          = useState('');
+
+  const [contatoModal,       setContatoModal]       = useState(false);
+  const [todosContatos,      setTodosContatos]      = useState([]);
+  const [contatoQuery,       setContatoQuery]       = useState('');
+  const [carregandoContatos, setCarregandoContatos] = useState(false);
+
+  async function importarAgenda() {
+    setCarregandoContatos(true);
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Permita o acesso aos contatos nas configurações do dispositivo.');
+        return;
+      }
+      const { data: contacts } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+      });
+      const validos = contacts
+        .filter(c => c.name && c.phoneNumbers?.length > 0)
+        .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+      setTodosContatos(validos);
+      setContatoQuery('');
+      setContatoModal(true);
+    } catch (err) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setCarregandoContatos(false);
+    }
+  }
+
+  function selecionarContato(c) {
+    setNomeDestinatario(c.name ?? '');
+    setTelefoneDestinatario(formatPhone(c.phoneNumbers?.[0]?.number ?? ''));
+    setContatoModal(false);
+  }
 
   function handleEnviar() {
     if (!opcaoSelecionada) {
@@ -39,6 +87,10 @@ export default function PresentearScreen({ navigation }) {
       [{ text: 'OK' }],
     );
   }
+
+  const contatosFiltrados = todosContatos.filter(c =>
+    !contatoQuery.trim() || (c.name ?? '').toLowerCase().includes(contatoQuery.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -96,6 +148,39 @@ export default function PresentearScreen({ navigation }) {
 
           <Text style={[styles.sectionLabel, { marginTop: 8 }]}>DESTINATÁRIO</Text>
 
+          <TouchableOpacity
+            style={[styles.importBtn, carregandoContatos && { opacity: 0.6 }]}
+            onPress={importarAgenda}
+            disabled={carregandoContatos}
+            activeOpacity={0.8}
+          >
+            {carregandoContatos
+              ? <ActivityIndicator color="#A8235A" size="small" />
+              : <Text style={styles.importBtnText}>Importar da agenda</Text>}
+          </TouchableOpacity>
+
+          <Text style={styles.label}>Nome</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nome da presenteada"
+            placeholderTextColor="#6B4A58"
+            value={nomeDestinatario}
+            onChangeText={setNomeDestinatario}
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+
+          <Text style={styles.label}>Telefone</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="(000) 000-0000"
+            placeholderTextColor="#6B4A58"
+            value={telefoneDestinatario}
+            onChangeText={v => setTelefoneDestinatario(formatPhone(v))}
+            keyboardType="phone-pad"
+            returnKeyType="next"
+          />
+
           <Text style={styles.label}>E-mail *</Text>
           <TextInput
             style={styles.input}
@@ -131,6 +216,40 @@ export default function PresentearScreen({ navigation }) {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Contacts picker ── */}
+      <Modal visible={contatoModal} transparent animationType="slide" onRequestClose={() => setContatoModal(false)}>
+        <View style={ct.backdrop}>
+          <View style={ct.container}>
+            <View style={ct.header}>
+              <Text style={ct.title}>Selecionar contato</Text>
+              <TouchableOpacity onPress={() => setContatoModal(false)} activeOpacity={0.7}>
+                <Text style={ct.close}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={ct.search}
+              placeholder="Buscar..."
+              placeholderTextColor="#C9A8B6"
+              value={contatoQuery}
+              onChangeText={setContatoQuery}
+              autoCorrect={false}
+            />
+            <FlatList
+              data={contatosFiltrados}
+              keyExtractor={c => c.id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item: c }) => (
+                <TouchableOpacity style={ct.item} onPress={() => selecionarContato(c)} activeOpacity={0.7}>
+                  <Text style={ct.name}>{c.name}</Text>
+                  <Text style={ct.phone}>{c.phoneNumbers?.[0]?.number ?? ''}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -187,6 +306,13 @@ const styles = StyleSheet.create({
   radioAtivo:{ borderColor: '#A8235A' },
   radioDot:  { width: 10, height: 10, borderRadius: 5, backgroundColor: '#A8235A' },
 
+  importBtn: {
+    borderWidth: 1, borderColor: '#A8235A', borderRadius: 8,
+    paddingVertical: 10, alignItems: 'center', marginBottom: 18,
+    height: 40, justifyContent: 'center',
+  },
+  importBtnText: { fontSize: 13, fontWeight: '600', color: '#A8235A' },
+
   label: { fontSize: 12, fontWeight: '600', color: '#C9A8B6', marginBottom: 8, letterSpacing: 0.4 },
 
   input: {
@@ -201,4 +327,21 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 8,
   },
   enviarBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+});
+
+const ct = StyleSheet.create({
+  backdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)' },
+  container: { flex: 1, backgroundColor: '#0E0F11', marginTop: 60, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
+  title:     { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  close:     { fontSize: 15, fontWeight: '600', color: '#A8235A' },
+  search: {
+    marginHorizontal: 20, marginBottom: 10,
+    backgroundColor: '#1A1B1E', borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 10,
+    fontSize: 15, color: '#FFFFFF',
+  },
+  item:  { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
+  name:  { fontSize: 15, fontWeight: '500', color: '#FFFFFF' },
+  phone: { fontSize: 12, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
 });
