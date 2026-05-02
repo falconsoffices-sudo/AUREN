@@ -15,7 +15,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { scheduleNotification } from '../lib/notifications';
 import colors from '../constants/colors';
-import { PieChart } from 'react-native-chart-kit';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -102,41 +101,6 @@ function ProgressBar({ current, target }) {
       <View style={styles.progressLabels}>
         <Text style={styles.progressCurrent}>{formatCurrency(current)}</Text>
         <Text style={[styles.progressPct, reached && { color: '#4ade80' }]}>{pctLabel}</Text>
-        <Text style={styles.progressTarget}>{formatCurrency(target)}</Text>
-      </View>
-    </View>
-  );
-}
-
-function DonutMensal({ current, target }) {
-  const pct     = target > 0 ? clamp(current / target, 0, 1) : 0;
-  const pctLabel = `${Math.round(pct * 100)}%`;
-  const reached  = pct >= 1;
-  const filled   = Math.max(pct * 100, 0.01);
-  const empty    = Math.max(100 - filled, 0.01);
-  return (
-    <View style={styles.donutWrap}>
-      <View style={{ width: 160, height: 160 }}>
-        <PieChart
-          data={[
-            { name: '', value: filled, color: reached ? '#4ade80' : '#A8235A', legendFontColor: 'transparent', legendFontSize: 0 },
-            { name: '', value: empty,  color: '#2A2A2A',                        legendFontColor: 'transparent', legendFontSize: 0 },
-          ]}
-          width={160}
-          height={160}
-          chartConfig={{ color: () => '#A8235A' }}
-          accessor="value"
-          backgroundColor="transparent"
-          paddingLeft="0"
-          hasLegend={false}
-        />
-        <View style={styles.donutHole}>
-          <Text style={[styles.donutPct, reached && { color: '#4ade80' }]}>{pctLabel}</Text>
-          <Text style={styles.donutLabel}>da meta</Text>
-        </View>
-      </View>
-      <View style={styles.donutValues}>
-        <Text style={styles.progressCurrent}>{formatCurrency(current)}</Text>
         <Text style={styles.progressTarget}>{formatCurrency(target)}</Text>
       </View>
     </View>
@@ -375,7 +339,7 @@ export default function MetasScreen({ navigation }) {
           readonly={!editing}
           wordsLabel={wordsMonthly}
         >
-          <DonutMensal current={receitaMensal} target={parseFloat(metaMensal) || 0} />
+          <ProgressBar current={receitaMensal} target={parseFloat(metaMensal) || 0} />
         </MetaCard>
 
         <MetaCard
@@ -495,18 +459,6 @@ const styles = StyleSheet.create({
     fontSize: 12, fontWeight: '500', color: colors.primary,
     fontStyle: 'italic', marginBottom: 12, marginLeft: 2,
   },
-
-  donutWrap:   { alignItems: 'center', marginTop: 8, marginBottom: 4 },
-  donutHole: {
-    position: 'absolute',
-    top: 32, left: 32,
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: CARD_BG,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  donutPct:    { fontSize: 22, fontWeight: '800', color: '#A8235A' },
-  donutLabel:  { fontSize: 10, fontWeight: '500', color: '#C9A8B6', marginTop: 2 },
-  donutValues: { flexDirection: 'row', justifyContent: 'space-between', width: 160, marginTop: 2 },
 
   progressWrap:    { gap: 6 },
   progressTrack: {
