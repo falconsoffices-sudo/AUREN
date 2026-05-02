@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,11 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
@@ -38,24 +41,55 @@ const PLANS = [
   },
 ];
 
-const MENU = [
-  { id: 0.5, label: 'Pagamentos' },
-  { id: 1,  label: 'Meus Dados' },
-  { id: 2,  label: 'Meus Serviços' },
-  { id: 3,  label: 'Endereços' },
-  { id: 4,  label: 'Templates de SMS' },
-  { id: 5,  label: 'Metas e Objetivos' },
-  { id: 5.5, label: 'Relatório Mensal' },
-  { id: 5.6, label: 'Inteligência de Clientela' },
-  { id: 5.7, label: 'Minhas Conexões' },
-  { id: 5.8, label: 'Minha Equipe' },
-  { id: 6,  label: 'Despesas' },
-  { id: 7,  label: 'Gamificação' },
-  { id: 8,  label: 'Presentear com AUREN' },
-  { id: 9,  label: 'Auren Community' },
-  { id: 10, label: 'Configurações' },
-  { id: 11, label: 'Ajuda' },
-  { id: 12, label: 'Sair', danger: true },
+const MENU_SECTIONS = [
+  {
+    title: 'Meu Negócio',
+    items: [
+      { label: 'Meus Dados' },
+      { label: 'Endereços' },
+      { label: 'Meus Serviços' },
+      { label: 'Licença Profissional' },
+      { label: 'EIN' },
+    ],
+  },
+  {
+    title: 'Financeiro',
+    items: [
+      { label: 'Pagamentos' },
+      { label: 'Despesas' },
+      { label: 'Relatório Mensal' },
+      { label: 'Metas e Objetivos' },
+    ],
+  },
+  {
+    title: 'Clientes & Agenda',
+    items: [
+      { label: 'Templates de SMS' },
+      { label: 'Inteligência de Clientela' },
+      { label: 'Minhas Conexões' },
+    ],
+  },
+  {
+    title: 'Equipe',
+    items: [
+      { label: 'Minha Equipe' },
+    ],
+  },
+  {
+    title: 'AUREN',
+    items: [
+      { label: 'Gamificação' },
+      { label: 'Presentear com AUREN' },
+      { label: 'Auren Community' },
+    ],
+  },
+  {
+    title: 'Conta',
+    items: [
+      { label: 'Configurações' },
+      { label: 'Sair', danger: true },
+    ],
+  },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -119,27 +153,132 @@ function MenuItem({ label, danger, last, onPress }) {
 export default function PerfilScreen({ navigation }) {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
-  const [planModal, setPlanModal] = useState(null);
+
+  const [planModal,       setPlanModal]       = useState(null);
+  const [photoModal,      setPhotoModal]      = useState(false);
+  const [userId,          setUserId]          = useState(null);
+  const [nome,            setNome]            = useState('');
+  const [fotoUrl,         setFotoUrl]         = useState(null);
+  const [uploadingPhoto,  setUploadingPhoto]  = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const uid = authData?.user?.id;
+      if (!uid) return;
+      setUserId(uid);
+      const { data } = await supabase
+        .from('profiles')
+        .select('nome, foto_url')
+        .eq('id', uid)
+        .single();
+      if (data) {
+        setNome(data.nome ?? '');
+        setFotoUrl(data.foto_url ?? null);
+      }
+    })();
+  }, []);
+
+  // ── Photo upload ────────────────────────────────────────────────────────────
+
+  async function pickAndUpload(source) {
+    setPhotoModal(false);
+    if (!userId) return;
+
+    const options = {
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    };
+
+    let result;
+    if (source === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Permita o acesso à câmera nas configurações do dispositivo.');
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync(options);
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Permita o acesso à galeria nas configurações do dispositivo.');
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync(options);
+    }
+
+    if (result.canceled) return;
+    const uri = result.assets[0].uri;
+
+    setUploadingPhoto(true);
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const path = `${userId}/avatar.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatares')
+        .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('avatares')
+        .getPublicUrl(path);
+
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ foto_url: publicUrl })
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      setFotoUrl(publicUrl);
+    } catch (err) {
+      Alert.alert('Erro ao enviar foto', err.message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function removerFoto() {
+    setPhotoModal(false);
+    if (!userId) return;
+    try {
+      await supabase.storage.from('avatares').remove([`${userId}/avatar.jpg`]);
+      await supabase.from('profiles').update({ foto_url: null }).eq('id', userId);
+      setFotoUrl(null);
+    } catch (err) {
+      Alert.alert('Erro ao remover foto', err.message);
+    }
+  }
+
+  // ── Menu navigation ─────────────────────────────────────────────────────────
 
   function menuPress(label) {
     switch (label) {
-      case 'Pagamentos':            return () => navigation.navigate('Pagamentos');
-      case 'Meus Serviços':        return () => navigation.navigate('Servicos');
-      case 'Meus Dados':           return () => navigation.navigate('MeusDados');
-      case 'Endereços':            return () => navigation.navigate('Enderecos');
-      case 'Despesas':             return () => navigation.navigate('Despesas');
-      case 'Configurações':        return () => navigation.navigate('Configuracoes');
-      case 'Templates de SMS':     return () => navigation.navigate('TemplatesSMS');
-      case 'Metas e Objetivos':    return () => navigation.navigate('Metas');
-      case 'Relatório Mensal':          return () => navigation.navigate('Relatorio');
-      case 'Inteligência de Clientela': return () => navigation.navigate('IntelClientela');
-      case 'Minhas Conexões':           return () => navigation.navigate('Conexoes');
-      case 'Minha Equipe':              return () => navigation.navigate('Equipe');
-      case 'Auren Community':           return () => navigation.navigate('Community');
-      case 'Gamificação':          return () => navigation.navigate('Gamificacao');
-      case 'Presentear com AUREN': return () => navigation.navigate('Presentear');
-      case 'Ajuda':                return () => navigation.navigate('Ajuda');
-      case 'Sair':                 return () => Alert.alert(
+      case 'Pagamentos':                return () => navigation.navigate('Pagamentos');
+      case 'Meus Serviços':            return () => navigation.navigate('Servicos');
+      case 'Meus Dados':               return () => navigation.navigate('MeusDados');
+      case 'Endereços':                return () => navigation.navigate('Enderecos');
+      case 'Despesas':                 return () => navigation.navigate('Despesas');
+      case 'Configurações':            return () => navigation.navigate('Configuracoes');
+      case 'Templates de SMS':         return () => navigation.navigate('TemplatesSMS');
+      case 'Metas e Objetivos':        return () => navigation.navigate('Metas');
+      case 'Relatório Mensal':         return () => navigation.navigate('Relatorio');
+      case 'Inteligência de Clientela':return () => navigation.navigate('IntelClientela');
+      case 'Minhas Conexões':          return () => navigation.navigate('Conexoes');
+      case 'Minha Equipe':             return () => navigation.navigate('Equipe');
+      case 'Auren Community':          return () => navigation.navigate('Community');
+      case 'Gamificação':              return () => navigation.navigate('Gamificacao');
+      case 'Presentear com AUREN':     return () => navigation.navigate('Presentear');
+      case 'Licença Profissional':     return () => navigation.navigate('Licenca');
+      case 'EIN':                      return () => navigation.navigate('MeusDados');
+      case 'Sair': return () => Alert.alert(
         'Sair',
         'Tem certeza que deseja sair?',
         [
@@ -161,6 +300,12 @@ export default function PerfilScreen({ navigation }) {
     }
   }
 
+  // ── Avatar display ──────────────────────────────────────────────────────────
+
+  const initials = nome
+    ? nome.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+    : '?';
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -168,6 +313,7 @@ export default function PerfilScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
 
+        {/* ── Profile card ── */}
         <View style={styles.profileCard}>
           <TouchableOpacity
             style={styles.gearBtn}
@@ -178,13 +324,28 @@ export default function PerfilScreen({ navigation }) {
             <GearIcon />
           </TouchableOpacity>
 
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>MC</Text>
+          <TouchableOpacity
+            style={styles.avatarWrap}
+            onPress={() => setPhotoModal(true)}
+            activeOpacity={0.8}
+          >
+            {uploadingPhoto ? (
+              <View style={styles.avatar}>
+                <ActivityIndicator color={colors.white} />
+              </View>
+            ) : fotoUrl ? (
+              <Image source={{ uri: fotoUrl }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
+            <View style={styles.avatarEditBadge}>
+              <Text style={styles.avatarEditIcon}>✎</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <Text style={styles.profileName}>Maria Carvalho</Text>
+          <Text style={styles.profileName}>{nome || '—'}</Text>
           <Text style={styles.profileSub}>Miami, FL · PT/ES</Text>
 
           <View style={styles.levelRow}>
@@ -195,6 +356,7 @@ export default function PerfilScreen({ navigation }) {
           </View>
         </View>
 
+        {/* ── Plans ── */}
         <Text style={[styles.sectionTitle, { color: isDark ? '#C9A8B6' : '#6B4A58' }]}>SEU PLANO</Text>
         <View style={styles.plansRow}>
           {PLANS.map(p => (
@@ -206,22 +368,71 @@ export default function PerfilScreen({ navigation }) {
           ))}
         </View>
 
-        <View style={styles.menuCard}>
-          {MENU.map((item, i) => (
-            <MenuItem
-              key={item.id}
-              {...item}
-              last={i === MENU.length - 1}
-              onPress={menuPress(item.label)}
-            />
-          ))}
-        </View>
+        {/* ── Menu sections ── */}
+        {MENU_SECTIONS.map((section, si) => {
+          const items = section.items;
+          return (
+            <View key={si}>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionHeaderLine} />
+                <Text style={styles.menuSectionTitle}>{section.title.toUpperCase()}</Text>
+              </View>
+              <View style={styles.menuCard}>
+                {items.map((item, i) => (
+                  <MenuItem
+                    key={item.label}
+                    label={item.label}
+                    danger={item.danger}
+                    last={i === items.length - 1}
+                    onPress={menuPress(item.label)}
+                  />
+                ))}
+              </View>
+            </View>
+          );
+        })}
 
         <Text style={styles.version}>AUREN v1.0.0</Text>
 
       </ScrollView>
 
-      {/* ── Confirmation modal ── */}
+      {/* ── Photo ActionSheet ── */}
+      <Modal
+        visible={photoModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPhotoModal(false)}
+      >
+        <View style={actionSt.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setPhotoModal(false)} activeOpacity={1} />
+          <View style={actionSt.sheet}>
+            <View style={actionSt.handle} />
+            <Text style={actionSt.title}>Foto de perfil</Text>
+
+            <TouchableOpacity style={actionSt.option} onPress={() => pickAndUpload('camera')} activeOpacity={0.75}>
+              <Text style={actionSt.optionText}>Tirar foto</Text>
+            </TouchableOpacity>
+            <View style={actionSt.sep} />
+            <TouchableOpacity style={actionSt.option} onPress={() => pickAndUpload('gallery')} activeOpacity={0.75}>
+              <Text style={actionSt.optionText}>Escolher da galeria</Text>
+            </TouchableOpacity>
+            {fotoUrl && (
+              <>
+                <View style={actionSt.sep} />
+                <TouchableOpacity style={actionSt.option} onPress={removerFoto} activeOpacity={0.75}>
+                  <Text style={[actionSt.optionText, actionSt.optionDanger]}>Remover foto</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity style={actionSt.cancelBtn} onPress={() => setPhotoModal(false)} activeOpacity={0.75}>
+              <Text style={actionSt.cancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Plan confirmation modal ── */}
       <Modal
         visible={planModal !== null}
         transparent
@@ -308,14 +519,27 @@ function makeStyles(isDark) {
       paddingTop: 48, paddingBottom: 28, paddingHorizontal: 20,
       alignItems: 'center', marginTop: 20, marginBottom: 28, position: 'relative',
     },
-    gearBtn:    { position: 'absolute', top: 18, right: 18 },
-    avatarWrap: { marginBottom: 14 },
+    gearBtn: { position: 'absolute', top: 18, right: 18 },
+
+    avatarWrap: { marginBottom: 14, position: 'relative' },
     avatar: {
       width: 80, height: 80, borderRadius: 40,
       backgroundColor: colors.primary,
       alignItems: 'center', justifyContent: 'center',
     },
-    avatarText:   { fontSize: 28, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+    avatarImg: {
+      width: 80, height: 80, borderRadius: 40,
+    },
+    avatarText: { fontSize: 28, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+    avatarEditBadge: {
+      position: 'absolute', bottom: 0, right: -2,
+      width: 24, height: 24, borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 2, borderColor: card,
+    },
+    avatarEditIcon: { fontSize: 11, color: colors.white, lineHeight: 13 },
+
     profileName:  { fontSize: 22, fontWeight: '700', color: text, marginBottom: 5 },
     profileSub:   { fontSize: 13, fontWeight: '400', color: sub, marginBottom: 16 },
     levelRow:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -326,7 +550,7 @@ function makeStyles(isDark) {
     levelBadgeText: { fontSize: 10, fontWeight: '800', color: colors.cream, letterSpacing: 1 },
     agendaStatus:   { fontSize: 13, fontWeight: '600', color: colors.cream },
 
-    sectionTitle: { fontSize: 11, fontWeight: '700', color: sub, letterSpacing: 1.3, marginBottom: 14 },
+    sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.3, marginBottom: 14 },
 
     plansRow: { flexDirection: 'row', gap: 12, marginBottom: 28, alignItems: 'stretch' },
     planCard: { flex: 1, backgroundColor: card, borderRadius: 16, padding: 16, justifyContent: 'space-between' },
@@ -350,7 +574,20 @@ function makeStyles(isDark) {
     planBtnText:      { fontSize: 13, fontWeight: '700', color: colors.primary },
     planBtnTextPro:   { color: colors.white },
 
-    menuCard: { backgroundColor: card, borderRadius: 16, overflow: 'hidden', marginBottom: 24 },
+    sectionHeaderRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      marginTop: 20, marginBottom: 8,
+    },
+    sectionHeaderLine: {
+      flex: 1, height: 1,
+      backgroundColor: isDark ? '#2A2A2A' : '#E6D8CF',
+    },
+    menuSectionTitle: {
+      fontSize: 10, fontWeight: '800', color: '#A8235A',
+      letterSpacing: 1.4,
+    },
+
+    menuCard: { backgroundColor: card, borderRadius: 16, overflow: 'hidden', marginBottom: 4 },
     menuItem: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingVertical: 16, paddingHorizontal: 18,
@@ -360,11 +597,27 @@ function makeStyles(isDark) {
     menuLabelDanger: { color: '#F87171' },
     menuArrow:       { fontSize: 20, fontWeight: '400', color: isDark ? '#555555' : '#B09AA8', lineHeight: 22 },
 
-    version: { textAlign: 'center', fontSize: 11, fontWeight: '400', color: sub, letterSpacing: 1, marginBottom: 8 },
+    version: { textAlign: 'center', fontSize: 11, fontWeight: '400', color: sub, letterSpacing: 1, marginTop: 20, marginBottom: 8 },
   });
 }
 
-// Modal styles always dark (overlay)
+// ─── Action Sheet styles (static dark) ───────────────────────────────────────
+
+const actionSt = StyleSheet.create({
+  backdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet:       { backgroundColor: '#1A1B1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 36 },
+  handle:      { width: 40, height: 4, borderRadius: 2, backgroundColor: '#2A2A2A', alignSelf: 'center', marginBottom: 20 },
+  title:       { fontSize: 14, fontWeight: '700', color: '#8A8A8E', textAlign: 'center', marginBottom: 16, letterSpacing: 0.4 },
+  option:      { paddingVertical: 16, alignItems: 'center' },
+  optionText:  { fontSize: 17, fontWeight: '400', color: '#F5EDE8' },
+  optionDanger:{ color: '#F87171' },
+  sep:         { height: 1, backgroundColor: '#2A2A2A' },
+  cancelBtn:   { marginTop: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#0E0F11', borderRadius: 14 },
+  cancelText:  { fontSize: 16, fontWeight: '600', color: '#8A8A8E' },
+});
+
+// ─── Plan modal styles (static dark) ─────────────────────────────────────────
+
 const modalStyles = StyleSheet.create({
   backdrop:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheet:          { backgroundColor: '#0E0F11', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40 },
