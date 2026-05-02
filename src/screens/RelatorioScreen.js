@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { gerarRelatorioMensal } from '../lib/relatorio';
 import { dispararRelatorio } from '../lib/emailRelatorio';
+import IndicacaoModal from '../components/IndicacaoModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ export default function RelatorioScreen({ navigation }) {
   const [dados,          setDados]          = useState(null);
   const [userId,         setUserId]         = useState(null);
   const [enviandoEmail,  setEnviandoEmail]  = useState(false);
+  const [indicModal,     setIndicModal]     = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -244,10 +246,36 @@ export default function RelatorioScreen({ navigation }) {
                 : <Text style={[styles.shareBtnText, { color: '#A8235A' }]}>Enviar relatório por email (teste)</Text>}
             </TouchableOpacity>
 
+            {/* ── Referral section ── */}
+            <View style={styles.indicacaoCard}>
+              <Text style={styles.indicacaoTitle}>Compartilhe esse resultado ✨</Text>
+              <Text style={styles.indicacaoSub}>
+                Conhece alguma profissional que deveria usar o AUREN? Ou uma cliente que gostaria de agendar online?
+              </Text>
+              <TouchableOpacity
+                style={styles.indicacaoBtn}
+                onPress={() => setIndicModal(true)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.indicacaoBtnText}>Indicar o AUREN</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={{ height: 48 }} />
           </>
         )}
       </ScrollView>
+
+      <IndicacaoModal
+        visible={indicModal}
+        momento="relatorio"
+        title="Indicar o AUREN"
+        subtitle="Indique profissionais ou convide clientes para agendar com as melhores nail pros."
+        onClose={enviou => {
+          setIndicModal(false);
+          if (enviou) Alert.alert('Obrigada!', 'Suas indicações foram enviadas!');
+        }}
+      />
 
     </SafeAreaView>
   );
@@ -322,4 +350,17 @@ const styles = StyleSheet.create({
   },
   shareBtnText:  { fontSize: 14, fontWeight: '700', color: '#A8235A' },
   emailTestBtn:  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#A8235A', borderStyle: 'dashed', marginTop: 10 },
+
+  indicacaoCard: {
+    backgroundColor: '#1A1B1E', borderRadius: 16,
+    padding: 20, marginTop: 24,
+    borderLeftWidth: 3, borderLeftColor: '#A8235A',
+  },
+  indicacaoTitle: { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginBottom: 8 },
+  indicacaoSub:   { fontSize: 13, fontWeight: '400', color: '#C9A8B6', lineHeight: 18, marginBottom: 16 },
+  indicacaoBtn: {
+    backgroundColor: '#A8235A', borderRadius: 12,
+    height: 46, alignItems: 'center', justifyContent: 'center',
+  },
+  indicacaoBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

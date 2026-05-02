@@ -6,8 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IndicacaoModal from '../components/IndicacaoModal';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -49,13 +51,13 @@ const PLANS = [
 
 export default function PlansScreen({ navigation }) {
   const [selectedPlan, setSelectedPlan] = useState('business');
+  const [celebModal,  setCelebModal]  = useState(false);
+  const [indicModal,  setIndicModal]  = useState(false);
+  const [planVendido, setPlanVendido] = useState('');
 
   function handleAssinar(planName) {
-    Alert.alert(
-      'Em breve',
-      'Pagamento via Stripe será ativado em breve. Aguarde novidades!',
-      [{ text: 'OK' }],
-    );
+    setPlanVendido(planName);
+    setCelebModal(true);
   }
 
   return (
@@ -133,6 +135,46 @@ export default function PlansScreen({ navigation }) {
         <View style={{ height: 24 }} />
       </ScrollView>
 
+      {/* ── Celebration modal ── */}
+      <Modal visible={celebModal} transparent animationType="fade" onRequestClose={() => setCelebModal(false)}>
+        <View style={celebStyles.backdrop}>
+          <View style={celebStyles.card}>
+            <Text style={celebStyles.emoji}>🎉</Text>
+            <Text style={celebStyles.title}>Bem-vinda ao{'\n'}{planVendido}!</Text>
+            <Text style={celebStyles.desc}>
+              Você acaba de investir no seu negócio.{'\n'}
+              Conhece alguma profissional ou cliente que também se beneficiaria do AUREN?
+            </Text>
+            <TouchableOpacity
+              style={celebStyles.primaryBtn}
+              onPress={() => { setCelebModal(false); setIndicModal(true); }}
+              activeOpacity={0.85}
+            >
+              <Text style={celebStyles.primaryBtnText}>Indicar agora</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={celebStyles.skipBtn}
+              onPress={() => setCelebModal(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={celebStyles.skipBtnText}>Agora não</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Indicação modal ── */}
+      <IndicacaoModal
+        visible={indicModal}
+        momento="venda"
+        title="Indicar o AUREN"
+        subtitle="Quem mais merece crescer? Indique profissionais ou convide clientes."
+        onClose={enviou => {
+          setIndicModal(false);
+          if (enviou) Alert.alert('Obrigada!', 'Suas indicações foram enviadas. Você está ajudando o AUREN a crescer!');
+        }}
+      />
+
     </SafeAreaView>
   );
 }
@@ -206,4 +248,29 @@ const styles = StyleSheet.create({
     fontSize: 12, color: '#555560', textAlign: 'center',
     lineHeight: 18, marginTop: 8,
   },
+});
+
+// ─── Celebration modal styles ─────────────────────────────────────────────────
+
+const celebStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.78)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28,
+  },
+  card: {
+    backgroundColor: '#1A1B1E', borderRadius: 24,
+    padding: 28, alignItems: 'center', width: '100%',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
+  },
+  emoji:      { fontSize: 48, marginBottom: 14 },
+  title:      { fontSize: 22, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 14, lineHeight: 28 },
+  desc:       { fontSize: 14, fontWeight: '400', color: '#C9A8B6', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  primaryBtn: {
+    backgroundColor: '#A8235A', borderRadius: 14,
+    height: 50, width: '100%', alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+  },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  skipBtn:        { paddingVertical: 10, width: '100%', alignItems: 'center' },
+  skipBtnText:    { fontSize: 14, fontWeight: '500', color: '#8A8A8E' },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
 import { BarChart } from 'react-native-chart-kit';
+import IndicacaoModal from '../components/IndicacaoModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -311,6 +312,8 @@ export default function CaixaScreen() {
   const [pagamentos,        setPagamentos]        = useState({});
   const [entradaModalVisible, setEntradaModalVisible] = useState(false);
   const [chartMonths, setChartMonths] = useState(() => groupByMonth([]));
+  const [roiModal,    setRoiModal]    = useState(false);
+  const roiShownRef = useRef(false);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -320,7 +323,7 @@ export default function CaixaScreen() {
     const { hoje, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
     const { start: mes6Start, end: mes6End } = get6MonthRange();
 
-    const [mesRes, hojeRes, semRes, finRes, despRes, seisMesesRes] = await Promise.all([
+    const [mesRes, hojeRes, semRes, finRes, despRes, seisMesesRes, profRes] = await Promise.all([
       supabase
         .from('agendamentos')
         .select('valor')
@@ -364,6 +367,12 @@ export default function CaixaScreen() {
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', mes6Start)
         .lte('data_hora', mes6End),
+
+      supabase
+        .from('profiles')
+        .select('roi_indicacao_mes')
+        .eq('id', uid)
+        .maybeSingle(),
     ]);
 
     const soma = rows => (rows ?? []).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
@@ -397,6 +406,13 @@ export default function CaixaScreen() {
     });
 
     setDespesasMes(soma(despesasDoMes));
+
+    const lucroCheck = soma(mesRes.data) - soma(despesasDoMes);
+    const mesKey = `${mesAtual.getFullYear()}-${String(mesAtualNum + 1).padStart(2, '0')}`;
+    if (lucroCheck > 0 && profRes.data?.roi_indicacao_mes !== mesKey && !roiShownRef.current) {
+      roiShownRef.current = true;
+      setRoiModal(true);
+    }
 
     const byMethod = {};
     for (const row of finRes.data ?? []) {
@@ -578,6 +594,25 @@ export default function CaixaScreen() {
         onSaved={() => {
           setEntradaModalVisible(false);
           carregarDados();
+        }}
+      />
+
+      <IndicacaoModal
+        visible={roiModal}
+        momento="roi"
+        title="🚀 Você está no lucro!"
+        subtitle="Parabéns pelo resultado deste mês. Conhece alguém que deveria usar o AUREN?"
+        onClose={async (enviou) => {
+          setRoiModal(false);
+          if (enviou) {
+            const { data: userData } = await supabase.auth.getUser();
+            const uid = userData?.user?.id;
+            if (uid) {
+              const now = new Date();
+              const mesKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+              await supabase.from('profiles').update({ roi_indicacao_mes: mesKey }).eq('id', uid);
+            }
+          }
         }}
       />
     </SafeAreaView>
