@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -133,12 +133,12 @@ function MetaCard({ title, accent, value, onChange, readonly, wordsLabel, childr
 
 function CelebrationModal({ visible, marco, onClose }) {
   const MESSAGES = {
-    10:  { emoji: '🌱', title: 'Você começou!',        sub: 'Ótimo começo! 10% da meta mensal concluído.' },
-    25:  { emoji: '✨', title: 'Excelente progresso!', sub: 'Um quarto da meta já é seu!' },
-    50:  { emoji: '🔥', title: 'Metade do caminho!',   sub: 'Você está na metade da meta mensal. Incrível!' },
-    75:  { emoji: '💪', title: 'Quase lá!',            sub: '75% da meta. A linha de chegada está próxima!' },
-    90:  { emoji: '🚀', title: 'Reta final!',          sub: 'Você está a 10% de atingir sua meta mensal!' },
-    100: { emoji: '🎉', title: 'Meta atingida!',       sub: 'Parabéns! Você conquistou sua meta mensal!' },
+    10:  { emoji: '🌱', title: 'Você começou!',             sub: 'Cada passo conta.' },
+    25:  { emoji: '✨', title: 'Um quarto do caminho!',      sub: '' },
+    50:  { emoji: '🔥', title: 'Metade lá!',                sub: '' },
+    75:  { emoji: '💪', title: 'Falta pouco!',              sub: '' },
+    90:  { emoji: '🚀', title: 'Quase lá, não para agora!', sub: '' },
+    100: { emoji: '🎉', title: 'META ATINGIDA!',            sub: 'Você é incrível!' },
   };
   const msg = MESSAGES[marco] ?? MESSAGES[100];
   return (
@@ -147,7 +147,7 @@ function CelebrationModal({ visible, marco, onClose }) {
         <View style={styles.celebCard}>
           <Text style={styles.celebEmoji}>{msg.emoji}</Text>
           <Text style={styles.celebTitle}>{msg.title}</Text>
-          <Text style={styles.celebSub}>{msg.sub}</Text>
+          {!!msg.sub && <Text style={styles.celebSub}>{msg.sub}</Text>}
           <Text style={styles.celebMarco}>{marco}% da meta mensal</Text>
           <TouchableOpacity style={styles.celebBtn} onPress={onClose} activeOpacity={0.85}>
             <Text style={styles.celebBtnText}>Continuar</Text>
@@ -177,10 +177,6 @@ export default function MetasScreen({ navigation }) {
 
   const [celebrationVisible, setCelebrationVisible] = useState(false);
   const [celebrationMarco,   setCelebrationMarco]   = useState(0);
-
-  const milestoneCheckedRef = useRef(false);
-
-  const monthKey = `${new Date().getFullYear()}-${new Date().getMonth() + 1}`;
 
   const fetchReceitas = useCallback(async (uid) => {
     const [mesRes, semRes, anoRes] = await Promise.all([
@@ -233,35 +229,40 @@ export default function MetasScreen({ navigation }) {
 
   // Check milestones whenever receita or meta changes
   useEffect(() => {
-    if (!userId || !metaMensal) return;
+    if (!userId || !metaMensal || celebrationVisible) return;
     const metaNum = parseFloat(metaMensal) || 0;
     if (!metaNum) return;
     const pct = Math.round((receitaMensal / metaNum) * 100);
+    const now = new Date();
+    const mm   = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
 
     (async () => {
       for (const marco of MILESTONES) {
         if (pct >= marco) {
-          const key = `auren:meta_marco_${userId}_${monthKey}_${marco}`;
+          const key = `marco_celebrado_${mm}_${yyyy}_${marco}`;
           try {
             const jaViu = await AsyncStorage.getItem(key);
             if (!jaViu) {
-              await AsyncStorage.setItem(key, '1');
               setCelebrationMarco(marco);
               setCelebrationVisible(true);
               scheduleNotification(
                 `${marco}% da meta mensal!`,
-                marco === 100
-                  ? 'Você atingiu 100% da sua meta! Parabéns!'
-                  : `Você está ${marco}% mais perto da sua meta mensal.`,
+                marco === 10  ? 'Você começou! Cada passo conta.'   :
+                marco === 25  ? 'Um quarto do caminho!'              :
+                marco === 50  ? 'Metade lá!'                        :
+                marco === 75  ? 'Falta pouco!'                      :
+                marco === 90  ? 'Quase lá, não para agora!'         :
+                                'META ATINGIDA! Você é incrível!',
                 2,
               ).catch(() => {});
-              break; // Show one at a time
+              break;
             }
           } catch { /* ignore */ }
         }
       }
     })();
-  }, [receitaMensal, metaMensal, userId]);
+  }, [receitaMensal, metaMensal, userId, celebrationVisible]);
 
   function handleMetaMensalChange(val) {
     setMetaMensal(val);
@@ -399,7 +400,13 @@ export default function MetasScreen({ navigation }) {
       <CelebrationModal
         visible={celebrationVisible}
         marco={celebrationMarco}
-        onClose={() => setCelebrationVisible(false)}
+        onClose={async () => {
+          const now = new Date();
+          const mm  = String(now.getMonth() + 1).padStart(2, '0');
+          const key = `marco_celebrado_${mm}_${now.getFullYear()}_${celebrationMarco}`;
+          try { await AsyncStorage.setItem(key, '1'); } catch {}
+          setCelebrationVisible(false);
+        }}
       />
     </SafeAreaView>
   );
