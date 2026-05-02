@@ -624,11 +624,11 @@ export default function DespesasScreen({ navigation }) {
   }, []);
 
   const despesasAtivas = useMemo(() =>
-    despesas.filter(d => d.status_pagamento !== 'concluida'),
+    despesas.filter(d => d.status_pagamento !== 'concluida' && d.status_pagamento !== 'paga'),
   [despesas]);
 
   const despesasConcluidas = useMemo(() =>
-    despesas.filter(d => d.status_pagamento === 'concluida'),
+    despesas.filter(d => d.status_pagamento === 'concluida' || d.status_pagamento === 'paga'),
   [despesas]);
 
   const totalMes = useMemo(() => {
@@ -684,26 +684,28 @@ export default function DespesasScreen({ navigation }) {
           </View>
         )}
 
-        {despesasConcluidas.length > 0 && (
-          <TouchableOpacity
-            style={styles.concluidasHeader}
-            onPress={() => setConcluidasVisible(v => !v)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.concluidasHeaderText}>
-              Concluídas ({despesasConcluidas.length})
-            </Text>
-            <Text style={styles.concluidasArrow}>{concluidasVisible ? '▲' : '▼'}</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.concluidasHeader}
+          onPress={() => setConcluidasVisible(v => !v)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.concluidasHeaderText}>
+            Concluídas ({despesasConcluidas.length})
+          </Text>
+          <Text style={styles.concluidasArrow}>{concluidasVisible ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
 
-        {concluidasVisible && despesasConcluidas.map(d => (
-          <DespesaCard
-            key={d.id}
-            {...d}
-            onPress={() => openEdit(d)}
-          />
-        ))}
+        {concluidasVisible && (
+          despesasConcluidas.length > 0
+            ? despesasConcluidas.map(d => (
+                <DespesaCard
+                  key={d.id}
+                  {...d}
+                  onPress={() => openEdit(d)}
+                />
+              ))
+            : <Text style={styles.concluidasEmpty}>Nenhuma despesa concluída ainda.</Text>
+        )}
       </ScrollView>
 
       <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => setAddVisible(true)}>
@@ -765,6 +767,7 @@ const styles = StyleSheet.create({
   concluidasHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, marginTop: 8, marginBottom: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)' },
   concluidasHeaderText: { fontSize: 13, fontWeight: '700', color: colors.gray, letterSpacing: 0.4 },
   concluidasArrow:      { fontSize: 11, color: colors.gray },
+  concluidasEmpty:      { fontSize: 13, fontWeight: '400', color: colors.gray, paddingHorizontal: 4, paddingVertical: 12 },
   fab:     { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 8 },
   fabText: { fontSize: 30, fontWeight: '400', color: colors.white, lineHeight: 34 },
 });
