@@ -15,36 +15,36 @@ export const NIVEIS_CONFIG = [
     nivel: 2, nome: 'Em Ritmo', emoji: '⚡',
     descricao: 'Sua agenda está ganhando forma.',
     criterios: [
-      { key: 'clientes',    label: 'Clientes',         meta: 10,   formato: 'count' },
-      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 40,  formato: 'pct'   },
-      { key: 'faturamento', label: 'Faturamento/mês',  meta: 500,  formato: 'moeda' },
+      { key: 'clientes',    label: 'Clientes',         meta: 15,   formato: 'count' },
+      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 60,  formato: 'pct'   },
+      { key: 'faturamento', label: 'Faturamento/mês',  meta: 750,  formato: 'moeda' },
     ],
   },
   {
     nivel: 3, nome: 'Agenda Cheia', emoji: '📅',
     descricao: 'Sua agenda está bombando!',
     criterios: [
-      { key: 'clientes',    label: 'Clientes',         meta: 25,   formato: 'count' },
-      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 70,  formato: 'pct'   },
-      { key: 'faturamento', label: 'Faturamento/mês',  meta: 1500, formato: 'moeda' },
+      { key: 'clientes',    label: 'Clientes',         meta: 38,   formato: 'count' },
+      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 100, formato: 'pct'   },
+      { key: 'faturamento', label: 'Faturamento/mês',  meta: 2250, formato: 'moeda' },
     ],
   },
   {
     nivel: 4, nome: 'Profissional', emoji: '💎',
     descricao: 'Você é uma referência na sua área.',
     criterios: [
-      { key: 'clientes',    label: 'Clientes',         meta: 50,   formato: 'count' },
-      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 85,  formato: 'pct'   },
-      { key: 'faturamento', label: 'Faturamento/mês',  meta: 3500, formato: 'moeda' },
+      { key: 'clientes',    label: 'Clientes',         meta: 75,   formato: 'count' },
+      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 100, formato: 'pct'   },
+      { key: 'faturamento', label: 'Faturamento/mês',  meta: 5250, formato: 'moeda' },
     ],
   },
   {
     nivel: 5, nome: 'Elite AUREN', emoji: '👑',
     descricao: 'O topo da profissão. Você chegou lá!',
     criterios: [
-      { key: 'clientes',    label: 'Clientes',         meta: 80,   formato: 'count' },
-      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 95,  formato: 'pct'   },
-      { key: 'faturamento', label: 'Faturamento/mês',  meta: 6000, formato: 'moeda' },
+      { key: 'clientes',    label: 'Clientes',         meta: 120,  formato: 'count' },
+      { key: 'agendaPct',   label: 'Agenda preenchida', meta: 100, formato: 'pct'   },
+      { key: 'faturamento', label: 'Faturamento/mês',  meta: 9000, formato: 'moeda' },
     ],
   },
 ];
@@ -141,10 +141,10 @@ export async function calcularNivel(userId) {
 
   // Determina o nível máximo cujos critérios foram todos atingidos
   let novoNivel = 1;
-  if (totalClientes >= 10 && agendaPct >= 40 && faturamento >= 500)  novoNivel = 2;
-  if (totalClientes >= 25 && agendaPct >= 70 && faturamento >= 1500) novoNivel = 3;
-  if (totalClientes >= 50 && agendaPct >= 85 && faturamento >= 3500) novoNivel = 4;
-  if (totalClientes >= 80 && agendaPct >= 95 && faturamento >= 6000) novoNivel = 5;
+  if (totalClientes >= 15  && agendaPct >= 60  && faturamento >= 750)  novoNivel = 2;
+  if (totalClientes >= 38  && agendaPct >= 100 && faturamento >= 2250) novoNivel = 3;
+  if (totalClientes >= 75  && agendaPct >= 100 && faturamento >= 5250) novoNivel = 4;
+  if (totalClientes >= 120 && agendaPct >= 100 && faturamento >= 9000) novoNivel = 5;
 
   const nivelAnterior = profileRes.data?.nivel_gamificacao ?? 1;
   const nivelFinal    = Math.max(novoNivel, nivelAnterior); // nunca rebaixa
