@@ -318,11 +318,9 @@ export default function CaixaScreen() {
 
       supabase
         .from('financeiro')
-        .select('valor')
+        .select('valor, recorrencia, data_despesa, status_pagamento, parcela_atual, total_parcelas')
         .eq('profissional_id', uid)
-        .eq('tipo', 'despesa')
-        .gte('created_at', mesInicio)
-        .lte('created_at', mesFim),
+        .eq('tipo', 'despesa'),
     ]);
 
     const soma = rows => (rows ?? []).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
@@ -331,7 +329,27 @@ export default function CaixaScreen() {
     setGanhosHoje(soma(hojeRes.data));
     setGanhosHojeCount(hojeRes.data?.length ?? 0);
     setGanhosSemana(soma(semRes.data));
-    setDespesasMes(soma(despRes.data));
+
+    const inicioMes = new Date(mesInicio);
+    const fimMes    = new Date(mesFim);
+    const despesasDoMes = (despRes.data ?? []).filter(d => {
+      const rec = d.recorrencia ?? 'variavel';
+      if (rec === 'fixa') {
+        return d.status_pagamento !== 'concluida';
+      }
+      if (rec === 'parcelada') {
+        return (
+          d.status_pagamento !== 'concluida' &&
+          d.parcela_atual != null &&
+          d.total_parcelas != null &&
+          d.parcela_atual <= d.total_parcelas
+        );
+      }
+      // variavel: filtra por data_despesa ou created_at
+      const ref = d.data_despesa ? new Date(`${d.data_despesa}T12:00:00`) : new Date(d.created_at);
+      return ref >= inicioMes && ref <= fimMes;
+    });
+    setDespesasMes(soma(despesasDoMes));
 
     const byMethod = {};
     for (const row of finRes.data ?? []) {
