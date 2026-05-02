@@ -330,8 +330,10 @@ export default function CaixaScreen() {
     setGanhosHojeCount(hojeRes.data?.length ?? 0);
     setGanhosSemana(soma(semRes.data));
 
-    const inicioMes = new Date(mesInicio);
-    const fimMes    = new Date(mesFim);
+    const mesAtual = new Date();
+    const mesAtualNum = mesAtual.getMonth();
+    const anoAtual    = mesAtual.getFullYear();
+
     const despesasDoMes = (despRes.data ?? []).filter(d => {
       const rec = d.recorrencia ?? 'variavel';
       if (rec === 'fixa') {
@@ -345,10 +347,11 @@ export default function CaixaScreen() {
           d.parcela_atual <= d.total_parcelas
         );
       }
-      // variavel: filtra por data_despesa ou created_at
+      // variavel: compara mês/ano local para evitar problema de timezone
       const ref = d.data_despesa ? new Date(`${d.data_despesa}T12:00:00`) : new Date(d.created_at);
-      return ref >= inicioMes && ref <= fimMes;
+      return ref.getMonth() === mesAtualNum && ref.getFullYear() === anoAtual;
     });
+
     setDespesasMes(soma(despesasDoMes));
 
     const byMethod = {};
