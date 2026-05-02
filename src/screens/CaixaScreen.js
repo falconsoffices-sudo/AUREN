@@ -337,11 +337,12 @@ export default function CaixaScreen() {
     const despesasDoMes = (despRes.data ?? []).filter(d => {
       const rec = d.recorrencia ?? 'variavel';
       if (rec === 'fixa') {
-        return d.status_pagamento !== 'concluida';
+        return d.status_pagamento !== 'concluida' && d.status_pagamento !== 'paga';
       }
       if (rec === 'parcelada') {
         return (
           d.status_pagamento !== 'concluida' &&
+          d.status_pagamento !== 'paga' &&
           d.parcela_atual != null &&
           d.total_parcelas != null &&
           d.parcela_atual <= d.total_parcelas

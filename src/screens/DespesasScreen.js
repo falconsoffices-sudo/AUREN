@@ -632,16 +632,13 @@ export default function DespesasScreen({ navigation }) {
   [despesas]);
 
   const totalMes = useMemo(() => {
-    const start = startOfMonth();
-    const end   = endOfMonth();
-    return despesasAtivas
-      .filter(d => {
-        const ref = d.data_despesa
-          ? new Date(`${d.data_despesa}T12:00:00`)
-          : new Date(d.created_at);
-        return ref >= start && ref <= end;
-      })
-      .reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0);
+    return despesasAtivas.filter(d => {
+      const rec = d.recorrencia ?? 'variavel';
+      if (rec === 'fixa') return true;
+      if (rec === 'parcelada') return d.parcela_atual != null && d.parcela_atual <= (d.total_parcelas ?? 999);
+      const ref = d.data_despesa ? new Date(`${d.data_despesa}T12:00:00`) : new Date(d.created_at);
+      return ref >= startOfMonth() && ref <= endOfMonth();
+    }).reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0);
   }, [despesasAtivas]);
 
   const mesLabel = `${MONTHS[new Date().getMonth()]} ${new Date().getFullYear()}`;
