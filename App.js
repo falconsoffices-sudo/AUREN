@@ -59,7 +59,15 @@ function MainTabs() {
       <Tab.Screen name="Agenda"   component={AgendaScreen}   />
       <Tab.Screen name="Clientes" component={ClientesScreen} />
       <Tab.Screen name="Caixa"    component={CaixaScreen}    />
-      <Tab.Screen name="Perfil"   component={PerfilStack}    />
+      <Tab.Screen
+        name="Perfil"
+        component={PerfilStack}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('Perfil', { screen: 'PerfilHome' });
+          },
+        })}
+      />
     </Tab.Navigator>
   );
 }
