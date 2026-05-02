@@ -228,7 +228,6 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
       supabase.from('clientes').select('id, nome, telefone, endereco').eq('profissional_id', userId).order('nome'),
       supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', userId).order('nome'),
     ]).then(([cRes, sRes]) => {
-      console.log('[AddModal] servicos userId:', userId, '| data:', sRes.data, '| error:', sRes.error);
       if (cRes.data) setClientes(cRes.data);
       if (sRes.data) setServicos(sRes.data);
       setLoadingClientes(false);
@@ -245,10 +244,10 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const handleSave = async () => {
     if (!selectedCliente) { Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return; }
     if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
-    if (!time || time.length < 3) { Alert.alert('Campo obrigatório', 'Informe o horário no formato HH:MM.'); return; }
+    if (!/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(time.trim())) { Alert.alert('Campo obrigatório', 'Informe o horário no formato HH:MM AM/PM (ex: 2:30 PM).'); return; }
     setSaving(true);
     try {
-      const novoInicio  = new Date(buildDataHora(selectedDate, time));
+      const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time));
       const novoDuracao = selectedServico.duracao_minutos || 60;
       const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
 
@@ -283,7 +282,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         profissional_id: userId,
         cliente_id:      selectedCliente.id,
         servico_id:      selectedServico.id,
-        data_hora:       buildDataHora(selectedDate, time),
+        data_hora:       buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time),
         status:          'confirmado',
         valor:           selectedServico.valor ?? null,
         tipo_endereco:   tipoEndereco,
@@ -310,7 +309,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
           const templateText = templates.confirmacao || DEFAULT_CONFIRMACAO;
           const mensagem = applyTemplate(templateText, {
             nome:              selectedCliente.nome,
-            horario:           formatTimeDisplay(buildDataHora(selectedDate, time)),
+            horario:           formatTimeDisplay(buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time)),
             servico:           selectedServico.nome,
             nome_profissional: prof?.nome_completo ?? prof?.nome ?? '',
           });
@@ -430,7 +429,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
 
               <Text style={modal.sectionLabel}>DATA E HORA</Text>
               <View style={modal.dateBox}><Text style={modal.dateText}>{dateLabel}</Text></View>
-              <TextInput style={modal.input} placeholder="Horário — HH:MM (ex: 14:30)" placeholderTextColor="#C9A8B6" value={time} onChangeText={t => setTime(formatTimeInput(t))} keyboardType="numeric" maxLength={5} />
+              <TextInput style={modal.input} placeholder="HH:MM AM/PM (ex: 2:30 PM)" placeholderTextColor="#C9A8B6" value={time} onChangeText={t => setTime(t.replace(/[^0-9:aAmMpP ]/g, '').slice(0, 8))} keyboardType="default" autoCapitalize="characters" maxLength={8} />
 
               <Text style={modal.sectionLabel}>LOCAL DE ATENDIMENTO</Text>
               <View style={modal.tipoRow}>
@@ -498,7 +497,6 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
       supabase.from('clientes').select('id, nome').eq('profissional_id', userId).order('nome'),
       supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', userId).order('nome'),
     ]).then(([cRes, sRes]) => {
-      console.log('[EditModal] servicos userId:', userId, '| data:', sRes.data, '| error:', sRes.error);
       if (cRes.data) setClientes(cRes.data);
       if (sRes.data) {
         setServicos(sRes.data);

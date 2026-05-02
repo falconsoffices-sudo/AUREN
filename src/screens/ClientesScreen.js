@@ -365,27 +365,19 @@ function AddClientModal({ visible, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      const { data: userData, error: authError } = await supabase.auth.getUser();
+      const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
-      console.log('[AddCliente] auth.getUser =>', { userId, authError });
       if (!userId) throw new Error('Usuário não autenticado.');
-
-      const { data: teste, error: testeError } = await supabase
-        .from('clientes').select('id').limit(1);
-      console.log('TESTE SELECT:', { teste, testeError });
 
       const servicoFinal = servicoOpcao === 'Outro' ? servicoOutro.trim() : servicoOpcao;
 
-      const payload = {
+      const { error } = await supabase.from('clientes').insert({
         profissional_id:  userId,
         nome:             nome.trim(),
         telefone:         telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
         servico_favorito: servicoFinal || null,
         observacoes:      observacoes.trim() || null,
-      };
-      console.log('[AddCliente] insert payload =>', payload);
-
-      const { error } = await supabase.from('clientes').insert(payload);
+      });
       if (error) throw error;
 
       reset();

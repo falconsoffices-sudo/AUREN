@@ -6,7 +6,6 @@ const SIMULATION_MODE = true;
 
 export async function sendSMS(to, body) {
   if (SIMULATION_MODE) {
-    console.log(`[SMS simulado] Para: ${to} | Mensagem: ${body}`);
     return { success: true, simulated: true };
   }
 

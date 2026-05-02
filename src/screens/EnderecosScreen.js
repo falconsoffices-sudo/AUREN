@@ -13,36 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
+import US_STATES from '../constants/usStates';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const US_STATES = [
-  { sigla: 'AL', nome: 'Alabama' },       { sigla: 'AK', nome: 'Alaska' },
-  { sigla: 'AZ', nome: 'Arizona' },       { sigla: 'AR', nome: 'Arkansas' },
-  { sigla: 'CA', nome: 'California' },    { sigla: 'CO', nome: 'Colorado' },
-  { sigla: 'CT', nome: 'Connecticut' },   { sigla: 'DE', nome: 'Delaware' },
-  { sigla: 'FL', nome: 'Florida' },       { sigla: 'GA', nome: 'Georgia' },
-  { sigla: 'HI', nome: 'Hawaii' },        { sigla: 'ID', nome: 'Idaho' },
-  { sigla: 'IL', nome: 'Illinois' },      { sigla: 'IN', nome: 'Indiana' },
-  { sigla: 'IA', nome: 'Iowa' },          { sigla: 'KS', nome: 'Kansas' },
-  { sigla: 'KY', nome: 'Kentucky' },      { sigla: 'LA', nome: 'Louisiana' },
-  { sigla: 'ME', nome: 'Maine' },         { sigla: 'MD', nome: 'Maryland' },
-  { sigla: 'MA', nome: 'Massachusetts' }, { sigla: 'MI', nome: 'Michigan' },
-  { sigla: 'MN', nome: 'Minnesota' },     { sigla: 'MS', nome: 'Mississippi' },
-  { sigla: 'MO', nome: 'Missouri' },      { sigla: 'MT', nome: 'Montana' },
-  { sigla: 'NE', nome: 'Nebraska' },      { sigla: 'NV', nome: 'Nevada' },
-  { sigla: 'NH', nome: 'New Hampshire' }, { sigla: 'NJ', nome: 'New Jersey' },
-  { sigla: 'NM', nome: 'New Mexico' },    { sigla: 'NY', nome: 'New York' },
-  { sigla: 'NC', nome: 'North Carolina' },{ sigla: 'ND', nome: 'North Dakota' },
-  { sigla: 'OH', nome: 'Ohio' },          { sigla: 'OK', nome: 'Oklahoma' },
-  { sigla: 'OR', nome: 'Oregon' },        { sigla: 'PA', nome: 'Pennsylvania' },
-  { sigla: 'RI', nome: 'Rhode Island' },  { sigla: 'SC', nome: 'South Carolina' },
-  { sigla: 'SD', nome: 'South Dakota' },  { sigla: 'TN', nome: 'Tennessee' },
-  { sigla: 'TX', nome: 'Texas' },         { sigla: 'UT', nome: 'Utah' },
-  { sigla: 'VT', nome: 'Vermont' },       { sigla: 'VA', nome: 'Virginia' },
-  { sigla: 'WA', nome: 'Washington' },    { sigla: 'WV', nome: 'West Virginia' },
-  { sigla: 'WI', nome: 'Wisconsin' },     { sigla: 'WY', nome: 'Wyoming' },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -215,6 +188,14 @@ export default function EnderecosScreen({ navigation }) {
   }, []);
 
   const handleSave = async () => {
+    if (!comercial.street.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe o Street Address do endereço comercial.');
+      return;
+    }
+    if (!comercial.zip || !/^\d{5}$/.test(comercial.zip)) {
+      Alert.alert('ZIP Code inválido', 'O ZIP Code comercial deve ter 5 dígitos.');
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase

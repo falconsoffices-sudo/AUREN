@@ -230,6 +230,7 @@ export default function PerfilScreen({ navigation }) {
         .from('avatares')
         .getPublicUrl(path);
 
+      if (!urlData?.publicUrl) throw new Error('Não foi possível obter a URL da foto.');
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
       const { error: profileError } = await supabase

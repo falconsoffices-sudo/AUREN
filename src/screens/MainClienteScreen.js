@@ -278,7 +278,7 @@ function ClienteHomeScreen({ navigation }) {
             ))}
             <TouchableOpacity
               style={styles.conexaoBtn}
-              onPress={() => navigation.navigate('Agenda')}
+              onPress={() => navigation.navigate('Main', { screen: 'Agenda' })}
               activeOpacity={0.85}
             >
               <Text style={styles.conexaoBtnText}>Agendar com conexão</Text>

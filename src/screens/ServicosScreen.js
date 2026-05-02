@@ -70,6 +70,10 @@ function AddServicoModal({ visible, onClose, onSaved, initialValues = null }) {
       Alert.alert('Campo obrigatório', 'Selecione ou informe o nome do serviço.');
       return;
     }
+    if (!valor || parseFloat(valor.replace(/[^0-9.]/g, '')) <= 0) {
+      Alert.alert('Campo obrigatório', 'Informe o valor do serviço.');
+      return;
+    }
     setSaving(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
