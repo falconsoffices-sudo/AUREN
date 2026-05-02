@@ -244,7 +244,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const handleSave = async () => {
     if (!selectedCliente) { Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return; }
     if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
-    if (!/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(time.trim())) { Alert.alert('Campo obrigatório', 'Informe o horário no formato HH:MM AM/PM (ex: 2:30 PM).'); return; }
+    if (!/^(1[0-2]|0?[1-9]):[0-5][0-9]\s?(AM|PM)$/i.test(time.trim())) { Alert.alert('Horário inválido', 'Use o formato HH:MM AM/PM (ex: 2:30 PM)'); return; }
     setSaving(true);
     try {
       const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time));
