@@ -782,7 +782,7 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
           )}
         </View>
         {valor != null && (
-          <Text style={[styles.apptValue, isNext && { color: '#A8235A' }]}>
+          <Text style={styles.apptValue}>
             ${parseFloat(valor).toFixed(2)}
           </Text>
         )}

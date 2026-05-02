@@ -22,7 +22,8 @@
       "Bash(npx supabase *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Flavi\\\\auren\\\\src\\\\screens\" -File)",
       "Bash(Select-Object Name, FullName)",
-      "mcp__claude_ai_Supabase__apply_migration"
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(git revert *)"
     ]
   }
 }

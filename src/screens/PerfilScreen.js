@@ -22,16 +22,16 @@ const PLANS = [
   {
     id: 'pro',
     name: 'AUREN PRO',
-    price: '$29',
+    price: '$89',
     popular: false,
     items: ['Agenda ilimitada', 'SMS automático', 'Relatório mensal', 'Inteligência de clientela', 'Conexões', 'Gamificação'],
   },
   {
     id: 'business',
     name: 'AUREN BUSINESS',
-    price: '$79',
+    price: '$149',
     popular: true,
-    items: ['Tudo do PRO', 'Equipe de até 10 profissionais', 'Dashboard consolidado', 'Faturamento unificado', 'Suporte prioritário'],
+    items: ['Tudo do PRO', '5 profissionais inclusos + $25/mês por profissional adicional', 'Dashboard consolidado', 'Faturamento unificado', 'Suporte prioritário'],
   },
 ];
 
@@ -89,11 +89,22 @@ const MENU_SECTIONS = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function PlanCard({ name, price, popular, items, onEscolher }) {
+function PlanCard({ id, name, price, popular, items, onEscolher, selectedPlan, onSelect }) {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  const isSelected = id === selectedPlan;
   return (
-    <View style={[styles.planCard, popular && styles.planCardPro]}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => onSelect(id)}
+      style={[
+        styles.planCard,
+        popular && styles.planCardPro,
+        isSelected
+          ? { borderWidth: 2, borderColor: '#A8235A' }
+          : { borderWidth: 1, borderColor: '#2A2A2A' },
+      ]}
+    >
       <View>
         {popular && (
           <View style={styles.popularBadge}>
@@ -122,7 +133,7 @@ function PlanCard({ name, price, popular, items, onEscolher }) {
           Escolher
         </Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -151,6 +162,8 @@ export default function PerfilScreen({ navigation }) {
 
   const [planModal,       setPlanModal]       = useState(null);
   const [photoModal,      setPhotoModal]      = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
+  const [selectedPlan,    setSelectedPlan]    = useState('business');
   const [userId,          setUserId]          = useState(null);
   const [nome,            setNome]            = useState('');
   const [fotoUrl,         setFotoUrl]         = useState(null);
@@ -382,32 +395,41 @@ export default function PerfilScreen({ navigation }) {
                   key={p.id}
                   {...p}
                   onEscolher={() => setPlanModal(p)}
+                  selectedPlan={selectedPlan}
+                  onSelect={setSelectedPlan}
                 />
               ))}
             </View>
           </>
         )}
 
-        {/* ── Menu sections ── */}
+        {/* ── Menu sections (accordion) ── */}
         {MENU_SECTIONS.map((section, si) => {
-          const items = section.items;
+          const isOpen = expandedSection === section.title;
           return (
             <View key={si}>
-              <View style={styles.sectionHeaderRow}>
+              <TouchableOpacity
+                style={styles.sectionHeaderRow}
+                onPress={() => setExpandedSection(isOpen ? null : section.title)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.menuSectionTitle}>{section.title}</Text>
+                <Text style={styles.sectionArrow}>{isOpen ? '▲' : '▼'}</Text>
                 <View style={styles.sectionHeaderLine} />
-                <Text style={styles.menuSectionTitle}>{section.title.toUpperCase()}</Text>
-              </View>
-              <View style={styles.menuCard}>
-                {items.map((item, i) => (
-                  <MenuItem
-                    key={item.label}
-                    label={item.label}
-                    danger={item.danger}
-                    last={i === items.length - 1}
-                    onPress={menuPress(item.label)}
-                  />
-                ))}
-              </View>
+              </TouchableOpacity>
+              {isOpen && (
+                <View style={styles.menuCard}>
+                  {section.items.map((item, i) => (
+                    <MenuItem
+                      key={item.label}
+                      label={item.label}
+                      danger={item.danger}
+                      last={i === section.items.length - 1}
+                      onPress={menuPress(item.label)}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           );
         })}
@@ -595,7 +617,7 @@ function makeStyles(isDark) {
     planBtnTextPro:   { color: colors.white },
 
     sectionHeaderRow: {
-      flexDirection: 'row', alignItems: 'center', gap: 10,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10,
       marginTop: 20, marginBottom: 8,
     },
     sectionHeaderLine: {
@@ -603,9 +625,9 @@ function makeStyles(isDark) {
       backgroundColor: isDark ? '#2A2A2A' : '#E6D8CF',
     },
     menuSectionTitle: {
-      fontSize: 10, fontWeight: '800', color: '#A8235A',
-      letterSpacing: 1.4,
+      fontSize: 16, fontWeight: '800', color: '#D4D4D4',
     },
+    sectionArrow: { fontSize: 11, fontWeight: '800', color: '#A8235A' },
 
     menuCard: { backgroundColor: card, borderRadius: 16, overflow: 'hidden', marginBottom: 4 },
     menuItem: {

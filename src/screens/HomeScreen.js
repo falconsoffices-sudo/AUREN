@@ -703,7 +703,7 @@ function makeStyles(isDark) {
 
     cardToday:    { backgroundColor: card, borderRadius: 16, padding: 18, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#A8235A', ...SM_SHADOW },
     todayBadge:   { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1.4, marginBottom: 12 },
-    todayValue:   { fontSize: 38, fontWeight: '800', color: '#A8235A', lineHeight: 44 },
+    todayValue:   { fontSize: 38, fontWeight: '800', color: '#F5EDE8', lineHeight: 44 },
     todayCaption: { fontSize: 13, fontWeight: '400', color: sub, marginTop: 4 },
 
     statRow:     { flexDirection: 'row', alignItems: 'center' },

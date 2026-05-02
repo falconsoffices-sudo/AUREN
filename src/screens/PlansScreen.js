@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ const PLANS = [
   {
     id: 'pro',
     name: 'AUREN PRO',
-    price: '$29',
+    price: '$89',
     period: '/mês',
     accent: '#A8235A',
     badge: 'POPULAR',
@@ -31,13 +31,13 @@ const PLANS = [
   {
     id: 'business',
     name: 'AUREN BUSINESS',
-    price: '$79',
+    price: '$149',
     period: '/mês',
     accent: '#6D3FA0',
     badge: 'COMPLETO',
     features: [
       'Tudo do PRO',
-      'Equipe de até 10 profissionais',
+      '5 profissionais inclusos + $25/mês por profissional adicional',
       'Dashboard consolidado',
       'Faturamento unificado',
       'Suporte prioritário',
@@ -48,6 +48,8 @@ const PLANS = [
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PlansScreen({ navigation }) {
+  const [selectedPlan, setSelectedPlan] = useState('business');
+
   function handleAssinar(planName) {
     Alert.alert(
       'Em breve',
@@ -75,7 +77,18 @@ export default function PlansScreen({ navigation }) {
         <Text style={styles.subline}>Cancele a qualquer momento. Sem taxa de adesão.</Text>
 
         {PLANS.map(plan => (
-          <View key={plan.id} style={[styles.planCard, { borderTopColor: plan.accent }]}>
+          <TouchableOpacity
+            key={plan.id}
+            activeOpacity={0.85}
+            onPress={() => setSelectedPlan(plan.id)}
+            style={[
+              styles.planCard,
+              { borderTopColor: plan.accent },
+              selectedPlan === plan.id
+                ? { borderWidth: 2, borderColor: plan.accent }
+                : { borderWidth: 1, borderColor: '#2A2A2A' },
+            ]}
+          >
 
             {/* Badge */}
             <View style={[styles.badge, { backgroundColor: plan.accent }]}>
@@ -109,7 +122,7 @@ export default function PlansScreen({ navigation }) {
               <Text style={styles.ctaBtnText}>Assinar agora</Text>
             </TouchableOpacity>
 
-          </View>
+          </TouchableOpacity>
         ))}
 
         <Text style={styles.footer}>

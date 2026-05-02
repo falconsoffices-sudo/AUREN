@@ -488,7 +488,7 @@ export default function CaixaScreen() {
                 ),
               }],
             }}
-            width={Dimensions.get('window').width - 40}
+            width={Dimensions.get('window').width - 64}
             height={180}
             fromZero
             withInnerLines={false}
@@ -502,7 +502,7 @@ export default function CaixaScreen() {
               color: () => isDark ? '#C9A8B6' : '#6B4A58',
               labelColor: () => isDark ? '#C9A8B6' : '#6B4A58',
               propsForLabels: { fontSize: 10 },
-              paddingRight: 40,
+              paddingRight: 64,
             }}
             style={{ borderRadius: 12 }}
           />
