@@ -313,6 +313,7 @@ export default function CaixaScreen() {
   const [entradaModalVisible, setEntradaModalVisible] = useState(false);
   const [chartMonths, setChartMonths] = useState(() => groupByMonth([]));
   const [roiModal,    setRoiModal]    = useState(false);
+  const [roiSubtitle, setRoiSubtitle] = useState('');
   const roiShownRef = useRef(false);
 
   const carregarDados = useCallback(async () => {
@@ -323,7 +324,7 @@ export default function CaixaScreen() {
     const { hoje, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
     const { start: mes6Start, end: mes6End } = get6MonthRange();
 
-    const [mesRes, hojeRes, semRes, finRes, despRes, seisMesesRes, profRes] = await Promise.all([
+    const [mesRes, hojeRes, semRes, finRes, despRes, seisMesesRes] = await Promise.all([
       supabase
         .from('agendamentos')
         .select('valor')
@@ -367,12 +368,6 @@ export default function CaixaScreen() {
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', mes6Start)
         .lte('data_hora', mes6End),
-
-      supabase
-        .from('profiles')
-        .select('roi_indicacao_mes')
-        .eq('id', uid)
-        .maybeSingle(),
     ]);
 
     const soma = rows => (rows ?? []).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
@@ -409,8 +404,32 @@ export default function CaixaScreen() {
 
     const lucroCheck = soma(mesRes.data) - soma(despesasDoMes);
     const mesKey = `${mesAtual.getFullYear()}-${String(mesAtualNum + 1).padStart(2, '0')}`;
-    if (lucroCheck > 0 && profRes.data?.roi_indicacao_mes !== mesKey && !roiShownRef.current) {
+
+    const [storedMeta, storedRoi] = await Promise.all([
+      AsyncStorage.getItem('auren:metas').catch(() => null),
+      AsyncStorage.getItem(`auren:roi_indicacao_${mesKey}`).catch(() => null),
+    ]);
+
+    let metaMensalLocal = 0;
+    try {
+      if (storedMeta) metaMensalLocal = parseFloat(JSON.parse(storedMeta).meta_mensal) || 0;
+    } catch {}
+    setMetaMensal(metaMensalLocal);
+
+    if (lucroCheck > 0 && !storedRoi && !roiShownRef.current) {
       roiShownRef.current = true;
+      let subtitle = '';
+      if (metaMensalLocal > 0) {
+        const roiPct = Math.round((lucroCheck / metaMensalLocal) * 100);
+        if (lucroCheck >= metaMensalLocal) {
+          subtitle = 'Você superou a meta este mês. Que tal ajudar outras profissionais a chegarem onde você chegou?';
+        } else {
+          subtitle = `${roiPct}% da sua meta mensal já está garantida. Conhece alguém que merece o mesmo resultado?`;
+        }
+      } else {
+        subtitle = 'Você fechou o mês no lucro. Conhece alguma profissional que merece o mesmo resultado?';
+      }
+      setRoiSubtitle(subtitle);
       setRoiModal(true);
     }
 
@@ -421,14 +440,6 @@ export default function CaixaScreen() {
     }
     setPagamentos(byMethod);
     setChartMonths(groupByMonth(seisMesesRes.data));
-
-    try {
-      const stored = await AsyncStorage.getItem('auren:metas');
-      if (stored) {
-        const m = JSON.parse(stored);
-        setMetaMensal(parseFloat(m.meta_mensal) || 0);
-      }
-    } catch {}
 
     setLoading(false);
   }, []);
@@ -600,18 +611,14 @@ export default function CaixaScreen() {
       <IndicacaoModal
         visible={roiModal}
         momento="roi"
-        title="🚀 Você está no lucro!"
-        subtitle="Parabéns pelo resultado deste mês. Conhece alguém que deveria usar o AUREN?"
+        title="Você está no lucro!"
+        subtitle={roiSubtitle}
         onClose={async (enviou) => {
           setRoiModal(false);
           if (enviou) {
-            const { data: userData } = await supabase.auth.getUser();
-            const uid = userData?.user?.id;
-            if (uid) {
-              const now = new Date();
-              const mesKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-              await supabase.from('profiles').update({ roi_indicacao_mes: mesKey }).eq('id', uid);
-            }
+            const now = new Date();
+            const mk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            await AsyncStorage.setItem(`auren:roi_indicacao_${mk}`, '1');
           }
         }}
       />

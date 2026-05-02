@@ -107,8 +107,8 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
                   />
                   <View style={s.tipoRow}>
                     {[
-                      { key: 'profissional', label: 'Profissional 💅' },
-                      { key: 'cliente',      label: 'Cliente 👤' },
+                      { key: 'profissional', label: 'Profissional' },
+                      { key: 'cliente',      label: 'Cliente' },
                     ].map(t => (
                       <TouchableOpacity
                         key={t.key}

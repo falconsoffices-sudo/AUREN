@@ -485,7 +485,7 @@ export default function HomeScreen({ navigation }) {
           source={require('../../assets/images/emblema.png')}
           style={{
             position: 'absolute',
-            top: -110,
+            top: -120,
             right: -70,
             width: 380,
             height: 380,
@@ -595,7 +595,6 @@ export default function HomeScreen({ navigation }) {
               {/* Empty state */}
               {agendamentosHoje.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyEmoji}>📅</Text>
                   <Text style={styles.emptyTitle}>Nenhum agendamento hoje</Text>
                   <Text style={styles.emptySub}>
                     Você ainda não tem clientes agendadas para hoje.{'\n'}
@@ -708,7 +707,7 @@ export default function HomeScreen({ navigation }) {
                 >
                   <View style={styles.insightDot} />
                   <View style={styles.insightBody}>
-                    <Text style={styles.insightTitle}>Seu dia de cuidado ✨</Text>
+                    <Text style={styles.insightTitle}>Seu dia de cuidado</Text>
                     <Text style={styles.insightText}>
                       Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.
                     </Text>
@@ -790,7 +789,7 @@ export default function HomeScreen({ navigation }) {
           style={styles.modalOverlay}
         >
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Seu dia de cuidado ✨</Text>
+            <Text style={styles.modalTitle}>Seu dia de cuidado</Text>
 
             {diaCuidadoStep === 'main' && (
               <>

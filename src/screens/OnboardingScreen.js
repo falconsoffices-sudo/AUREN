@@ -510,7 +510,7 @@ export default function OnboardingScreen({ navigation }) {
               >
                 {carregandoContatos
                   ? <ActivityIndicator color="#A8235A" />
-                  : <Text style={styles.btnAgendaText}>📱  Importar da minha agenda</Text>}
+                  : <Text style={styles.btnAgendaText}>Importar da minha agenda</Text>}
               </TouchableOpacity>
 
               {visivelRows.map((row, idx) => (

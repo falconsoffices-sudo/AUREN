@@ -248,9 +248,11 @@ export default function RelatorioScreen({ navigation }) {
 
             {/* ── Referral section ── */}
             <View style={styles.indicacaoCard}>
-              <Text style={styles.indicacaoTitle}>Compartilhe esse resultado ✨</Text>
+              <Text style={styles.indicacaoTitle}>Compartilhe esse resultado</Text>
               <Text style={styles.indicacaoSub}>
-                Conhece alguma profissional que deveria usar o AUREN? Ou uma cliente que gostaria de agendar online?
+                {dados.lucroReal > 0
+                  ? 'Você fechou o mês no positivo. Ajude outras profissionais a chegarem onde você chegou.'
+                  : 'Conhece alguma profissional que quer organizar seu negócio? Indica o AUREN.'}
               </Text>
               <TouchableOpacity
                 style={styles.indicacaoBtn}
@@ -270,7 +272,11 @@ export default function RelatorioScreen({ navigation }) {
         visible={indicModal}
         momento="relatorio"
         title="Indicar o AUREN"
-        subtitle="Indique profissionais ou convide clientes para agendar com as melhores nail pros."
+        subtitle={
+          dados?.lucroReal > 0
+            ? 'Você fechou o mês no positivo. Ajude outras profissionais a chegarem onde você chegou.'
+            : 'Conhece alguma profissional que quer organizar seu negócio? Indica o AUREN.'
+        }
         onClose={enviou => {
           setIndicModal(false);
           if (enviou) Alert.alert('Obrigada!', 'Suas indicações foram enviadas!');
