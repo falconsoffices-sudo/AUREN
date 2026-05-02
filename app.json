@@ -31,7 +31,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      ["expo-contacts", {"contactsPermission": "O AUREN precisa acessar seus contatos para importar clientes."}]
     ],
     "extra": {
       "eas": {

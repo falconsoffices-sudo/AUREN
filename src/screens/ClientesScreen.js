@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   Modal,
@@ -13,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Contacts from 'expo-contacts';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
@@ -184,9 +186,9 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
 
   if (!cliente) return null;
 
-  const ativos      = agendamentos.filter(a => a.status !== 'cancelado');
+  const ativos       = agendamentos.filter(a => a.status !== 'cancelado');
   const totalVisitas = ativos.length;
-  const valorTotal  = ativos.reduce((s, a) => s + Number(a.valor || 0), 0);
+  const valorTotal   = ativos.reduce((s, a) => s + Number(a.valor || 0), 0);
   const ultimaVisita = ativos[0]?.data_hora ?? null;
 
   const bySvc = {};
@@ -194,9 +196,7 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
     const nome = a.servicos?.nome ?? '—';
     bySvc[nome] = (bySvc[nome] ?? 0) + 1;
   }
-  const topServicos = Object.entries(bySvc)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3);
+  const topServicos = Object.entries(bySvc).sort(([, a], [, b]) => b - a).slice(0, 3);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -210,7 +210,6 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
           >
             <View style={modal.handle} />
 
-            {/* ── Cabeçalho ── */}
             <View style={hist.headerRow}>
               <View style={hist.avatar}>
                 <Text style={hist.avatarText}>{getInitials(cliente.nome)}</Text>
@@ -225,7 +224,6 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
               </View>
             </View>
 
-            {/* ── Resumo ── */}
             <View style={hist.resumoRow}>
               <View style={hist.resumoCell}>
                 <Text style={hist.resumoVal}>{totalVisitas}</Text>
@@ -243,7 +241,6 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
               </View>
             </View>
 
-            {/* ── Serviços mais feitos ── */}
             {topServicos.length > 0 && (
               <>
                 <Text style={hist.sectionLabel}>SERVIÇOS MAIS FEITOS</Text>
@@ -261,7 +258,6 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
               </>
             )}
 
-            {/* ── Histórico completo ── */}
             <Text style={hist.sectionLabel}>HISTÓRICO</Text>
             {loading ? (
               <ActivityIndicator color="#A8235A" style={{ marginTop: 20 }} />
@@ -275,9 +271,7 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
                     <View style={hist.agRow}>
                       <View style={[hist.statusDot, { backgroundColor: STATUS_COLOR[a.status] ?? '#6B7280' }]} />
                       <View style={{ flex: 1 }}>
-                        <Text style={hist.agServico} numberOfLines={1}>
-                          {a.servicos?.nome ?? '—'}
-                        </Text>
+                        <Text style={hist.agServico} numberOfLines={1}>{a.servicos?.nome ?? '—'}</Text>
                         <Text style={hist.agData}>{formatDtBrief(a.data_hora)}</Text>
                       </View>
                       <Text style={hist.agValor}>{formatMoeda(a.valor)}</Text>
@@ -287,7 +281,6 @@ function ClienteHistoricoModal({ visible, cliente, userId, onClose, onEditar }) 
               </View>
             )}
 
-            {/* ── Ações ── */}
             <View style={hist.btnRow}>
               <TouchableOpacity style={hist.btnEditar} onPress={onEditar} activeOpacity={0.85}>
                 <Text style={hist.btnEditarText}>Editar cliente</Text>
@@ -333,10 +326,10 @@ const hist = StyleSheet.create({
 
   semDados:  { fontSize: 13, color: '#8A8A8E', marginBottom: 18 },
 
-  btnRow:     { flexDirection: 'row', gap: 10, marginTop: 4 },
-  btnEditar:  { flex: 2, height: 50, borderRadius: 12, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center' },
+  btnRow:        { flexDirection: 'row', gap: 10, marginTop: 4 },
+  btnEditar:     { flex: 2, height: 50, borderRadius: 12, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center' },
   btnEditarText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  btnFechar:  { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#3A3A3A', alignItems: 'center', justifyContent: 'center' },
+  btnFechar:     { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#3A3A3A', alignItems: 'center', justifyContent: 'center' },
   btnFecharText: { fontSize: 15, fontWeight: '600', color: '#8A8A8E' },
 });
 
@@ -623,15 +616,30 @@ function EditClientModal({ visible, cliente, onClose, onSaved }) {
 export default function ClientesScreen() {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
-  const [clientes,        setClientes]        = useState([]);
-  const [loading,         setLoading]         = useState(true);
-  const [query,           setQuery]           = useState('');
+
+  const [clientes,          setClientes]          = useState([]);
+  const [loading,           setLoading]           = useState(true);
+  const [query,             setQuery]             = useState('');
   const [addVisible,        setAddVisible]        = useState(false);
   const [editVisible,       setEditVisible]       = useState(false);
   const [selectedCliente,   setSelectedCliente]   = useState(null);
   const [historicoVisible,  setHistoricoVisible]  = useState(false);
   const [historicoCliente,  setHistoricoCliente]  = useState(null);
   const [userId,            setUserId]            = useState(null);
+
+  // Importar da agenda
+  const [carregandoContatos, setCarregandoContatos] = useState(false);
+  const [importandoContatos, setImportandoContatos] = useState(false);
+  const [contatoModal,       setContatoModal]       = useState(false);
+  const [todosContatos,      setTodosContatos]      = useState([]);
+  const [contatoQuery,       setContatoQuery]       = useState('');
+  const [selecionados,       setSelecionados]       = useState([]);
+
+  const contatosFiltrados = useMemo(() => {
+    if (!contatoQuery.trim()) return todosContatos;
+    const q = contatoQuery.toLowerCase();
+    return todosContatos.filter(c => c.name?.toLowerCase().includes(q));
+  }, [todosContatos, contatoQuery]);
 
   const fetchClientes = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -683,12 +691,115 @@ export default function ClientesScreen() {
     setSelectedCliente(null);
   };
 
+  async function importarDaAgenda() {
+    setCarregandoContatos(true);
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'Ative o acesso aos contatos nas configurações do dispositivo.');
+        return;
+      }
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+      });
+      const comFone = (data ?? [])
+        .filter(c => c.name && c.phoneNumbers?.length > 0)
+        .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+      setTodosContatos(comFone);
+      setSelecionados([]);
+      setContatoQuery('');
+      setContatoModal(true);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível acessar os contatos.');
+    } finally {
+      setCarregandoContatos(false);
+    }
+  }
+
+  function toggleContato(id) {
+    setSelecionados(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }
+
+  async function confirmarImportacao() {
+    if (!userId) return;
+    setContatoModal(false);
+    setImportandoContatos(true);
+    try {
+      const selected = todosContatos.filter(c => selecionados.includes(c.id));
+      const duplicados = [];
+      const inseridos  = [];
+
+      for (const c of selected) {
+        const digits  = (c.phoneNumbers?.[0]?.number ?? '').replace(/\D/g, '').slice(-10);
+        const foneDb  = digits ? `+1${digits}` : null;
+
+        if (foneDb) {
+          const { data: existing } = await supabase
+            .from('clientes')
+            .select('id')
+            .eq('profissional_id', userId)
+            .eq('telefone', foneDb)
+            .maybeSingle();
+
+          if (existing) {
+            duplicados.push(c.name ?? '');
+            continue;
+          }
+        }
+
+        await supabase.from('clientes').insert({
+          profissional_id: userId,
+          nome:     c.name ?? 'Sem nome',
+          telefone: foneDb,
+        });
+        inseridos.push(c.name ?? '');
+      }
+
+      await fetchClientes();
+
+      if (duplicados.length > 0 && inseridos.length > 0) {
+        Alert.alert(
+          `${inseridos.length} cliente${inseridos.length !== 1 ? 's' : ''} importada${inseridos.length !== 1 ? 's' : ''}`,
+          `${duplicados.length} contato${duplicados.length !== 1 ? 's' : ''} já ${duplicados.length !== 1 ? 'estavam cadastrados' : 'estava cadastrado'}.`
+        );
+      } else if (duplicados.length > 0) {
+        Alert.alert(
+          'Já cadastradas',
+          duplicados.length === 1
+            ? `"${duplicados[0]}" já está cadastrada.`
+            : `${duplicados.length} contatos já são clientes cadastradas.`
+        );
+      } else if (inseridos.length > 0) {
+        Alert.alert('Importação concluída', `${inseridos.length} cliente${inseridos.length !== 1 ? 's' : ''} importada${inseridos.length !== 1 ? 's' : ''} com sucesso.`);
+      }
+    } catch (err) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setImportandoContatos(false);
+      setSelecionados([]);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Clientes</Text>
-        <Text style={styles.headerSubtitle}>Sua base em Miami, FL</Text>
+        <View>
+          <Text style={styles.headerTitle}>Clientes</Text>
+          <Text style={styles.headerSubtitle}>Sua base em Miami, FL</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.importBtn}
+          onPress={importarDaAgenda}
+          disabled={carregandoContatos || importandoContatos}
+          activeOpacity={0.85}
+        >
+          {carregandoContatos || importandoContatos
+            ? <ActivityIndicator size="small" color="#A8235A" />
+            : <Text style={styles.importBtnText}>📱 Importar</Text>}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.searchWrap}>
@@ -774,6 +885,77 @@ export default function ClientesScreen() {
         onSaved={() => { closeEdit(); fetchClientes(); }}
       />
 
+      {/* ── Modal: seletor de contatos ── */}
+      <Modal
+        visible={contatoModal}
+        animationType="slide"
+        onRequestClose={() => setContatoModal(false)}
+      >
+        <SafeAreaView style={ctStyles.safe} edges={['top', 'bottom']}>
+          <View style={ctStyles.header}>
+            <Text style={ctStyles.title}>Selecionar contatos</Text>
+            <Text style={ctStyles.count}>
+              {selecionados.length} selecionado{selecionados.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+
+          <TextInput
+            style={ctStyles.search}
+            placeholder="Buscar contato..."
+            placeholderTextColor="#6B4A58"
+            value={contatoQuery}
+            onChangeText={setContatoQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+
+          <FlatList
+            data={contatosFiltrados}
+            keyExtractor={c => c.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item: c }) => {
+              const sel  = selecionados.includes(c.id);
+              const fone = c.phoneNumbers?.[0]?.number ?? '';
+              return (
+                <TouchableOpacity
+                  style={[ctStyles.item, sel && ctStyles.itemSelected]}
+                  onPress={() => toggleContato(c.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[ctStyles.check, sel && ctStyles.checkSelected]}>
+                    {sel && <Text style={ctStyles.checkMark}>✓</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ctStyles.nome}>{c.name}</Text>
+                    {!!fone && <Text style={ctStyles.fone}>{fone}</Text>}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          />
+
+          <View style={ctStyles.footer}>
+            <TouchableOpacity
+              style={ctStyles.btnCancelar}
+              onPress={() => setContatoModal(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={ctStyles.btnCancelarText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[ctStyles.btnConfirmar, selecionados.length === 0 && { opacity: 0.4 }]}
+              onPress={confirmarImportacao}
+              disabled={selecionados.length === 0}
+              activeOpacity={0.85}
+            >
+              <Text style={ctStyles.btnConfirmarText}>Importar ({selecionados.length})</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -790,9 +972,16 @@ function makeStyles(isDark) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: bg },
 
-    header: { paddingHorizontal: 20, paddingTop: 28, marginBottom: 20 },
+    header: { paddingHorizontal: 20, paddingTop: 28, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     headerTitle:    { fontSize: 28, fontWeight: '700', color: text, marginBottom: 3 },
     headerSubtitle: { fontSize: 13, fontWeight: '400', color: sub },
+
+    importBtn: {
+      borderWidth: 1.5, borderColor: '#A8235A', borderRadius: 20,
+      paddingHorizontal: 14, paddingVertical: 8,
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+    },
+    importBtnText: { fontSize: 13, fontWeight: '700', color: '#A8235A' },
 
     searchWrap: { paddingHorizontal: 20, marginBottom: 20 },
     searchInput: {
@@ -911,4 +1100,52 @@ const modal = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 8,
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+});
+
+// ─── Contacts picker modal styles ─────────────────────────────────────────────
+
+const ctStyles = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: '#0E0F11' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  title:  { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
+  count:  { fontSize: 13, fontWeight: '600', color: '#A8235A' },
+  search: {
+    backgroundColor: '#1A1B1E', borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 13,
+    fontSize: 14, color: '#FFFFFF',
+    marginHorizontal: 20, marginBottom: 8,
+  },
+  item: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#1A1B1E',
+  },
+  itemSelected: { backgroundColor: 'rgba(168,35,90,0.08)' },
+  check: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: '#3D1020',
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 14, flexShrink: 0,
+  },
+  checkSelected: { backgroundColor: '#A8235A', borderColor: '#A8235A' },
+  checkMark:     { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+  nome:          { fontSize: 15, fontWeight: '600', color: '#FFFFFF', marginBottom: 2 },
+  fone:          { fontSize: 12, fontWeight: '400', color: '#6B4A58' },
+  footer: {
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderTopWidth: 1, borderTopColor: '#1A1B1E',
+  },
+  btnCancelar: {
+    flex: 1, height: 50, borderRadius: 12,
+    borderWidth: 1, borderColor: '#3A3A3A',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  btnCancelarText:  { fontSize: 15, fontWeight: '600', color: '#8A8A8E' },
+  btnConfirmar: {
+    flex: 2, height: 50, borderRadius: 12,
+    backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  btnConfirmarText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
