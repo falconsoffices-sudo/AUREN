@@ -85,8 +85,9 @@ const DEFAULT_HORARIO = {
 
 const DEFAULT_HORARIO_ESPECIAL = {
   ativo:  false,
-  inicio: '19:00',
-  fim:    '22:00',
+  dias:   ['sab', 'dom'],
+  inicio: '09:00',
+  fim:    '18:00',
 };
 
 export default function ConfiguracoesScreen({ navigation }) {
@@ -140,6 +141,15 @@ export default function ConfiguracoesScreen({ navigation }) {
       const dias = h.dias.includes(value)
         ? h.dias.filter(d => d !== value)
         : [...h.dias, value];
+      return { ...h, dias };
+    });
+  }
+
+  function toggleDiaEspecial(value) {
+    setHorarioEspecial(h => {
+      const dias = (h.dias ?? []).includes(value)
+        ? (h.dias ?? []).filter(d => d !== value)
+        : [...(h.dias ?? []), value];
       return { ...h, dias };
     });
   }
@@ -365,7 +375,7 @@ export default function ConfiguracoesScreen({ navigation }) {
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text style={styles.rowLabel}>Bloco adicional</Text>
-              <Text style={styles.rowHint}>Ex: atendimentos noturnos</Text>
+              <Text style={styles.rowHint}>Ex: Sáb-Dom, 9:00 AM às 6:00 PM</Text>
             </View>
             <TouchableOpacity
               style={[styles.toggleBtn, horarioEspecial.ativo && styles.toggleBtnActive]}
@@ -380,13 +390,33 @@ export default function ConfiguracoesScreen({ navigation }) {
           {horarioEspecial.ativo && (
             <>
               <View style={styles.divider} />
+              <View style={{ paddingVertical: 14 }}>
+                <Text style={styles.rowLabel}>Dias</Text>
+                <Text style={styles.rowHint}>Dias com horário especial</Text>
+                <View style={styles.daysRow}>
+                  {DIAS_SEMANA.map(d => {
+                    const active = (horarioEspecial.dias ?? []).includes(d.value);
+                    return (
+                      <TouchableOpacity
+                        key={d.value}
+                        style={[styles.dayBtn, active && styles.dayBtnActive]}
+                        onPress={() => toggleDiaEspecial(d.value)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.dayBtnText, active && styles.dayBtnTextActive]}>{d.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              <View style={styles.divider} />
               <View style={styles.row}>
                 <Text style={styles.rowLabel}>Início</Text>
                 <TextInput
                   style={styles.numInput}
                   value={horarioEspecial.inicio}
                   onChangeText={t => setHorarioEspecial(h => ({ ...h, inicio: t }))}
-                  placeholder="19:00"
+                  placeholder="09:00"
                   placeholderTextColor={colors.gray}
                   keyboardType="numbers-and-punctuation"
                   maxLength={5}
@@ -399,7 +429,7 @@ export default function ConfiguracoesScreen({ navigation }) {
                   style={styles.numInput}
                   value={horarioEspecial.fim}
                   onChangeText={t => setHorarioEspecial(h => ({ ...h, fim: t }))}
-                  placeholder="22:00"
+                  placeholder="18:00"
                   placeholderTextColor={colors.gray}
                   keyboardType="numbers-and-punctuation"
                   maxLength={5}

@@ -126,14 +126,36 @@ function timeToMins(str) {
   return h * 60 + m;
 }
 
-function calcSlotsLivres(agendamentos, horario) {
+function calcSlotsLivres(agendamentos, horario, horarioEspecial) {
   const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-  const todayKey = weekDayMap[new Date().getDay()];
-  if (!horario.dias.includes(todayKey)) return null;
+  const todayKey   = weekDayMap[new Date().getDay()];
 
-  const workStart  = timeToMins(horario.inicio);
-  const workEnd    = timeToMins(horario.fim);
-  const busy = [{ s: timeToMins(horario.almocoInicio), e: timeToMins(horario.almocoFim) }];
+  const isRegular = horario.dias.includes(todayKey);
+  const isSpecial = !!(horarioEspecial?.ativo && (horarioEspecial.dias ?? []).includes(todayKey));
+
+  if (!isRegular && !isSpecial) return null;
+
+  let workStart, workEnd;
+  const busy = [];
+
+  if (isRegular && isSpecial) {
+    const regStart  = timeToMins(horario.inicio);
+    const regEnd    = timeToMins(horario.fim);
+    const specStart = timeToMins(horarioEspecial.inicio);
+    const specEnd   = timeToMins(horarioEspecial.fim);
+    workStart = Math.min(regStart, specStart);
+    workEnd   = Math.max(regEnd, specEnd);
+    busy.push({ s: timeToMins(horario.almocoInicio), e: timeToMins(horario.almocoFim) });
+    if (regEnd < specStart) busy.push({ s: regEnd, e: specStart });
+    if (specEnd < regStart) busy.push({ s: specEnd, e: regStart });
+  } else if (isRegular) {
+    workStart = timeToMins(horario.inicio);
+    workEnd   = timeToMins(horario.fim);
+    busy.push({ s: timeToMins(horario.almocoInicio), e: timeToMins(horario.almocoFim) });
+  } else {
+    workStart = timeToMins(horarioEspecial.inicio);
+    workEnd   = timeToMins(horarioEspecial.fim);
+  }
 
   for (const a of agendamentos) {
     if (a.status === 'cancelado') continue;
@@ -305,7 +327,9 @@ export default function HomeScreen({ navigation }) {
     try {
       const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
       const horario = storedH ? { ...DEFAULT_HORARIO, ...JSON.parse(storedH) } : DEFAULT_HORARIO;
-      const slots = calcSlotsLivres(hojeAgend, horario);
+      const storedE = await AsyncStorage.getItem('auren:horario_especial');
+      const horarioEspecial = storedE ? JSON.parse(storedE) : null;
+      const slots = calcSlotsLivres(hojeAgend, horario, horarioEspecial);
       setSlotsLivres(slots);
       if (slots === 0) {
         const { data: conRows } = await supabase

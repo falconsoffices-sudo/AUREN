@@ -241,10 +241,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     return clientes.filter(c => normalize(c.nome).includes(q));
   }, [clientes, clienteSearch]);
 
-  const handleSave = async () => {
-    if (!selectedCliente) { Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return; }
-    if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
-    if (!/^(1[0-2]|0?[1-9]):[0-5][0-9]\s?(AM|PM)$/i.test(time.trim())) { Alert.alert('Horário inválido', 'Use o formato HH:MM AM/PM (ex: 2:30 PM)'); return; }
+  const doSave = async () => {
     setSaving(true);
     try {
       const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time));
@@ -369,6 +366,51 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!selectedCliente) { Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return; }
+    if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
+    if (!/^(1[0-2]|0?[1-9]):[0-5][0-9]\s?(AM|PM)$/i.test(time.trim())) { Alert.alert('Horário inválido', 'Use o formato HH:MM AM/PM (ex: 2:30 PM)'); return; }
+
+    let outsideHours = false;
+    try {
+      const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+      const dayKey     = weekDayMap[selectedDate.getDay()];
+      const [storedH, storedE] = await Promise.all([
+        AsyncStorage.getItem('auren:horario_atendimento'),
+        AsyncStorage.getItem('auren:horario_especial'),
+      ]);
+      const DEF = { dias: ['seg', 'ter', 'qua', 'qui', 'sex'], inicio: '08:00', fim: '17:00' };
+      const h   = storedH ? { ...DEF, ...JSON.parse(storedH) } : DEF;
+      const he  = storedE ? JSON.parse(storedE) : null;
+      const upper = time.trim().toUpperCase();
+      const parts = upper.split(/\s+/);
+      const [hStr, mStr] = (parts[0] || '0:0').split(':');
+      let hh = parseInt(hStr, 10) || 0;
+      const mm = parseInt(mStr, 10) || 0;
+      if (parts[1] === 'PM' && hh !== 12) hh += 12;
+      if (parts[1] === 'AM' && hh === 12) hh = 0;
+      const tMins = s => { const [a, b] = (s || '0:0').split(':').map(Number); return a * 60 + b; };
+      const timeMins = hh * 60 + mm;
+      const inReg = h.dias.includes(dayKey) && timeMins >= tMins(h.inicio) && timeMins < tMins(h.fim);
+      const inSpe = he?.ativo && (he.dias ?? []).includes(dayKey) && timeMins >= tMins(he.inicio) && timeMins < tMins(he.fim);
+      outsideHours = !inReg && !inSpe;
+    } catch (_) {}
+
+    if (outsideHours) {
+      Alert.alert(
+        'Fora do horário',
+        'O horário está fora do seu horário de atendimento. Deseja continuar mesmo assim?',
+        [
+          { text: 'Corrigir', style: 'cancel' },
+          { text: 'Confirmar', onPress: doSave },
+        ]
+      );
+      return;
+    }
+
+    doSave();
   };
 
   const dateLabel = `${DAYS_LONG[selectedDate.getDay()]}, ${selectedDate.getDate()} de ${MONTHS[selectedDate.getMonth()]}`;
