@@ -5,6 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  FlatList,
+  Modal,
   StyleSheet,
   Share,
   Alert,
@@ -14,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import * as Contacts from 'expo-contacts';
 import { supabase } from '../lib/supabase';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,6 +45,11 @@ export default function IndicacaoScreen({ navigation }) {
   const [msgTocada, setMsgTocada] = useState(false);
   const [saving,    setSaving]    = useState(false);
 
+  const [contatoModal,       setContatoModal]       = useState(false);
+  const [todosContatos,      setTodosContatos]      = useState([]);
+  const [contatoQuery,       setContatoQuery]       = useState('');
+  const [carregandoContatos, setCarregandoContatos] = useState(false);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user?.id) setUserId(data.user.id);
@@ -55,6 +63,36 @@ export default function IndicacaoScreen({ navigation }) {
 
   function handleTelefone(raw) {
     setTelefone(applyPhoneMask(raw));
+  }
+
+  async function abrirAgenda() {
+    setCarregandoContatos(true);
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Permita o acesso aos contatos nas configurações do dispositivo.');
+        return;
+      }
+      const { data: contacts } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+      });
+      const validos = contacts
+        .filter(c => c.name && c.phoneNumbers?.length > 0)
+        .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+      setTodosContatos(validos);
+      setContatoQuery('');
+      setContatoModal(true);
+    } catch (err) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setCarregandoContatos(false);
+    }
+  }
+
+  function selecionarContato(c) {
+    setNome(c.name ?? '');
+    setTelefone(applyPhoneMask(c.phoneNumbers?.[0]?.number ?? ''));
+    setContatoModal(false);
   }
 
   function handleMensagem(texto) {
@@ -124,6 +162,18 @@ export default function IndicacaoScreen({ navigation }) {
 
           {/* ── Contato ── */}
           <Text style={styles.sectionLabel}>CONTATO</Text>
+
+          <TouchableOpacity
+            style={[styles.importBtn, carregandoContatos && { opacity: 0.6 }]}
+            onPress={abrirAgenda}
+            disabled={carregandoContatos}
+            activeOpacity={0.8}
+          >
+            {carregandoContatos
+              ? <ActivityIndicator color="#A8235A" size="small" />
+              : <Text style={styles.importBtnText}>Importar da agenda</Text>}
+          </TouchableOpacity>
+
           <View style={styles.card}>
             <View style={styles.fieldWrap}>
               <Text style={styles.fieldLabel}>Nome <Text style={styles.required}>*</Text></Text>
@@ -222,6 +272,41 @@ export default function IndicacaoScreen({ navigation }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* ── Contacts picker ── */}
+      <Modal visible={contatoModal} transparent animationType="slide" onRequestClose={() => setContatoModal(false)}>
+        <View style={ct.backdrop}>
+          <View style={ct.container}>
+            <View style={ct.header}>
+              <Text style={ct.title}>Selecionar contato</Text>
+              <TouchableOpacity onPress={() => setContatoModal(false)} activeOpacity={0.7}>
+                <Text style={ct.close}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={ct.search}
+              placeholder="Buscar..."
+              placeholderTextColor="#C9A8B6"
+              value={contatoQuery}
+              onChangeText={setContatoQuery}
+              autoCorrect={false}
+            />
+            <FlatList
+              data={todosContatos.filter(c =>
+                !contatoQuery.trim() || (c.name ?? '').toLowerCase().includes(contatoQuery.toLowerCase())
+              )}
+              keyExtractor={c => c.id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item: c }) => (
+                <TouchableOpacity style={ct.item} onPress={() => selecionarContato(c)} activeOpacity={0.7}>
+                  <Text style={ct.name}>{c.name}</Text>
+                  <Text style={ct.phone}>{c.phoneNumbers?.[0]?.number ?? ''}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -300,4 +385,28 @@ const styles = StyleSheet.create({
     fontSize: 12, color: '#555560', textAlign: 'center',
     marginTop: 12, lineHeight: 18, paddingHorizontal: 8,
   },
+
+  importBtn: {
+    borderWidth: 1, borderColor: '#A8235A', borderRadius: 8,
+    paddingVertical: 10, alignItems: 'center', marginBottom: 12,
+    height: 40, justifyContent: 'center',
+  },
+  importBtnText: { fontSize: 13, fontWeight: '600', color: '#A8235A' },
+});
+
+const ct = StyleSheet.create({
+  backdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)' },
+  container: { flex: 1, backgroundColor: '#0E0F11', marginTop: 60, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
+  title:     { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  close:     { fontSize: 15, fontWeight: '600', color: '#A8235A' },
+  search: {
+    marginHorizontal: 20, marginBottom: 10,
+    backgroundColor: '#1A1B1E', borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 10,
+    fontSize: 15, color: '#FFFFFF',
+  },
+  item:  { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1A1B1E' },
+  name:  { fontSize: 15, fontWeight: '500', color: '#FFFFFF' },
+  phone: { fontSize: 12, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
 });
