@@ -656,8 +656,8 @@ export default function HomeScreen({ navigation }) {
               {/* ── Insights de hoje ── */}
               <Text style={styles.sectionTitle}>Insights de hoje</Text>
 
-              {/* 1. Horários livres / Agenda cheia */}
-              {slotsLivres !== null && (
+              {/* 1. Horários livres */}
+              {slotsLivres !== null && slotsLivres >= 1 && (
                 <TouchableOpacity
                   style={styles.insightCard}
                   onPress={() => navigation.navigate('Agenda')}
@@ -666,14 +666,10 @@ export default function HomeScreen({ navigation }) {
                   <View style={styles.insightDot} />
                   <View style={styles.insightBody}>
                     <Text style={styles.insightTitle}>
-                      {slotsLivres === 0
-                        ? 'Sua agenda está cheia hoje'
-                        : `${slotsLivres} horário${slotsLivres !== 1 ? 's' : ''} livre${slotsLivres !== 1 ? 's' : ''} hoje`}
+                      {`${slotsLivres} horário${slotsLivres !== 1 ? 's' : ''} livre${slotsLivres !== 1 ? 's' : ''} hoje`}
                     </Text>
                     <Text style={styles.insightText}>
-                      {slotsLivres === 0
-                        ? 'Sua agenda está cheia hoje! Ótimo trabalho.'
-                        : `Você tem ${slotsLivres} janela${slotsLivres !== 1 ? 's' : ''} disponível${slotsLivres !== 1 ? 'is' : ''} (mín. 1h30). Considere contatar clientes para preenchê-${slotsLivres !== 1 ? 'las' : 'la'}.`}
+                      {`Você tem ${slotsLivres} janela${slotsLivres !== 1 ? 's' : ''} disponível${slotsLivres !== 1 ? 'is' : ''} (mín. 1h30). Considere contatar clientes para preenchê-${slotsLivres !== 1 ? 'las' : 'la'}.`}
                     </Text>
                   </View>
                   <Text style={styles.insightArrow}>›</Text>
