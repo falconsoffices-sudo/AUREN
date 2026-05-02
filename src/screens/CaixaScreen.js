@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
+import { BarChart } from 'react-native-chart-kit';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,8 @@ const MONTHS = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
+
+const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 const PAYMENT_META = [
   { key: 'zelle',    abbr: 'ZL', label: 'Zelle',    bg: '#1A0D38', color: '#A78BFA' },
@@ -66,6 +70,35 @@ function getDateRanges() {
   const mesFim    = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(ultimoDia)}T23:59:59`;
 
   return { hoje, semanaInicio, semanaFim, mesInicio, mesFim };
+}
+
+function get6MonthRange() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    start: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01T00:00:00`,
+    end: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T23:59:59`,
+  };
+}
+
+function groupByMonth(rows) {
+  const now = new Date();
+  const labels = [];
+  const values = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    labels.push(MONTHS_SHORT[d.getMonth()]);
+    const sum = (rows ?? [])
+      .filter(r => {
+        const rd = new Date(r.data_hora);
+        return rd.getMonth() === d.getMonth() && rd.getFullYear() === d.getFullYear();
+      })
+      .reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
+    values.push(Math.round(sum));
+  }
+  return { labels, values };
 }
 
 function todayMMDDYYYY() {
@@ -277,6 +310,7 @@ export default function CaixaScreen() {
   const [despesasMes,       setDespesasMes]       = useState(0);
   const [pagamentos,        setPagamentos]        = useState({});
   const [entradaModalVisible, setEntradaModalVisible] = useState(false);
+  const [chartMonths, setChartMonths] = useState(() => groupByMonth([]));
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -284,8 +318,9 @@ export default function CaixaScreen() {
     if (!uid) { setLoading(false); return; }
 
     const { hoje, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
+    const { start: mes6Start, end: mes6End } = get6MonthRange();
 
-    const [mesRes, hojeRes, semRes, finRes, despRes] = await Promise.all([
+    const [mesRes, hojeRes, semRes, finRes, despRes, seisMesesRes] = await Promise.all([
       supabase
         .from('agendamentos')
         .select('valor')
@@ -321,6 +356,14 @@ export default function CaixaScreen() {
         .select('valor, recorrencia, data_despesa, status_pagamento, parcela_atual, total_parcelas')
         .eq('profissional_id', uid)
         .eq('tipo', 'despesa'),
+
+      supabase
+        .from('agendamentos')
+        .select('valor, data_hora')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', mes6Start)
+        .lte('data_hora', mes6End),
     ]);
 
     const soma = rows => (rows ?? []).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
@@ -361,6 +404,7 @@ export default function CaixaScreen() {
       byMethod[key] = (byMethod[key] || 0) + (parseFloat(row.valor) || 0);
     }
     setPagamentos(byMethod);
+    setChartMonths(groupByMonth(seisMesesRes.data));
 
     try {
       const stored = await AsyncStorage.getItem('auren:metas');
@@ -428,6 +472,39 @@ export default function CaixaScreen() {
           </Text>
           <ProgressBar progress={monthPct} />
           <Text style={styles.mainCardPct}>{monthPct}% da meta</Text>
+        </View>
+
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>Faturamento — Últimos 6 meses</Text>
+          <BarChart
+            data={{
+              labels: chartMonths.labels,
+              datasets: [{
+                data: chartMonths.values,
+                colors: chartMonths.labels.map((_, i) =>
+                  i === 5
+                    ? (opacity) => `rgba(168,35,90,${opacity})`
+                    : (opacity) => `rgba(58,42,46,${opacity})`
+                ),
+              }],
+            }}
+            width={Dimensions.get('window').width - 40}
+            height={180}
+            fromZero
+            withInnerLines={false}
+            withCustomBarColorFromData
+            flatColor
+            chartConfig={{
+              backgroundColor: 'transparent',
+              backgroundGradientFrom: isDark ? '#1A1B1E' : '#FFFFFF',
+              backgroundGradientTo: isDark ? '#1A1B1E' : '#FFFFFF',
+              decimalPlaces: 0,
+              color: () => isDark ? '#C9A8B6' : '#6B4A58',
+              labelColor: () => isDark ? '#C9A8B6' : '#6B4A58',
+              propsForLabels: { fontSize: 10 },
+            }}
+            style={{ borderRadius: 12 }}
+          />
         </View>
 
         <View style={styles.statsRow}>
@@ -531,6 +608,16 @@ function makeStyles(isDark) {
     mainCardValue: { fontSize: 48, fontWeight: '800', color: text, lineHeight: 52, marginBottom: 8 },
     mainCardSub:   { fontSize: 13, fontWeight: '400', color: sub, marginBottom: 16 },
     mainCardPct:   { fontSize: 12, fontWeight: '400', color: sub, marginTop: 8 },
+
+    chartCard: {
+      backgroundColor: card, borderRadius: 16,
+      paddingTop: 20, paddingBottom: 4,
+      marginBottom: 12, overflow: 'hidden',
+    },
+    chartTitle: {
+      fontSize: 11, fontWeight: '700', color: colors.primary,
+      letterSpacing: 1.5, marginBottom: 4, paddingHorizontal: 20,
+    },
 
     statsRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
     statCard:  { backgroundColor: card, borderRadius: 16, padding: 18 },
