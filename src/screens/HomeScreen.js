@@ -199,7 +199,7 @@ export default function HomeScreen({ navigation }) {
     const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein')
+        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein, endereco_comercial, cidade, estado')
         .eq('id', uid)
         .single(),
 
@@ -255,6 +255,19 @@ export default function HomeScreen({ navigation }) {
       if (!profileRes.data.ein && profileRes.data.created_at) {
         const diasConta = Math.floor((Date.now() - new Date(profileRes.data.created_at).getTime()) / 86400000);
         if (diasConta >= 60) setMostrarEINBanner(true);
+      }
+
+      // Sync cidade/estado from endereco_comercial if profile columns are empty
+      if ((!profileRes.data.cidade || !profileRes.data.estado) && profileRes.data.endereco_comercial) {
+        try {
+          const ec    = JSON.parse(profileRes.data.endereco_comercial);
+          const city  = ec.city  ?? ec.cidade  ?? '';
+          const state = ec.state ?? ec.estado  ?? '';
+          if (city || state) {
+            supabase.from('profiles').update({ cidade: city || null, estado: state || null })
+              .eq('id', uid).then(() => {}).catch(() => {});
+          }
+        } catch (_) {}
       }
     }
 

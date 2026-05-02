@@ -157,6 +157,7 @@ export default function PerfilScreen({ navigation }) {
   const [uploadingPhoto,  setUploadingPhoto]  = useState(false);
   const [plano,           setPlano]           = useState(null);
   const [diasConta,       setDiasConta]       = useState(null);
+  const [cidadeEstado,    setCidadeEstado]    = useState('');
 
   useEffect(() => {
     (async () => {
@@ -166,7 +167,7 @@ export default function PerfilScreen({ navigation }) {
       setUserId(uid);
       const { data } = await supabase
         .from('profiles')
-        .select('nome, foto_url, plano, created_at')
+        .select('nome, foto_url, plano, created_at, endereco_comercial, cidade, estado')
         .eq('id', uid)
         .single();
       if (data) {
@@ -177,6 +178,17 @@ export default function PerfilScreen({ navigation }) {
           const dias = Math.floor((Date.now() - new Date(data.created_at).getTime()) / 86400000);
           setDiasConta(dias);
         }
+        // Derive city/state from endereco_comercial, fallback to profile columns
+        let city  = data.cidade  ?? '';
+        let state = data.estado  ?? '';
+        if (data.endereco_comercial) {
+          try {
+            const ec = JSON.parse(data.endereco_comercial);
+            city  = ec.city  ?? ec.cidade  ?? city;
+            state = ec.state ?? ec.estado  ?? state;
+          } catch (_) {}
+        }
+        if (city || state) setCidadeEstado([city, state].filter(Boolean).join(', '));
       }
     })();
   }, []);
@@ -350,7 +362,7 @@ export default function PerfilScreen({ navigation }) {
           </TouchableOpacity>
 
           <Text style={styles.profileName}>{nome || '—'}</Text>
-          <Text style={styles.profileSub}>Miami, FL · PT/ES</Text>
+          <Text style={styles.profileSub}>{cidadeEstado || ''}</Text>
 
           <View style={styles.levelRow}>
             <View style={styles.levelBadge}>

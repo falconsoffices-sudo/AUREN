@@ -283,6 +283,8 @@ export default function MeusDadosScreen({ navigation }) {
           nome:              nome.trim(),
           telefone:          telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
           endereco_comercial: JSON.stringify(endComercial),
+          cidade:            endComercial.city  || null,
+          estado:            endComercial.state || null,
           genero,
           licenca_numero:    licencaNumero.trim()    || null,
           licenca_tipo:      licencaTipo             || null,
