@@ -127,6 +127,7 @@ function GraficoServicos({ topSvcCount }) {
           paddingRight: 40,
         }}
         style={{ borderRadius: 12 }}
+        segments={Math.max(...values) || 1}
       />
       <View style={styles.graficoList}>
         {topSvcCount.map((s, i) => (
