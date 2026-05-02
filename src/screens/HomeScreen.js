@@ -363,9 +363,14 @@ export default function HomeScreen({ navigation }) {
       const storedE = await AsyncStorage.getItem('auren:horario_especial');
       const horarioEspecial = storedE ? JSON.parse(storedE) : null;
       let slots = calcSlotsLivres(hojeAgend, horario, horarioEspecial);
-      // Se retornou null sem config salva, usa DEFAULT_HORARIO como fallback
-      if (slots === null && !storedH) {
-        slots = calcSlotsLivres(hojeAgend, DEFAULT_HORARIO, null);
+      if (slots === null) {
+        // Dia não configurado como dia de trabalho
+        const ativos = hojeAgend.filter(a => a.status !== 'cancelado');
+        if (ativos.length > 0) {
+          // Há agendamentos hoje: capacidade mínima de 4 atendimentos por dia
+          slots = Math.max(0, 4 - ativos.length);
+        }
+        // Se não há agendamentos e não é dia de trabalho, mantém null — insight não aparece
       }
       setSlotsLivres(slots);
       if (slots === 0) {
