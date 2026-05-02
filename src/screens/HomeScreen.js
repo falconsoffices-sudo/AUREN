@@ -7,6 +7,10 @@ import {
   Image,
   ActivityIndicator,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,7 +18,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { calcularNivel } from '../lib/gamificacao';
-import { scheduleNotification } from '../lib/notifications';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -55,9 +58,7 @@ function getDateRanges() {
     `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 
   // Dia
-  const hoje        = fmtDate(now);
-  const ontemDate   = new Date(now); ontemDate.setDate(now.getDate() - 1);
-  const ontem       = fmtDate(ontemDate);
+  const hoje      = fmtDate(now);
 
   // Semana: segunda → domingo
   const diaSemana      = now.getDay(); // 0=Dom
@@ -72,7 +73,7 @@ function getDateRanges() {
   const mesInicio = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01T00:00:00`;
   const mesFim    = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(ultimoDia)}T23:59:59`;
 
-  return { hoje, ontem, semanaInicio, semanaFim, mesInicio, mesFim };
+  return { hoje, semanaInicio, semanaFim, mesInicio, mesFim };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -210,22 +211,33 @@ export default function HomeScreen({ navigation }) {
   const [mostraDiaCuidado,  setMostraDiaCuidado]  = useState(false);
   const [nomeIncompleto,    setNomeIncompleto]     = useState(false);
   const [mostrarEINBanner,  setMostrarEINBanner]  = useState(false);
+  const [clientesInativas,  setClientesInativas]  = useState(null);
+  const [indicacoesDoMes,   setIndicacoesDoMes]   = useState(null);
+
+  // Modal — Seu dia de cuidado
+  const [diaCuidadoModal,  setDiaCuidadoModal]  = useState(false);
+  const [diaCuidadoStep,   setDiaCuidadoStep]   = useState('main');
+  const [diaCuidadoOpcao,  setDiaCuidadoOpcao]  = useState(null);
+  const [foraNome,         setForaNome]         = useState('');
+  const [foraContato,      setForaContato]      = useState('');
+  const [conexoesModal,    setConexoesModal]    = useState([]);
+  const [salvandoCuidado,  setSalvandoCuidado]  = useState(false);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData?.user?.id;
     if (!uid) { setLoading(false); return; }
 
-    const { hoje, ontem, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
+    const { hoje, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
 
-    const [profileRes, agendSemanaRes, agendMesRes] = await Promise.all([
+    const [profileRes, agendSemanaRes, agendMesRes, allApptsRes, indRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein, endereco_comercial, cidade, estado')
+        .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein, endereco_comercial, cidade, estado, ultimo_dia_cuidado')
         .eq('id', uid)
         .single(),
 
-      // Todos os agendamentos da semana — filtra hoje em JS para evitar problema de timezone
+      // Agendamentos da semana — filtra hoje em JS para evitar problema de timezone
       supabase
         .from('agendamentos')
         .select('*, clientes(nome), servicos(nome, valor, duracao_minutos)')
@@ -242,6 +254,20 @@ export default function HomeScreen({ navigation }) {
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', mesInicio)
         .lte('data_hora', mesFim),
+
+      // Todos os agendamentos não cancelados para calcular clientes inativas
+      supabase
+        .from('agendamentos')
+        .select('cliente_id, data_hora')
+        .eq('profissional_id', uid)
+        .neq('status', 'cancelado'),
+
+      // Indicações feitas no mês atual
+      supabase
+        .from('indicacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('profissional_id', uid)
+        .gte('created_at', mesInicio),
     ]);
 
     if (profileRes.data) {
@@ -254,6 +280,7 @@ export default function HomeScreen({ navigation }) {
           setNivelGamificacao(result.nivel);
         }
       }).catch(() => {});
+
       if (profileRes.data.created_at) {
         const criado = new Date(profileRes.data.created_at);
         const dias = Math.floor((Date.now() - criado.getTime()) / (1000 * 60 * 60 * 24));
@@ -263,8 +290,8 @@ export default function HomeScreen({ navigation }) {
       if (profileRes.data.licenca_expiracao) {
         const [y, mo, d] = profileRes.data.licenca_expiracao.split('-').map(Number);
         const exp  = new Date(y, mo - 1, d);
-        const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-        setLicencaDias(Math.round((exp.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
+        const hj   = new Date(); hj.setHours(0, 0, 0, 0);
+        setLicencaDias(Math.round((exp.getTime() - hj.getTime()) / (1000 * 60 * 60 * 24)));
       }
 
       // Banner nome incompleto: só após 30 dias de conta
@@ -291,28 +318,18 @@ export default function HomeScreen({ navigation }) {
           }
         } catch (_) {}
       }
-    }
 
-    // Card "Seu dia de cuidado" — uma vez por mês
-    try {
-      const agora   = new Date();
-      const mesKey  = `meu_dia_${agora.getMonth() + 1}_${agora.getFullYear()}`;
-      const jaViu   = await AsyncStorage.getItem(mesKey);
-      if (!jaViu) {
+      // Dia de cuidado — baseado em ultimo_dia_cuidado no banco
+      const ult = profileRes.data.ultimo_dia_cuidado ?? null;
+      if (ult) {
+        const d   = new Date(ult);
+        const now = new Date();
+        const mesmoMes = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        setMostraDiaCuidado(!mesmoMes);
+      } else {
         setMostraDiaCuidado(true);
-        await AsyncStorage.setItem(mesKey, '1');
-        // Notificação push para dia 1 do próximo mês às 9h
-        const proximo1 = new Date(agora.getFullYear(), agora.getMonth() + 1, 1, 9, 0, 0);
-        const secsAte  = (proximo1.getTime() - agora.getTime()) / 1000;
-        if (secsAte > 0) {
-          scheduleNotification(
-            'Seu dia de cuidado ✨',
-            'Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.',
-            secsAte,
-          ).catch(() => {});
-        }
       }
-    } catch (_) {}
+    }
 
     const semanaData = agendSemanaRes.data ?? [];
     const statusFat  = ['finalizado', 'confirmado', 'pendente'];
@@ -324,12 +341,32 @@ export default function HomeScreen({ navigation }) {
     setFaturamentoSemana(soma(semanaData.filter(a => statusFat.includes(a.status))));
     setFaturamentoMes(soma(agendMesRes.data ?? []));
 
+    // Clientes inativas: últ. agendamento > 45 dias atrás
+    const limite45 = new Date();
+    limite45.setDate(limite45.getDate() - 45);
+    limite45.setHours(0, 0, 0, 0);
+    const ultimoAppt = {};
+    for (const a of (allApptsRes.data ?? [])) {
+      const dt = new Date(a.data_hora);
+      if (!ultimoAppt[a.cliente_id] || dt > ultimoAppt[a.cliente_id]) {
+        ultimoAppt[a.cliente_id] = dt;
+      }
+    }
+    setClientesInativas(Object.values(ultimoAppt).filter(d => d < limite45).length);
+
+    // Indicações do mês
+    setIndicacoesDoMes(indRes.count ?? 0);
+
     try {
       const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
       const horario = storedH ? { ...DEFAULT_HORARIO, ...JSON.parse(storedH) } : DEFAULT_HORARIO;
       const storedE = await AsyncStorage.getItem('auren:horario_especial');
       const horarioEspecial = storedE ? JSON.parse(storedE) : null;
-      const slots = calcSlotsLivres(hojeAgend, horario, horarioEspecial);
+      let slots = calcSlotsLivres(hojeAgend, horario, horarioEspecial);
+      // Se retornou null sem config salva, usa DEFAULT_HORARIO como fallback
+      if (slots === null && !storedH) {
+        slots = calcSlotsLivres(hojeAgend, DEFAULT_HORARIO, null);
+      }
       setSlotsLivres(slots);
       if (slots === 0) {
         const { data: conRows } = await supabase
@@ -347,6 +384,40 @@ export default function HomeScreen({ navigation }) {
     }
 
     setLoading(false);
+  }, []);
+
+  const loadConexoesModal = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData?.user?.id;
+    if (!uid) return;
+    const { data } = await supabase
+      .from('conexoes')
+      .select('*, conexao:profiles!conexao_id(id, nome, cidade)')
+      .eq('profissional_id', uid)
+      .eq('status', 'aceita');
+    setConexoesModal(data ?? []);
+  }, []);
+
+  const salvarDiaCuidado = useCallback(async (opcao, nome, contato) => {
+    setSalvandoCuidado(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+      if (!uid) return;
+      const hoje = new Date().toISOString().split('T')[0];
+      await supabase.from('profiles').update({ ultimo_dia_cuidado: hoje }).eq('id', uid);
+      if (opcao === 'fora') {
+        console.log('[Dia de Cuidado] Convite simulado para:', nome, contato);
+      }
+      setMostraDiaCuidado(false);
+    } finally {
+      setSalvandoCuidado(false);
+      setDiaCuidadoModal(false);
+      setDiaCuidadoStep('main');
+      setDiaCuidadoOpcao(null);
+      setForaNome('');
+      setForaContato('');
+    }
   }, []);
 
   // Recarrega sempre que a tela recebe foco
@@ -582,11 +653,16 @@ export default function HomeScreen({ navigation }) {
                 <ProgressBar progress={nivelProgress} />
               </View>
 
-              {/* Insights */}
+              {/* ── Insights de hoje ── */}
               <Text style={styles.sectionTitle}>Insights de hoje</Text>
 
+              {/* 1. Horários livres / Agenda cheia */}
               {slotsLivres !== null && (
-                <View style={styles.insightCard}>
+                <TouchableOpacity
+                  style={styles.insightCard}
+                  onPress={() => navigation.navigate('Agenda')}
+                  activeOpacity={0.8}
+                >
                   <View style={styles.insightDot} />
                   <View style={styles.insightBody}>
                     <Text style={styles.insightTitle}>
@@ -600,9 +676,77 @@ export default function HomeScreen({ navigation }) {
                         : `Você tem ${slotsLivres} janela${slotsLivres !== 1 ? 's' : ''} disponível${slotsLivres !== 1 ? 'is' : ''} (mín. 1h30). Considere contatar clientes para preenchê-${slotsLivres !== 1 ? 'las' : 'la'}.`}
                     </Text>
                   </View>
-                </View>
+                  <Text style={styles.insightArrow}>›</Text>
+                </TouchableOpacity>
               )}
 
+              {/* 2. Clientes inativas — query real */}
+              {clientesInativas !== null && clientesInativas > 0 && (
+                <TouchableOpacity
+                  style={styles.insightCard}
+                  onPress={() => navigation.navigate('Clientes')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.insightDot} />
+                  <View style={styles.insightBody}>
+                    <Text style={styles.insightTitle}>Clientes inativas</Text>
+                    <Text style={styles.insightText}>
+                      {`${clientesInativas} ${clientesInativas === 1 ? 'cliente não retorna' : 'clientes não retornam'} há mais de 45 dias. Um contato rápido pode recuperar essas visitas esta semana.`}
+                    </Text>
+                  </View>
+                  <Text style={styles.insightArrow}>›</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* 3. Seu dia de cuidado */}
+              {mostraDiaCuidado && (
+                <TouchableOpacity
+                  style={styles.insightCard}
+                  onPress={() => { setDiaCuidadoStep('main'); setDiaCuidadoModal(true); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.insightDot} />
+                  <View style={styles.insightBody}>
+                    <Text style={styles.insightTitle}>Seu dia de cuidado ✨</Text>
+                    <Text style={styles.insightText}>
+                      Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.
+                    </Text>
+                  </View>
+                  <Text style={styles.insightArrow}>›</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* 4. Indique o AUREN / Você está crescendo */}
+              {indicacoesDoMes !== null && (
+                indicacoesDoMes === 0 ? (
+                  <TouchableOpacity
+                    style={styles.insightCard}
+                    onPress={() => navigation.navigate('Indicacao')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.insightDot} />
+                    <View style={styles.insightBody}>
+                      <Text style={styles.insightTitle}>Indique o AUREN</Text>
+                      <Text style={styles.insightText}>
+                        Que tal indicar o AUREN para uma colega profissional? Ela vai amar.
+                      </Text>
+                    </View>
+                    <Text style={styles.insightArrow}>›</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.insightCard}>
+                    <View style={styles.insightDot} />
+                    <View style={styles.insightBody}>
+                      <Text style={styles.insightTitle}>Você está crescendo!</Text>
+                      <Text style={styles.insightText}>
+                        Você já indicou o AUREN este mês. Obrigada por fazer parte da comunidade!
+                      </Text>
+                    </View>
+                  </View>
+                )
+              )}
+
+              {/* 5. Suas conexões — só quando agenda cheia */}
               {slotsLivres === 0 && conexoesAtivas.length > 0 && (
                 <TouchableOpacity
                   style={styles.insightCard}
@@ -626,58 +770,141 @@ export default function HomeScreen({ navigation }) {
                   </View>
                 </TouchableOpacity>
               )}
-
-              <View style={styles.insightCard}>
-                <View style={styles.insightDot} />
-                <View style={styles.insightBody}>
-                  <Text style={styles.insightTitle}>Clientes inativas</Text>
-                  <Text style={styles.insightText}>
-                    3 clientes não retornam há mais de 45 dias. Um contato rápido
-                    pode recuperar essas visitas esta semana.
-                  </Text>
-                </View>
-              </View>
-
-              {slotsLivres !== null && slotsLivres > 0 && (
-                <TouchableOpacity
-                  style={styles.insightCard}
-                  onPress={() => navigation.navigate('Indicacao')}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.insightDot} />
-                  <View style={styles.insightBody}>
-                    <Text style={styles.insightTitle}>Indique o AUREN</Text>
-                    <Text style={styles.insightText}>
-                      Você tem horários livres hoje. Que tal indicar o AUREN para
-                      uma colega profissional? Ela vai amar.
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 20, color: '#A8235A', lineHeight: 22, alignSelf: 'center', marginLeft: 8 }}>›</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Card Seu dia de cuidado — aparece uma vez por mês */}
-              {mostraDiaCuidado && (
-                <View style={styles.diaCuidadoCard}>
-                  <Text style={styles.diaCuidadoTitle}>Seu dia de cuidado ✨</Text>
-                  <Text style={styles.diaCuidadoText}>
-                    Cuide-se também! Reserve um dia este mês para suas unhas com outra profissional AUREN.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.diaCuidadoBtn}
-                    onPress={() => navigation.navigate('Perfil', { screen: 'Conexoes' })}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.diaCuidadoBtnText}>Ver profissionais disponíveis</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
                 </>
               )}
             </>
           )}
         </ScrollView>
       </View>
+
+      {/* ── Modal: Seu dia de cuidado ── */}
+      <Modal
+        visible={diaCuidadoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDiaCuidadoModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Seu dia de cuidado ✨</Text>
+
+            {diaCuidadoStep === 'main' && (
+              <>
+                <Text style={styles.modalSub}>
+                  Cuide-se também! Como posso te ajudar?
+                </Text>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => setDiaCuidadoStep('ja-cuidei')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalBtnText}>Já me cuidei este mês</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnOutline]}
+                  onPress={() => { setDiaCuidadoStep('quero-agendar'); loadConexoesModal(); }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.modalBtnText, styles.modalBtnTextOutline]}>Quero agendar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setDiaCuidadoModal(false)}
+                  style={styles.modalLink}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalLinkText}>Fechar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {diaCuidadoStep === 'ja-cuidei' && (
+              <>
+                <Text style={styles.modalSub}>Com quem você se cuidou?</Text>
+                {[
+                  { label: 'Conexão AUREN',     val: 'conexao'      },
+                  { label: 'Profissional AUREN', val: 'profissional' },
+                  { label: 'Fora do AUREN',      val: 'fora'         },
+                ].map(({ label, val }) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={styles.modalOption}
+                    onPress={() => setDiaCuidadoOpcao(val)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.modalRadio, diaCuidadoOpcao === val && styles.modalRadioSelected]} />
+                    <Text style={styles.modalOptionText}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+                {diaCuidadoOpcao === 'fora' && (
+                  <>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Nome da profissional"
+                      placeholderTextColor="#9B7B8A"
+                      value={foraNome}
+                      onChangeText={setForaNome}
+                    />
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Contato (telefone ou Instagram)"
+                      placeholderTextColor="#9B7B8A"
+                      value={foraContato}
+                      onChangeText={setForaContato}
+                    />
+                  </>
+                )}
+                <TouchableOpacity
+                  style={[styles.modalBtn, { marginTop: 16 }, !diaCuidadoOpcao && styles.modalBtnDisabled]}
+                  disabled={!diaCuidadoOpcao || salvandoCuidado}
+                  onPress={() => salvarDiaCuidado(diaCuidadoOpcao, foraNome, foraContato)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalBtnText}>
+                    {salvandoCuidado ? 'Salvando…' : 'Confirmar'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { setDiaCuidadoStep('main'); setDiaCuidadoOpcao(null); }}
+                  style={styles.modalLink}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalLinkText}>Voltar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {diaCuidadoStep === 'quero-agendar' && (
+              <>
+                <Text style={styles.modalSub}>Suas conexões AUREN:</Text>
+                {conexoesModal.length === 0 ? (
+                  <Text style={styles.modalEmptySub}>
+                    Você ainda não tem conexões ativas. Conecte-se com colegas na aba Perfil.
+                  </Text>
+                ) : (
+                  conexoesModal.map(c => (
+                    <View key={c.id} style={styles.modalConexaoRow}>
+                      <Text style={styles.modalConexaoNome}>{c.conexao?.nome}</Text>
+                      {c.conexao?.cidade ? (
+                        <Text style={styles.modalConexaoCidade}>{c.conexao.cidade}</Text>
+                      ) : null}
+                    </View>
+                  ))
+                )}
+                <TouchableOpacity
+                  onPress={() => setDiaCuidadoStep('main')}
+                  style={styles.modalLink}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalLinkText}>Voltar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -747,12 +974,13 @@ function makeStyles(isDark) {
     emptyBtn:     { backgroundColor: '#A8235A', borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
     emptyBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: text, marginTop: 8, marginBottom: 12 },
-    insightCard:  { backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', ...SM_SHADOW },
-    insightDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A8235A', marginTop: 5, marginRight: 12, flexShrink: 0 },
-    insightBody:  { flex: 1 },
-    insightTitle: { fontSize: 14, fontWeight: '700', color: text, marginBottom: 5 },
-    insightText:  { fontSize: 13, fontWeight: '400', color: sub, lineHeight: 20 },
+    sectionTitle:  { fontSize: 16, fontWeight: '700', color: text, marginTop: 8, marginBottom: 12 },
+    insightCard:   { backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', ...SM_SHADOW },
+    insightDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A8235A', marginTop: 5, marginRight: 12, flexShrink: 0 },
+    insightBody:   { flex: 1 },
+    insightTitle:  { fontSize: 14, fontWeight: '700', color: text, marginBottom: 5 },
+    insightText:   { fontSize: 13, fontWeight: '400', color: sub, lineHeight: 20 },
+    insightArrow:  { fontSize: 20, color: '#A8235A', lineHeight: 22, alignSelf: 'center', marginLeft: 8 },
 
     licencaBanner:   { borderRadius: 14, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
     licencaWarning:  { backgroundColor: 'rgba(245,158,11,0.10)', borderColor: 'rgba(245,158,11,0.35)' },
@@ -780,13 +1008,44 @@ function makeStyles(isDark) {
     einBannerSub:   { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
     einBannerArrow: { fontSize: 22, color: '#A8235A', marginLeft: 10 },
 
-    diaCuidadoCard: {
-      backgroundColor: card, borderRadius: 16, padding: 18,
-      marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#A8235A', ...SM_SHADOW,
+    // ── Modal ──
+    modalOverlay: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center', alignItems: 'center', padding: 24,
     },
-    diaCuidadoTitle:   { fontSize: 15, fontWeight: '800', color: text, marginBottom: 8 },
-    diaCuidadoText:    { fontSize: 13, fontWeight: '400', color: sub, lineHeight: 20, marginBottom: 14 },
-    diaCuidadoBtn:     { backgroundColor: '#A8235A', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 18, alignSelf: 'flex-start' },
-    diaCuidadoBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+    modalBox: {
+      backgroundColor: card, borderRadius: 20, padding: 24, width: '100%',
+    },
+    modalTitle:          { fontSize: 18, fontWeight: '800', color: text, marginBottom: 8 },
+    modalSub:            { fontSize: 14, fontWeight: '400', color: sub, marginBottom: 20, lineHeight: 20 },
+    modalBtn: {
+      backgroundColor: '#A8235A', borderRadius: 12,
+      paddingVertical: 13, alignItems: 'center', marginBottom: 10,
+    },
+    modalBtnOutline:     { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#A8235A' },
+    modalBtnDisabled:    { opacity: 0.4 },
+    modalBtnText:        { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+    modalBtnTextOutline: { color: '#A8235A' },
+    modalLink:           { marginTop: 10, alignSelf: 'center', paddingVertical: 6 },
+    modalLinkText:       { fontSize: 14, fontWeight: '500', color: '#A8235A' },
+    modalOption: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingVertical: 12, borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#2A2A2A' : '#E6D8CF',
+    },
+    modalRadio:         { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#A8235A', marginRight: 12 },
+    modalRadioSelected: { backgroundColor: '#A8235A' },
+    modalOptionText:    { fontSize: 14, fontWeight: '500', color: text },
+    modalInput: {
+      borderWidth: 1, borderColor: isDark ? '#2A2A2A' : '#E6D8CF',
+      borderRadius: 10, padding: 12, fontSize: 14, color: text, marginTop: 10,
+    },
+    modalEmptySub: { fontSize: 13, color: sub, lineHeight: 20, marginBottom: 10 },
+    modalConexaoRow: {
+      paddingVertical: 10, borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#2A2A2A' : '#E6D8CF',
+    },
+    modalConexaoNome:   { fontSize: 14, fontWeight: '700', color: text },
+    modalConexaoCidade: { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
   });
 }
