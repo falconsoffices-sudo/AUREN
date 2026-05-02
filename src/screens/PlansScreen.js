@@ -411,7 +411,14 @@ export default function PlansScreen({ navigation }) {
             ))}
             <TouchableOpacity
               style={[styles.ctaBtn, { backgroundColor: plan.accent }]}
-              onPress={() => handleAssinar(plan.name)}
+              onPress={() => Alert.alert(
+                'Confirmar assinatura',
+                `Deseja assinar o ${plan.name} por ${plan.price}/mês?`,
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Confirmar', onPress: () => handleAssinar(plan.name) },
+                ]
+              )}
               activeOpacity={0.85}
             >
               <Text style={styles.ctaBtnText}>Assinar agora</Text>
