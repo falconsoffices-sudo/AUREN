@@ -502,6 +502,7 @@ export default function CaixaScreen() {
               color: () => isDark ? '#C9A8B6' : '#6B4A58',
               labelColor: () => isDark ? '#C9A8B6' : '#6B4A58',
               propsForLabels: { fontSize: 10 },
+              paddingRight: 40,
             }}
             style={{ borderRadius: 12 }}
           />
