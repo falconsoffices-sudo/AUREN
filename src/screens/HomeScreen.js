@@ -405,15 +405,21 @@ export default function HomeScreen({ navigation }) {
             style={styles.logoImage}
           />
         </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={styles.greeting}>Olá, {primeiroNome || '—'}</Text>
-            <Text style={styles.date}>{today}</Text>
-          </View>
-          <Image
-            source={require('../../assets/images/emblema.png')}
-            style={{ width: 45, height: 45, resizeMode: 'contain' }}
-          />
+        <Image
+          source={require('../../assets/images/emblema.png')}
+          style={{
+            position: 'absolute',
+            top: -110,
+            right: -70,
+            width: 380,
+            height: 380,
+            resizeMode: 'contain',
+            zIndex: 0,
+          }}
+        />
+        <View style={{ zIndex: 1 }}>
+          <Text style={styles.greeting}>Olá, {primeiroNome || '—'}</Text>
+          <Text style={styles.date}>{today}</Text>
         </View>
       </View>
 
@@ -701,7 +707,7 @@ function makeStyles(isDark) {
 
     logoImage: { height: 28, resizeMode: 'contain' },
 
-    header:   { backgroundColor: '#0E0F11', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30 },
+    header:   { backgroundColor: '#0E0F11', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30, position: 'relative' },
     logoRow:  { marginBottom: 20 },
     greeting: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
     date:     { fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.42)', textTransform: 'capitalize' },
