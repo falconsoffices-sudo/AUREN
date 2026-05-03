@@ -11,6 +11,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { calcularNivel } from '../lib/gamificacao';
+import { BarChart } from 'react-native-chart-kit';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,27 @@ function getDateRanges() {
   const mesFim    = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(ultimoDia)}T23:59:59`;
 
   return { hoje, semanaInicio, semanaFim, mesInicio, mesFim };
+}
+
+function getWeeklyChart(rows) {
+  const DIA_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const pad = n => String(n).padStart(2, '0');
+  const today = new Date();
+  const dow = today.getDay();
+  const mondayOffset = dow === 0 ? 6 : dow - 1;
+  const statusFat = ['finalizado', 'confirmado', 'pendente'];
+  const labels = [], values = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - mondayOffset + i);
+    labels.push(DIA_SHORT[d.getDay()]);
+    const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const sum = (rows ?? [])
+      .filter(r => r.data_hora.startsWith(ds) && statusFat.includes(r.status))
+      .reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
+    values.push(Math.round(sum));
+  }
+  return { labels, values, mondayOffset };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -213,6 +236,9 @@ export default function HomeScreen({ navigation }) {
   const [mostrarEINBanner,  setMostrarEINBanner]  = useState(false);
   const [clientesInativas,  setClientesInativas]  = useState(null);
   const [indicacoesDoMes,   setIndicacoesDoMes]   = useState(null);
+  const [hojeModal,         setHojeModal]         = useState(false);
+  const [fatModal,          setFatModal]          = useState(false);
+  const [agendSemana,       setAgendSemana]       = useState([]);
 
   // Modal — Seu dia de cuidado
   const [diaCuidadoModal,  setDiaCuidadoModal]  = useState(false);
@@ -332,6 +358,7 @@ export default function HomeScreen({ navigation }) {
     }
 
     const semanaData = agendSemanaRes.data ?? [];
+    setAgendSemana(semanaData);
     const statusFat  = ['finalizado', 'confirmado', 'pendente'];
 
     const hojeAgend = semanaData.filter(a => a.data_hora.startsWith(hoje));
@@ -611,7 +638,7 @@ export default function HomeScreen({ navigation }) {
               ) : (
                 <>
               {/* Card: Hoje */}
-              <View style={styles.cardToday}>
+              <TouchableOpacity style={styles.cardToday} onPress={() => setHojeModal(true)} activeOpacity={0.85}>
                 <Text style={styles.todayBadge}>
                   {`HOJE · ${totalAtendimentos} ${totalAtendimentos === 1 ? 'ATENDIMENTO' : 'ATENDIMENTOS'}`}
                 </Text>
@@ -619,20 +646,22 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.todayCaption}>
                   {proximaCliente ? `próxima: ${proximaCliente}` : 'previsto para hoje'}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Próximos 2 agendamentos */}
               {proximosDois.length > 0 && (
                 <View style={styles.card}>
                   <Text style={styles.cardLabel}>Próximos agendamentos</Text>
                   {proximosDois.map((a, idx) => (
-                    <AgendamentoRow key={a.id} agendamento={a} showDivider={idx > 0} />
+                    <TouchableOpacity key={a.id} onPress={() => navigation.navigate('Agenda')} activeOpacity={0.75}>
+                      <AgendamentoRow agendamento={a} showDivider={idx > 0} />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
 
               {/* Card: Faturamento */}
-              <View style={styles.card}>
+              <TouchableOpacity style={styles.card} onPress={() => setFatModal(true)} activeOpacity={0.85}>
                 <Text style={styles.cardLabel}>Faturamento</Text>
                 <View style={styles.statRow}>
                   <StatColumn
@@ -645,17 +674,17 @@ export default function HomeScreen({ navigation }) {
                     value={formatMoeda(faturamentoMes)}
                   />
                 </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Card: Nível de gamificação */}
-              <View style={styles.card}>
+              <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Perfil', { screen: 'Gamificacao' })} activeOpacity={0.85}>
                 <View style={styles.levelHeader}>
                   <Text style={styles.cardLabel}>Nível</Text>
                   <Text style={styles.levelPercent}>Nível {nivelGamificacao}</Text>
                 </View>
                 <Text style={styles.levelTitle}>{nivelLabel}</Text>
                 <ProgressBar progress={nivelProgress} />
-              </View>
+              </TouchableOpacity>
 
               {/* ── Insights de hoje ── */}
               <Text style={styles.sectionTitle}>Insights de hoje</Text>
@@ -776,6 +805,89 @@ export default function HomeScreen({ navigation }) {
           )}
         </ScrollView>
       </View>
+
+      {/* ── Modal: Hoje ── */}
+      <Modal visible={hojeModal} transparent animationType="slide" onRequestClose={() => setHojeModal(false)}>
+        <View style={styles.bsBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setHojeModal(false)} activeOpacity={1} />
+          <View style={styles.bsSheet}>
+            <View style={styles.bsHandle} />
+            <Text style={styles.bsTitle}>
+              {`Hoje · ${totalAtendimentos} ${totalAtendimentos === 1 ? 'Atendimento' : 'Atendimentos'}`}
+            </Text>
+            {agendamentosHoje.length === 0 ? (
+              <Text style={styles.bsEmpty}>Nenhum atendimento hoje ainda.</Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                {agendamentosHoje.map((a, i) => (
+                  <View key={a.id} style={[styles.bsRow, i > 0 && styles.bsRowBorder]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bsCliente}>{a.clientes?.nome ?? 'Cliente'}</Text>
+                      <Text style={styles.bsServico}>{a.servicos?.nome ?? '—'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.bsHora}>{formatHora(a.data_hora)}</Text>
+                      <Text style={styles.bsValor}>{formatMoeda(a.valor ?? a.servicos?.valor ?? 0)}</Text>
+                    </View>
+                  </View>
+                ))}
+                <View style={{ height: 24 }} />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: Faturamento da semana ── */}
+      <Modal visible={fatModal} transparent animationType="slide" onRequestClose={() => setFatModal(false)}>
+        <View style={styles.bsBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setFatModal(false)} activeOpacity={1} />
+          <View style={styles.bsSheet}>
+            <View style={styles.bsHandle} />
+            <Text style={styles.bsTitle}>Faturamento da semana</Text>
+            {(() => {
+              const wc = getWeeklyChart(agendSemana);
+              const { mondayOffset } = wc;
+              const todayVal = wc.values[mondayOffset] ?? 0;
+              const pastValues = wc.values.slice(0, mondayOffset + 1);
+              const maxVal = Math.max(...pastValues);
+              const maxIdx = wc.values.findIndex((v, i) => i <= mondayOffset && v === maxVal);
+              const compText = maxVal === 0
+                ? 'Sem faturamento esta semana ainda.'
+                : maxIdx === mondayOffset && maxVal > 0
+                ? `Hoje é o melhor dia da semana até agora — ${formatMoeda(todayVal)}.`
+                : `Melhor dia até agora: ${wc.labels[maxIdx]} · ${formatMoeda(maxVal)}.`;
+              return (
+                <>
+                  <Text style={styles.bsChartTitle}>ESTA SEMANA · {formatMoeda(faturamentoSemana)}</Text>
+                  <BarChart
+                    data={{ labels: wc.labels, datasets: [{ data: wc.values.map(v => v || 0.01) }] }}
+                    width={Dimensions.get('window').width - 40}
+                    height={160}
+                    fromZero
+                    withInnerLines={false}
+                    chartConfig={{
+                      backgroundColor: 'transparent',
+                      backgroundGradientFrom: isDark ? '#0E0F11' : '#FFFFFF',
+                      backgroundGradientTo: isDark ? '#0E0F11' : '#FFFFFF',
+                      decimalPlaces: 0,
+                      color: () => isDark ? '#C9A8B6' : '#6B4A58',
+                      labelColor: () => isDark ? '#C9A8B6' : '#6B4A58',
+                      fillShadowGradient: '#A8235A',
+                      fillShadowGradientOpacity: 1,
+                      propsForLabels: { fontSize: 10 },
+                      paddingRight: 64,
+                    }}
+                    style={{ borderRadius: 12 }}
+                  />
+                  <Text style={styles.bsCompText}>{compText}</Text>
+                  <View style={{ height: 24 }} />
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Modal: Seu dia de cuidado ── */}
       <Modal
@@ -930,7 +1042,7 @@ function makeStyles(isDark) {
   return StyleSheet.create({
     safe:   { flex: 1, backgroundColor: bg },
     shell:  { flex: 1, backgroundColor: bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
-    scroll: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 44 },
+    scroll: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 44 },
 
     logoImage: { height: 28, resizeMode: 'contain' },
 
@@ -1047,5 +1159,20 @@ function makeStyles(isDark) {
     },
     modalConexaoNome:   { fontSize: 14, fontWeight: '700', color: text },
     modalConexaoCidade: { fontSize: 12, fontWeight: '400', color: sub, marginTop: 2 },
+
+    // ── Bottom sheets ──
+    bsBackdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+    bsSheet:      { backgroundColor: card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '75%' },
+    bsHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: divBg, alignSelf: 'center', marginBottom: 16 },
+    bsTitle:      { fontSize: 18, fontWeight: '800', color: text, marginBottom: 16 },
+    bsEmpty:      { fontSize: 14, color: sub, textAlign: 'center', paddingVertical: 24 },
+    bsRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+    bsRowBorder:  { borderTopWidth: 1, borderTopColor: divBg },
+    bsCliente:    { fontSize: 14, fontWeight: '700', color: text, marginBottom: 2 },
+    bsServico:    { fontSize: 12, fontWeight: '400', color: sub },
+    bsHora:       { fontSize: 13, fontWeight: '700', color: '#A8235A', marginBottom: 2 },
+    bsValor:      { fontSize: 12, fontWeight: '500', color: sub },
+    bsChartTitle: { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1.2, marginBottom: 4 },
+    bsCompText:   { fontSize: 13, fontWeight: '500', color: sub, marginTop: 8, lineHeight: 20 },
   });
 }
