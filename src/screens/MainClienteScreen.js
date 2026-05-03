@@ -56,6 +56,20 @@ function toMins(str) {
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
+function formatPhoneMask(raw) {
+  const d = raw.replace(/\D/g, '').slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`;
+  return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+}
+
+function formatPhoneDisplay(stored) {
+  const digits = (stored ?? '').replace(/\D/g, '');
+  const d10 = digits.length >= 11 ? digits.slice(1) : digits;
+  if (d10.length !== 10) return stored ?? '—';
+  return `+1 (${d10.slice(0,3)}) ${d10.slice(3,6)}-${d10.slice(6)}`;
+}
+
 function isSameDayLocal(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -895,10 +909,11 @@ function ClienteAgendaScreen() {
 // ── ClientePerfilScreen ───────────────────────────────────────────────────────
 
 function ClientePerfilScreen({ navigation }) {
-  const [nome,     setNome]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [telefone, setTelefone] = useState('');
-  const [editando, setEditando] = useState(false);
+  const [nome,        setNome]        = useState('');
+  const [email,       setEmail]       = useState('');
+  const [telefone,    setTelefone]    = useState('');
+  const [telefoneMask,setTelefoneMask]= useState('');
+  const [editando,    setEditando]    = useState(false);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
   const [uid,      setUid]      = useState(null);
@@ -924,7 +939,10 @@ function ClientePerfilScreen({ navigation }) {
   const salvar = async () => {
     if (!nome.trim()) { Alert.alert('Campo obrigatório', 'Informe seu nome.'); return; }
     setSaving(true);
-    await supabase.from('profiles').update({ nome: nome.trim(), telefone }).eq('id', uid);
+    const digits = telefoneMask.replace(/\D/g, '').slice(0, 10);
+    const foneDb = digits.length === 10 ? `+1${digits}` : (telefone || null);
+    await supabase.from('profiles').update({ nome: nome.trim(), telefone: foneDb }).eq('id', uid);
+    if (foneDb) setTelefone(foneDb);
     setSaving(false);
     setEditando(false);
   };
@@ -982,15 +1000,19 @@ function ClientePerfilScreen({ navigation }) {
 
           <Text style={styles.fieldLabel}>Telefone</Text>
           {editando ? (
-            <TextInput
-              style={styles.fieldInput}
-              value={telefone}
-              onChangeText={setTelefone}
-              keyboardType="phone-pad"
-              placeholderTextColor="#6B4A58"
-            />
+            <View style={styles.phoneEditRow}>
+              <Text style={styles.phonePrefix}>+1</Text>
+              <TextInput
+                style={[styles.fieldInput, { flex: 1, marginBottom: 0 }]}
+                value={telefoneMask}
+                onChangeText={v => setTelefoneMask(formatPhoneMask(v))}
+                keyboardType="phone-pad"
+                placeholder="(305) 555-0000"
+                placeholderTextColor="#6B4A58"
+              />
+            </View>
           ) : (
-            <Text style={styles.fieldValue}>{telefone || '—'}</Text>
+            <Text style={styles.fieldValue}>{telefone ? formatPhoneDisplay(telefone) : '—'}</Text>
           )}
         </View>
 
@@ -1017,7 +1039,12 @@ function ClientePerfilScreen({ navigation }) {
         ) : (
           <TouchableOpacity
             style={styles.outlineBtn}
-            onPress={() => setEditando(true)}
+            onPress={() => {
+              const digits = telefone.replace(/\D/g, '');
+              const d10 = digits.length >= 11 ? digits.slice(1) : digits;
+              setTelefoneMask(formatPhoneMask(d10));
+              setEditando(true);
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.outlineBtnText}>Editar dados</Text>
@@ -1152,10 +1179,12 @@ const styles = StyleSheet.create({
   // Perfil screen
   avatarCircle:{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#A8235A22', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 24 },
   avatarText:  { fontSize: 30, fontWeight: '800', color: '#A8235A' },
-  fieldLabel:  { fontSize: 11, fontWeight: '600', color: '#6B4A58', letterSpacing: 0.6, marginBottom: 6, marginTop: 14 },
-  fieldValue:  { fontSize: 15, fontWeight: '400', color: '#FFFFFF', paddingVertical: 4 },
-  fieldReadonly:{ color: '#6B4A58' },
-  fieldInput:  { backgroundColor: '#0E0F11', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#FFFFFF', marginBottom: 4 },
+  fieldLabel:    { fontSize: 11, fontWeight: '600', color: '#6B4A58', letterSpacing: 0.6, marginBottom: 6, marginTop: 14 },
+  fieldValue:    { fontSize: 15, fontWeight: '400', color: '#FFFFFF', paddingVertical: 4 },
+  fieldReadonly: { color: '#6B4A58' },
+  fieldInput:    { backgroundColor: '#0E0F11', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#FFFFFF', marginBottom: 4 },
+  phoneEditRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  phonePrefix:   { fontSize: 15, fontWeight: '700', color: '#C9A8B6' },
 
   // Pagamento placeholder
   pagamentoCard: {
