@@ -264,15 +264,17 @@ export default function ConfiguracoesScreen({ navigation }) {
           <View style={styles.fullToggleRow}>
             {IDIOMA_OPTIONS.map(opt => {
               const active = idioma === opt.value;
+              const locked = opt.value !== 'pt';
               return (
                 <TouchableOpacity
                   key={opt.value}
-                  style={[styles.fullToggleBtn, active && styles.fullToggleBtnActive]}
+                  style={[styles.fullToggleBtn, active && styles.fullToggleBtnActive, locked && { opacity: 0.4 }]}
                   onPress={() => setIdioma(opt.value)}
                   activeOpacity={0.75}
+                  disabled={locked}
                 >
                   <Text style={[styles.fullToggleText, active && styles.fullToggleTextActive]}>
-                    {opt.label}
+                    {locked ? `${opt.label} 🔒` : opt.label}
                   </Text>
                 </TouchableOpacity>
               );

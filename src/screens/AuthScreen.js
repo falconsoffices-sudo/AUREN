@@ -348,18 +348,22 @@ export default function AuthScreen({ navigation }) {
               <Text style={styles.subtitle}>{IDIOMA_COPY[idioma].sub}</Text>
 
               <View style={styles.idiomaChips}>
-                {IDIOMAS.map(({ key, label }) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.idiomaChip, idioma === key && styles.idiomaChipActive]}
-                    onPress={() => setIdioma(key)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.idiomaChipText, idioma === key && styles.idiomaChipTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {IDIOMAS.map(({ key, label }) => {
+                  const locked = key !== 'pt';
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.idiomaChip, idioma === key && styles.idiomaChipActive, locked && { opacity: 0.4 }]}
+                      onPress={() => setIdioma(key)}
+                      activeOpacity={0.8}
+                      disabled={locked}
+                    >
+                      <Text style={[styles.idiomaChipText, idioma === key && styles.idiomaChipTextActive]}>
+                        {locked ? `${label} 🔒` : label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <TouchableOpacity
