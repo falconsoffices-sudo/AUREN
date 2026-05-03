@@ -201,14 +201,42 @@ function MetaBar({ label, current, total }) {
 // ─── EntradaManualModal ───────────────────────────────────────────────────────
 
 function EntradaManualModal({ visible, onClose, onSaved }) {
-  const [descricao, setDescricao] = useState('');
-  const [valor,     setValor]     = useState('');
-  const [metodo,    setMetodo]    = useState('zelle');
-  const [data,      setData]      = useState(todayMMDDYYYY());
-  const [saving,    setSaving]    = useState(false);
+  const [descricao,       setDescricao]       = useState('');
+  const [valor,           setValor]           = useState('');
+  const [metodo,          setMetodo]          = useState('zelle');
+  const [data,            setData]            = useState(todayMMDDYYYY());
+  const [saving,          setSaving]          = useState(false);
+  const [clienteSearch,   setClienteSearch]   = useState('');
+  const [clientes,        setClientes]        = useState([]);
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    (async () => {
+      setLoadingClientes(true);
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+      if (!uid) { setLoadingClientes(false); return; }
+      const { data: cData } = await supabase
+        .from('clientes')
+        .select('id, nome')
+        .eq('profissional_id', uid)
+        .order('nome');
+      setClientes(cData ?? []);
+      setLoadingClientes(false);
+    })();
+  }, [visible]);
+
+  const filteredClientes = useMemo(() => {
+    if (!clienteSearch.trim() || selectedCliente) return [];
+    const q = clienteSearch.toLowerCase();
+    return clientes.filter(c => c.nome.toLowerCase().includes(q)).slice(0, 5);
+  }, [clientes, clienteSearch, selectedCliente]);
 
   function reset() {
     setDescricao(''); setValor(''); setMetodo('zelle'); setData(todayMMDDYYYY());
+    setClienteSearch(''); setSelectedCliente(null);
   }
 
   function handleClose() { reset(); onClose(); }
@@ -231,6 +259,7 @@ function EntradaManualModal({ visible, onClose, onSaved }) {
         metodo_pagamento: metodo,
         tipo:             'receita',
         categoria:        descricao.trim() || 'entrada_manual',
+        cliente_id:       selectedCliente?.id ?? null,
         created_at:       mmddyyyyToISO(data),
       });
       if (error) throw error;
@@ -253,6 +282,44 @@ function EntradaManualModal({ visible, onClose, onSaved }) {
             <View style={mstyles.handle} />
             <Text style={mstyles.title}>Registrar Entrada</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+              <Text style={mstyles.label}>CLIENTE (OPCIONAL)</Text>
+              {selectedCliente ? (
+                <TouchableOpacity
+                  style={mstyles.clienteSelectedRow}
+                  onPress={() => { setSelectedCliente(null); setClienteSearch(''); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={mstyles.clienteSelectedText}>{selectedCliente.nome}</Text>
+                  <Text style={mstyles.clienteClearBtn}>✕</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TextInput
+                    style={mstyles.input}
+                    placeholder={loadingClientes ? 'Carregando...' : 'Buscar cliente...'}
+                    placeholderTextColor="#C9A8B6"
+                    value={clienteSearch}
+                    onChangeText={setClienteSearch}
+                    autoCapitalize="words"
+                    returnKeyType="search"
+                  />
+                  {filteredClientes.length > 0 && (
+                    <View style={mstyles.clienteListBox}>
+                      {filteredClientes.map((c, i) => (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[mstyles.clienteItem, i < filteredClientes.length - 1 && mstyles.clienteItemBorder]}
+                          onPress={() => { setSelectedCliente(c); setClienteSearch(''); }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={mstyles.clienteItemText}>{c.nome}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
 
               <Text style={mstyles.label}>DESCRIÇÃO</Text>
               <TextInput
@@ -362,6 +429,7 @@ export default function CaixaScreen({ navigation }) {
   const [finLista,        setFinLista]        = useState([]);
   const [prevMesGanhos,   setPrevMesGanhos]   = useState(0);
   const [prevMesDespesas, setPrevMesDespesas] = useState(0);
+  const [clienteNomes,    setClienteNomes]    = useState({});
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -399,7 +467,7 @@ export default function CaixaScreen({ navigation }) {
 
       supabase
         .from('financeiro')
-        .select('metodo_pagamento, valor, created_at, categoria')
+        .select('metodo_pagamento, valor, created_at, categoria, cliente_id')
         .eq('profissional_id', uid)
         .eq('tipo', 'receita')
         .order('created_at', { ascending: false }),
@@ -505,6 +573,13 @@ export default function CaixaScreen({ navigation }) {
     setAgendSemana(semRes.data ?? []);
     setSeisMesData(seisMesesRes.data ?? []);
     setFinLista(finRes.data ?? []);
+    const cIds = [...new Set((finRes.data ?? []).filter(r => r.cliente_id).map(r => r.cliente_id))];
+    if (cIds.length > 0) {
+      const { data: cNomesData } = await supabase.from('clientes').select('id, nome').in('id', cIds);
+      const cMap = {};
+      (cNomesData ?? []).forEach(c => { cMap[c.id] = c.nome; });
+      setClienteNomes(cMap);
+    }
 
     const padx = n => String(n).padStart(2, '0');
     const prevMo = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
@@ -843,7 +918,10 @@ export default function CaixaScreen({ navigation }) {
                         const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
                         return (
                           <View key={i} style={[bss.row, i > 0 && bss.rowBorder]}>
-                            <Text style={[bss.rowTitle, { flex: 1 }]}>{t.categoria || 'Entrada manual'}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={bss.rowTitle}>{t.categoria || 'Entrada manual'}</Text>
+                              <Text style={bss.rowSub}>{t.cliente_id ? (clienteNomes[t.cliente_id] ?? '—') : 'Cliente não identificado'}</Text>
+                            </View>
                             <Text style={bss.rowSub}>{dtStr}</Text>
                             <Text style={[bss.rowAccent, { marginLeft: 12 }]}>{fmt(t.valor)}</Text>
                           </View>
@@ -992,6 +1070,14 @@ const mstyles = StyleSheet.create({
 
   saveBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+
+  clienteListBox:      { backgroundColor: MINPUT_BG, borderRadius: 12, marginBottom: 14, overflow: 'hidden' },
+  clienteItem:         { paddingHorizontal: 16, paddingVertical: 13 },
+  clienteItemBorder:   { borderBottomWidth: 1, borderBottomColor: MSUBTLE },
+  clienteItemText:     { fontSize: 14, fontWeight: '500', color: '#F5EDE8' },
+  clienteSelectedRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: MINPUT_BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14, gap: 10 },
+  clienteSelectedText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#F5EDE8' },
+  clienteClearBtn:     { fontSize: 16, color: '#C9A8B6', fontWeight: '600' },
 });
 
 // ─── Bottom-sheet styles (theme-aware) ───────────────────────────────────────
