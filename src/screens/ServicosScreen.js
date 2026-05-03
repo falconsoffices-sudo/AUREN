@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import colors from '../constants/colors';
 
+const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CATALOGO = [
@@ -469,6 +471,91 @@ function ServicoCard({ nome, valor, duracao_minutos, descricao, onPress }) {
   );
 }
 
+// ─── Habilitar Servico Modal ──────────────────────────────────────────────────
+
+function HabilitarServicoModal({ visible, catalogItem, userId, onClose, onSaved }) {
+  const [valor,   setValor]   = useState('');
+  const [duracao, setDuracao] = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  useEffect(() => {
+    if (visible && catalogItem) {
+      setValor(String(catalogItem.refValor));
+      setDuracao(String(catalogItem.refDuracao));
+      setSaving(false);
+    }
+  }, [visible, catalogItem]);
+
+  const handleSave = async () => {
+    if (!valor || parseFloat(valor) <= 0) {
+      Alert.alert('Campo obrigatório', 'Informe o valor do serviço.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('servicos').insert({
+        profissional_id:  userId,
+        nome:             catalogItem.nome,
+        valor:            parseFloat(valor.replace(/[^0-9.]/g, '')),
+        duracao_minutos:  duracao ? parseInt(duracao.replace(/\D/g, ''), 10) : null,
+      });
+      if (error) throw error;
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao habilitar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!catalogItem) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[modal.sheet, { paddingBottom: 40 }]}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Habilitar serviço</Text>
+            <Text style={modal.refHint}>{catalogItem.nome}</Text>
+            <View style={modal.row}>
+              <TextInput
+                style={[modal.input, modal.halfInput]}
+                placeholder="Valor ($)"
+                placeholderTextColor="#6B4A58"
+                value={valor}
+                onChangeText={setValor}
+                keyboardType="decimal-pad"
+                returnKeyType="next"
+              />
+              <TextInput
+                style={[modal.input, modal.halfInput, { marginRight: 0 }]}
+                placeholder="Duração (min)"
+                placeholderTextColor="#6B4A58"
+                value={duracao}
+                onChangeText={t => setDuracao(t.replace(/\D/g, ''))}
+                keyboardType="number-pad"
+                returnKeyType="done"
+              />
+            </View>
+            <TouchableOpacity
+              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+              onPress={handleSave}
+              disabled={saving}
+              activeOpacity={0.85}
+            >
+              {saving
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={modal.saveBtnText}>Habilitar</Text>}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ServicosScreen({ navigation }) {
@@ -478,7 +565,9 @@ export default function ServicosScreen({ navigation }) {
   const [editServico,   setEditServico]   = useState(null);
   const [editVisible,   setEditVisible]   = useState(false);
   const [userId,        setUserId]        = useState(null);
-  const [initialValues, setInitialValues] = useState(null);
+  const [initialValues,    setInitialValues]    = useState(null);
+  const [habilitarVisible, setHabilitarVisible] = useState(false);
+  const [habilitarItem,    setHabilitarItem]    = useState(null);
 
   const fetchServicos = useCallback(async (uid) => {
     const id = uid ?? userId;
@@ -505,19 +594,17 @@ export default function ServicosScreen({ navigation }) {
   }, []);
 
   // Map catalog items to their active service (if enabled)
-  const servicoByNome = Object.fromEntries(servicos.map(s => [s.nome, s]));
+  const servicoByNome = Object.fromEntries(servicos.map(s => [normalize(s.nome), s]));
   const customServicos = servicos.filter(s => !CATALOGO_NOMES.includes(s.nome));
 
   function handleCatalogPress(catalogItem) {
-    const ativo = servicoByNome[catalogItem.nome];
+    const ativo = servicoByNome[normalize(catalogItem.nome)];
     if (ativo) {
       setEditServico(ativo);
       setEditVisible(true);
     } else {
-      Alert.alert(
-        'Serviço não habilitado',
-        'Você ainda não habilitou este serviço. Cadastre-o em Meus Serviços.'
-      );
+      setHabilitarItem(catalogItem);
+      setHabilitarVisible(true);
     }
   }
 
@@ -548,7 +635,7 @@ export default function ServicosScreen({ navigation }) {
               <CatalogCard
                 key={cat.nome}
                 catalogItem={cat}
-                servicoAtivo={servicoByNome[cat.nome] ?? null}
+                servicoAtivo={servicoByNome[normalize(cat.nome)] ?? null}
                 onPress={() => handleCatalogPress(cat)}
               />
             ))}
@@ -589,6 +676,14 @@ export default function ServicosScreen({ navigation }) {
         servico={editServico}
         onClose={() => { setEditVisible(false); setEditServico(null); }}
         onSaved={() => { setEditVisible(false); setEditServico(null); fetchServicos(); }}
+      />
+
+      <HabilitarServicoModal
+        visible={habilitarVisible}
+        catalogItem={habilitarItem}
+        userId={userId}
+        onClose={() => { setHabilitarVisible(false); setHabilitarItem(null); }}
+        onSaved={() => { setHabilitarVisible(false); setHabilitarItem(null); fetchServicos(); }}
       />
 
     </SafeAreaView>
