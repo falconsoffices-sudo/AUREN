@@ -812,7 +812,7 @@ export default function ClientesScreen() {
         >
           {carregandoContatos || importandoContatos
             ? <ActivityIndicator size="small" color="#A8235A" />
-            : <Text style={styles.importBtnText}>📱 Importar</Text>}
+            : <Text style={styles.importBtnText}>Importar da agenda</Text>}
         </TouchableOpacity>
       </View>
 
