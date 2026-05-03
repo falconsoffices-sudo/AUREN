@@ -876,7 +876,7 @@ export default function HomeScreen({ navigation }) {
                       fillShadowGradient: '#A8235A',
                       fillShadowGradientOpacity: 1,
                       propsForLabels: { fontSize: 10 },
-                      paddingRight: 64,
+                      paddingRight: 40,
                     }}
                     style={{ borderRadius: 12 }}
                   />
