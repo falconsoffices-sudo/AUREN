@@ -624,7 +624,7 @@ function ClienteHomeScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.greeting}>Olá, {primeiroNome || 'bem-vinda'} 👋</Text>
+        <Text style={styles.greeting}>Olá, {primeiroNome || 'bem-vinda'}</Text>
 
         {/* Card boas-vindas */}
         {primeiraVisita && profBoas && (
