@@ -121,6 +121,39 @@ function mmddyyyyToISO(str) {
   return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}T12:00:00`;
 }
 
+function getDailyChartMes(rows) {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth(), today = now.getDate();
+  const pad = n => String(n).padStart(2, '0');
+  const prefix = `${year}-${pad(month + 1)}`;
+  const labels = [], values = [];
+  for (let d = 1; d <= today; d++) {
+    labels.push(d % 5 === 1 || d === today ? String(d) : '');
+    const ds = `${prefix}-${pad(d)}`;
+    const sum = (rows ?? []).filter(r => r.data_hora?.startsWith(ds)).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
+    values.push(Math.round(sum));
+  }
+  return { labels, values };
+}
+
+function getDailyChartSemana(rows) {
+  const DIA_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const pad = n => String(n).padStart(2, '0');
+  const today = new Date();
+  const dow = today.getDay();
+  const mondayOffset = dow === 0 ? 6 : dow - 1;
+  const labels = [], values = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - mondayOffset + i);
+    labels.push(DIA_SHORT[d.getDay()]);
+    const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const sum = (rows ?? []).filter(r => r.data_hora?.startsWith(ds)).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
+    values.push(Math.round(sum));
+  }
+  return { labels, values, mondayOffset };
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }) {
@@ -299,9 +332,10 @@ function EntradaManualModal({ visible, onClose, onSaved }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function CaixaScreen() {
+export default function CaixaScreen({ navigation }) {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  const bss    = useMemo(() => makeBss(isDark),    [isDark]);
   const [loading,           setLoading]           = useState(true);
   const [ganhosMes,         setGanhosMes]         = useState(0);
   const [ganhosHoje,        setGanhosHoje]        = useState(0);
@@ -316,6 +350,18 @@ export default function CaixaScreen() {
   const [roiSubtitle, setRoiSubtitle] = useState('');
   const [roiMarco,    setRoiMarco]    = useState(null);
   const roiShownRef = useRef(false);
+  const [mesMModal,       setMesMModal]       = useState(false);
+  const [hojeModal,       setHojeModal]       = useState(false);
+  const [semanaModal,     setSemanaModal]     = useState(false);
+  const [lucroModal,      setLucroModal]      = useState(false);
+  const [pagModal,        setPagModal]        = useState(false);
+  const [pagModalKey,     setPagModalKey]     = useState(null);
+  const [agendHoje,       setAgendHoje]       = useState([]);
+  const [agendSemana,     setAgendSemana]     = useState([]);
+  const [seisMesData,     setSeisMesData]     = useState([]);
+  const [finLista,        setFinLista]        = useState([]);
+  const [prevMesGanhos,   setPrevMesGanhos]   = useState(0);
+  const [prevMesDespesas, setPrevMesDespesas] = useState(0);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -336,15 +382,16 @@ export default function CaixaScreen() {
 
       supabase
         .from('agendamentos')
-        .select('valor')
+        .select('valor, data_hora, clientes(nome), servicos(nome)')
         .eq('profissional_id', uid)
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', `${hoje}T00:00:00`)
-        .lte('data_hora', `${hoje}T23:59:59`),
+        .lte('data_hora', `${hoje}T23:59:59`)
+        .order('data_hora'),
 
       supabase
         .from('agendamentos')
-        .select('valor')
+        .select('valor, data_hora')
         .eq('profissional_id', uid)
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', semanaInicio)
@@ -352,9 +399,10 @@ export default function CaixaScreen() {
 
       supabase
         .from('financeiro')
-        .select('metodo_pagamento, valor')
+        .select('metodo_pagamento, valor, created_at, categoria')
         .eq('profissional_id', uid)
-        .eq('tipo', 'receita'),
+        .eq('tipo', 'receita')
+        .order('created_at', { ascending: false }),
 
       supabase
         .from('financeiro')
@@ -453,6 +501,20 @@ export default function CaixaScreen() {
     }
     setPagamentos(byMethod);
     setChartMonths(groupByMonth(seisMesesRes.data));
+    setAgendHoje(hojeRes.data ?? []);
+    setAgendSemana(semRes.data ?? []);
+    setSeisMesData(seisMesesRes.data ?? []);
+    setFinLista(finRes.data ?? []);
+
+    const padx = n => String(n).padStart(2, '0');
+    const prevMo = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
+    const prevStr = `${prevMo.getFullYear()}-${padx(prevMo.getMonth() + 1)}`;
+    setPrevMesGanhos((seisMesesRes.data ?? []).filter(r => r.data_hora?.startsWith(prevStr)).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0));
+    setPrevMesDespesas(soma((despRes.data ?? []).filter(d => {
+      if ((d.recorrencia ?? 'variavel') !== 'variavel') return false;
+      const ref = d.data_despesa ? new Date(`${d.data_despesa}T12:00:00`) : new Date(d.created_at);
+      return ref.getMonth() === prevMo.getMonth() && ref.getFullYear() === prevMo.getFullYear();
+    })));
 
     setLoading(false);
   }, []);
@@ -502,7 +564,7 @@ export default function CaixaScreen() {
           <Text style={styles.headerSub}>{monthName} · parcial</Text>
         </View>
 
-        <View style={styles.mainCard}>
+        <TouchableOpacity style={styles.mainCard} onPress={() => setMesMModal(true)} activeOpacity={0.88}>
           <Text style={styles.mainCardLabel}>GANHOS DO MÊS</Text>
           <Text style={styles.mainCardValue}>{fmt(ganhosMes)}</Text>
           <Text style={styles.mainCardSub}>
@@ -512,7 +574,7 @@ export default function CaixaScreen() {
           </Text>
           <ProgressBar progress={monthPct} />
           <Text style={styles.mainCardPct}>{monthPct}% da meta</Text>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>Faturamento — Últimos 6 meses</Text>
@@ -549,30 +611,30 @@ export default function CaixaScreen() {
         </View>
 
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { flex: 1 }]}>
+          <TouchableOpacity style={[styles.statCard, { flex: 1 }]} onPress={() => setHojeModal(true)} activeOpacity={0.85}>
             <Text style={styles.statLabel}>HOJE</Text>
             <Text style={styles.statValue}>{fmt(ganhosHoje)}</Text>
             <Text style={styles.statSub}>
               {ganhosHojeCount} {ganhosHojeCount === 1 ? 'atendimento' : 'atendimentos'}
             </Text>
-          </View>
-          <View style={[styles.statCard, { flex: 1 }]}>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.statCard, { flex: 1 }]} onPress={() => setSemanaModal(true)} activeOpacity={0.85}>
             <Text style={styles.statLabel}>ESTA SEMANA</Text>
             <Text style={styles.statValue}>{fmt(ganhosSemana)}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { flex: 1 }]}>
+          <TouchableOpacity style={[styles.statCard, { flex: 1 }]} onPress={() => navigation.navigate('Despesas')} activeOpacity={0.85}>
             <Text style={styles.statLabel}>DESPESAS DO MÊS</Text>
             <Text style={[styles.statValue, styles.valueRed]}>{fmt(despesasMes)}</Text>
-          </View>
-          <View style={[styles.statCard, { flex: 1 }]}>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.statCard, { flex: 1 }]} onPress={() => setLucroModal(true)} activeOpacity={0.85}>
             <Text style={styles.statLabel}>LUCRO REAL</Text>
             <Text style={[styles.statValue, lucroReal >= 0 ? styles.valueGreen : styles.valueRed]}>
               {fmt(lucroReal)}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionTitle}>Pagamentos recebidos</Text>
@@ -580,27 +642,27 @@ export default function CaixaScreen() {
           {payRows.map((row, ri) => (
             <View key={ri} style={styles.payRow}>
               {row.map(p => (
-                <PaymentCard
+                <TouchableOpacity
                   key={p.key}
-                  abbr={p.abbr}
-                  label={p.label}
-                  bg={p.bg}
-                  color={p.color}
-                  value={fmt(pagamentos[p.key] || 0)}
-                />
+                  style={{ flex: 1 }}
+                  onPress={() => { setPagModalKey(p.key); setPagModal(true); }}
+                  activeOpacity={0.85}
+                >
+                  <PaymentCard abbr={p.abbr} label={p.label} bg={p.bg} color={p.color} value={fmt(pagamentos[p.key] || 0)} />
+                </TouchableOpacity>
               ))}
             </View>
           ))}
         </View>
 
         <Text style={styles.sectionTitle}>Metas</Text>
-        <View style={styles.metasCard}>
+        <TouchableOpacity style={styles.metasCard} onPress={() => navigation.navigate('Metas')} activeOpacity={0.85}>
           <MetaBar
             label="Meta mensal"
             current={ganhosMes}
             total={metaMensal}
           />
-        </View>
+        </TouchableOpacity>
 
       </ScrollView>
 
@@ -611,6 +673,191 @@ export default function CaixaScreen() {
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      {/* ── Modal: Ganhos do Mês ── */}
+      <Modal visible={mesMModal} transparent animationType="slide" onRequestClose={() => setMesMModal(false)}>
+        <View style={bss.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setMesMModal(false)} activeOpacity={1} />
+          <View style={bss.sheet}>
+            <View style={bss.handle} />
+            <Text style={bss.title}>{MONTHS[new Date().getMonth()]} · {fmt(ganhosMes)}</Text>
+            {(() => {
+              const dc = getDailyChartMes(seisMesData);
+              const chartW = Math.max(Dimensions.get('window').width - 40, dc.values.length * 22);
+              const padx = n => String(n).padStart(2, '0');
+              const now = new Date();
+              const mesPrefix = `${now.getFullYear()}-${padx(now.getMonth() + 1)}`;
+              const mesCount = seisMesData.filter(r => r.data_hora?.startsWith(mesPrefix)).length;
+              const ticket = mesCount > 0 ? ganhosMes / mesCount : 0;
+              const diff = ganhosMes - prevMesGanhos;
+              const diffTxt = diff >= 0
+                ? `↑ ${fmt(diff)} a mais que ${MONTHS_SHORT[new Date(now.getFullYear(), now.getMonth() - 1).getMonth()]}`
+                : `↓ ${fmt(Math.abs(diff))} a menos que ${MONTHS_SHORT[new Date(now.getFullYear(), now.getMonth() - 1).getMonth()]}`;
+              return (
+                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  <Text style={bss.chartTitle}>FATURAMENTO POR DIA</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <BarChart
+                      data={{ labels: dc.labels, datasets: [{ data: dc.values.map(v => v || 0.01) }] }}
+                      width={chartW}
+                      height={140}
+                      fromZero
+                      withInnerLines={false}
+                      chartConfig={{ backgroundColor: 'transparent', backgroundGradientFrom: isDark ? '#1A1B1E' : '#FFFFFF', backgroundGradientTo: isDark ? '#1A1B1E' : '#FFFFFF', decimalPlaces: 0, color: () => isDark ? '#C9A8B6' : '#6B4A58', labelColor: () => isDark ? '#C9A8B6' : '#6B4A58', fillShadowGradient: '#A8235A', fillShadowGradientOpacity: 1, propsForLabels: { fontSize: 9 }, paddingRight: 40 }}
+                      style={{ borderRadius: 12 }}
+                    />
+                  </ScrollView>
+                  <Text style={bss.compText}>Média por atendimento: {fmt(ticket)}</Text>
+                  <Text style={bss.compText}>{diffTxt} ({fmt(prevMesGanhos)}).</Text>
+                  <View style={{ height: 24 }} />
+                </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: Hoje ── */}
+      <Modal visible={hojeModal} transparent animationType="slide" onRequestClose={() => setHojeModal(false)}>
+        <View style={bss.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setHojeModal(false)} activeOpacity={1} />
+          <View style={bss.sheet}>
+            <View style={bss.handle} />
+            <Text style={bss.title}>Hoje · {fmt(ganhosHoje)}</Text>
+            {agendHoje.length === 0 ? (
+              <Text style={bss.empty}>Nenhum atendimento hoje ainda.</Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                {agendHoje.map((a, i) => (
+                  <View key={i} style={[bss.row, i > 0 && bss.rowBorder]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={bss.rowTitle}>{a.clientes?.nome ?? 'Cliente'}</Text>
+                      <Text style={bss.rowSub}>{a.servicos?.nome ?? '—'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={bss.rowAccent}>{new Date(a.data_hora).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</Text>
+                      <Text style={bss.rowSub}>{fmt(a.valor ?? 0)}</Text>
+                    </View>
+                  </View>
+                ))}
+                <View style={{ height: 24 }} />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: Esta Semana ── */}
+      <Modal visible={semanaModal} transparent animationType="slide" onRequestClose={() => setSemanaModal(false)}>
+        <View style={bss.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setSemanaModal(false)} activeOpacity={1} />
+          <View style={bss.sheet}>
+            <View style={bss.handle} />
+            <Text style={bss.title}>Esta semana · {fmt(ganhosSemana)}</Text>
+            {(() => {
+              const wc = getDailyChartSemana(agendSemana);
+              const pastVals = wc.values.slice(0, wc.mondayOffset + 1);
+              const maxVal = Math.max(...pastVals);
+              const maxIdx = wc.values.findIndex((v, i) => i <= wc.mondayOffset && v === maxVal);
+              const compTxt = maxVal === 0
+                ? 'Sem faturamento esta semana ainda.'
+                : maxIdx === wc.mondayOffset && maxVal > 0
+                ? `Hoje é o melhor dia da semana — ${fmt(maxVal)}.`
+                : `Melhor dia: ${wc.labels[maxIdx]} · ${fmt(maxVal)}.`;
+              return (
+                <>
+                  <Text style={bss.chartTitle}>FATURAMENTO POR DIA</Text>
+                  <BarChart
+                    data={{ labels: wc.labels, datasets: [{ data: wc.values.map((v, i) => v || 0.01), colors: wc.labels.map((_, i) => i === maxIdx ? () => '#A8235A' : () => (isDark ? '#3A2A2E' : '#E6D8CF')) }] }}
+                    width={Dimensions.get('window').width - 40}
+                    height={160}
+                    fromZero
+                    withInnerLines={false}
+                    withCustomBarColorFromData
+                    flatColor
+                    chartConfig={{ backgroundColor: 'transparent', backgroundGradientFrom: isDark ? '#1A1B1E' : '#FFFFFF', backgroundGradientTo: isDark ? '#1A1B1E' : '#FFFFFF', decimalPlaces: 0, color: () => isDark ? '#C9A8B6' : '#6B4A58', labelColor: () => isDark ? '#C9A8B6' : '#6B4A58', propsForLabels: { fontSize: 10 }, paddingRight: 64 }}
+                    style={{ borderRadius: 12 }}
+                  />
+                  <Text style={bss.compText}>{compTxt}</Text>
+                  <View style={{ height: 24 }} />
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: Lucro Real ── */}
+      <Modal visible={lucroModal} transparent animationType="slide" onRequestClose={() => setLucroModal(false)}>
+        <View style={bss.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setLucroModal(false)} activeOpacity={1} />
+          <View style={bss.sheet}>
+            <View style={bss.handle} />
+            <Text style={bss.title}>Lucro Real</Text>
+            {(() => {
+              const prevLucro = prevMesGanhos - prevMesDespesas;
+              const diffLucro = lucroReal - prevLucro;
+              const now = new Date();
+              const curDay = now.getDate();
+              const daysInMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+              const dailyAvg = curDay > 0 ? ganhosMes / curDay : 0;
+              const projecao = dailyAvg * daysInMes;
+              const projLucro = projecao - despesasMes;
+              const diffTxt = diffLucro >= 0
+                ? `↑ ${fmt(Math.abs(diffLucro))} a mais que mês anterior (${fmt(prevLucro)})`
+                : `↓ ${fmt(Math.abs(diffLucro))} a menos que mês anterior (${fmt(prevLucro)})`;
+              return (
+                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  <View style={bss.eqRow}><Text style={bss.eqLabel}>Ganhos</Text><Text style={bss.eqVal}>{fmt(ganhosMes)}</Text></View>
+                  <View style={bss.eqRow}><Text style={bss.eqLabel}>− Despesas</Text><Text style={[bss.eqVal, { color: '#F87171' }]}>{fmt(despesasMes)}</Text></View>
+                  <View style={bss.eqDivider} />
+                  <Text style={[bss.eqTotal, { color: lucroReal >= 0 ? '#4ade80' : '#F87171' }]}>{fmt(lucroReal)}</Text>
+                  <Text style={bss.compText}>{diffTxt}.</Text>
+                  <Text style={bss.compText}>Projeção até dia {daysInMes}: {fmt(projLucro)} de lucro ({fmt(projecao)} em ganhos).</Text>
+                  <View style={{ height: 24 }} />
+                </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: Pagamento ── */}
+      <Modal visible={pagModal} transparent animationType="slide" onRequestClose={() => setPagModal(false)}>
+        <View style={bss.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setPagModal(false)} activeOpacity={1} />
+          <View style={bss.sheet}>
+            <View style={bss.handle} />
+            {(() => {
+              const meta = PAYMENT_META.find(p => p.key === pagModalKey);
+              const txs = finLista.filter(r => r.metodo_pagamento === pagModalKey);
+              return (
+                <>
+                  <Text style={bss.title}>{meta?.label ?? pagModalKey} · {fmt(pagamentos[pagModalKey] || 0)}</Text>
+                  {txs.length === 0 ? (
+                    <Text style={bss.empty}>Nenhuma transação registrada.</Text>
+                  ) : (
+                    <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                      {txs.map((t, i) => {
+                        const d = new Date(t.created_at);
+                        const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+                        return (
+                          <View key={i} style={[bss.row, i > 0 && bss.rowBorder]}>
+                            <Text style={[bss.rowTitle, { flex: 1 }]}>{t.categoria || 'Entrada manual'}</Text>
+                            <Text style={bss.rowSub}>{dtStr}</Text>
+                            <Text style={[bss.rowAccent, { marginLeft: 12 }]}>{fmt(t.valor)}</Text>
+                          </View>
+                        );
+                      })}
+                      <View style={{ height: 24 }} />
+                    </ScrollView>
+                  )}
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
 
       <EntradaManualModal
         visible={entradaModalVisible}
@@ -746,3 +993,31 @@ const mstyles = StyleSheet.create({
   saveBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 });
+
+// ─── Bottom-sheet styles (theme-aware) ───────────────────────────────────────
+
+function makeBss(isDark) {
+  const card = isDark ? '#1A1B1E' : '#FFFFFF';
+  const text = isDark ? '#F5EDE8' : '#1A0A14';
+  const sub  = isDark ? '#C9A8B6' : '#6B4A58';
+  const div  = isDark ? '#2A2A2A' : '#E6D8CF';
+  return StyleSheet.create({
+    backdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+    sheet:       { backgroundColor: card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
+    handle:      { width: 40, height: 4, borderRadius: 2, backgroundColor: div, alignSelf: 'center', marginBottom: 16 },
+    title:       { fontSize: 18, fontWeight: '800', color: text, marginBottom: 16 },
+    chartTitle:  { fontSize: 10, fontWeight: '700', color: '#A8235A', letterSpacing: 1.2, marginBottom: 4 },
+    compText:    { fontSize: 13, fontWeight: '400', color: sub, marginTop: 8, lineHeight: 20 },
+    empty:       { fontSize: 14, color: sub, textAlign: 'center', paddingVertical: 28 },
+    row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+    rowBorder:   { borderTopWidth: 1, borderTopColor: div },
+    rowTitle:    { fontSize: 14, fontWeight: '600', color: text, marginBottom: 2 },
+    rowSub:      { fontSize: 12, fontWeight: '400', color: sub },
+    rowAccent:   { fontSize: 13, fontWeight: '700', color: '#A8235A' },
+    eqRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+    eqLabel:     { fontSize: 16, fontWeight: '500', color: sub },
+    eqVal:       { fontSize: 20, fontWeight: '800', color: text },
+    eqDivider:   { height: 1, backgroundColor: div, marginVertical: 10 },
+    eqTotal:     { fontSize: 32, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  });
+}
