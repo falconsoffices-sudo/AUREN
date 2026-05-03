@@ -516,17 +516,7 @@ export default function ServicosScreen({ navigation }) {
     } else {
       Alert.alert(
         'Serviço não habilitado',
-        'Habilite este serviço em Meus Serviços para usá-lo.',
-        [
-          { text: 'Agora não', style: 'cancel' },
-          {
-            text: 'Habilitar',
-            onPress: () => {
-              setInitialValues(catalogItem);
-              setModalVisible(true);
-            },
-          },
-        ]
+        'Você ainda não habilitou este serviço. Cadastre-o em Meus Serviços.'
       );
     }
   }
