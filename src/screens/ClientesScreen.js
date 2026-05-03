@@ -364,14 +364,28 @@ function AddClientModal({ visible, onClose, onSaved }) {
 
       const servicoFinal = servicoOpcao === 'Outro' ? servicoOutro.trim() : servicoOpcao;
 
+      const foneDb = telefone ? `+1${telefone.replace(/\D/g, '')}` : null;
+
       const { error } = await supabase.from('clientes').insert({
         profissional_id:  userId,
         nome:             nome.trim(),
-        telefone:         telefone ? `+1${telefone.replace(/\D/g, '')}` : null,
+        telefone:         foneDb,
         servico_favorito: servicoFinal || null,
         observacoes:      observacoes.trim() || null,
       });
       if (error) throw error;
+
+      if (foneDb) {
+        const { data: profileMatch } = await supabase
+          .from('profiles')
+          .select('id, nome')
+          .eq('telefone', foneDb)
+          .maybeSingle();
+        if (profileMatch) {
+          await supabase.from('profiles').update({ primeira_visita: true }).eq('id', profileMatch.id);
+          console.log(`[PUSH] Nova cliente: ${nome.trim()} (${foneDb}) adicionada à agenda. Notificando ${profileMatch.nome} (${profileMatch.id})`);
+        }
+      }
 
       reset();
       onSaved();
