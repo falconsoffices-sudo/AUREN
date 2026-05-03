@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image, StyleSheet, Animated } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -63,8 +63,14 @@ function MainTabs() {
         name="Perfil"
         component={PerfilStack}
         listeners={({ navigation }) => ({
-          tabPress: () => {
-            navigation.navigate('Perfil', { screen: 'PerfilHome' });
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Perfil' }],
+              })
+            );
           },
         })}
       />
