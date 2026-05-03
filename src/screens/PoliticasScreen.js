@@ -264,6 +264,63 @@ function PrivacidadeContent() {
   );
 }
 
+// ─── Política de Cancelamento ────────────────────────────────────────────────
+
+function CancelamentoContent() {
+  return (
+    <View style={{ marginBottom: 32 }}>
+      <Text style={doc.sectionTitle}>Política de Cancelamento e Remarcação</Text>
+      <Text style={doc.updated}>Em vigor desde 1º de maio de 2026</Text>
+
+      <Section title="Cancelamento gratuito">
+        <P>
+          Cancelamentos realizados com <Text style={{ fontWeight: '700', color: '#F5EDE8' }}>4 horas ou mais</Text> de
+          antecedência em relação ao horário agendado são sempre gratuitos, sem qualquer cobrança.
+        </P>
+      </Section>
+
+      <Section title="Cancelamento tardio">
+        <P>
+          Cancelamentos realizados com <Text style={{ fontWeight: '700', color: '#F5EDE8' }}>menos de 4 horas</Text> de
+          antecedência estão sujeitos a uma taxa de <Text style={{ fontWeight: '700', color: '#F5EDE8' }}>20%</Text> do
+          valor do serviço agendado.
+        </P>
+        <Bullets items={[
+          'Na primeira ocorrência, a taxa é dispensada automaticamente como cortesia — você será notificada no momento do cancelamento.',
+          'A partir do segundo cancelamento tardio, a taxa de 20% é cobrada automaticamente e de forma irrevogável.',
+          'A taxa é calculada sobre o valor confirmado no agendamento no momento do cancelamento.',
+        ]} />
+      </Section>
+
+      <Section title="Remarcação">
+        <P>
+          Remarcações realizadas com <Text style={{ fontWeight: '700', color: '#F5EDE8' }}>4 horas ou mais</Text> de
+          antecedência são gratuitas e podem ser feitas diretamente pelo aplicativo.
+        </P>
+        <P>
+          Remarcações com menos de 4 horas de antecedência seguem a mesma regra do cancelamento tardio e
+          estão sujeitas à mesma taxa de 20%.
+        </P>
+      </Section>
+
+      <Section title="Distribuição da taxa">
+        <Bullets items={[
+          '70% do valor da taxa é destinado ao profissional para compensar o horário perdido.',
+          '30% é destinado à operação e manutenção da plataforma AUREN.',
+        ]} />
+      </Section>
+
+      <Section title="Disposições gerais">
+        <P>
+          A AUREN reserva-se o direito de alterar esta política com aviso prévio de 15 dias pelo
+          aplicativo. O uso continuado após as alterações constitui aceitação das novas condições.
+        </P>
+        <P>Dúvidas: suporte@auren.app</P>
+      </Section>
+    </View>
+  );
+}
+
 // ─── Suas Escolhas ────────────────────────────────────────────────────────────
 
 const ESCOLHAS = [
@@ -388,7 +445,12 @@ export default function PoliticasScreen({ navigation }) {
       >
         {tab === 'termos'      && <TermosContent />}
         {tab === 'privacidade' && <PrivacidadeContent />}
-        {tab === 'escolhas'    && <EscolhasContent prefs={prefs} onToggle={handleToggle} />}
+        {tab === 'escolhas'    && (
+          <>
+            <CancelamentoContent />
+            <EscolhasContent prefs={prefs} onToggle={handleToggle} />
+          </>
+        )}
         <View style={{ height: 60 }} />
       </ScrollView>
 

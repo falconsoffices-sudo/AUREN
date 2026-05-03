@@ -27,11 +27,13 @@ export default function AuthClienteScreen({ navigation }) {
   const { idioma } = useTheme();
   const [step, setStep] = useState('form');
 
-  const [nome,     setNome]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [telefone, setTelefone] = useState('');
-  const [otpCode,  setOtpCode]  = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [nome,       setNome]       = useState('');
+  const [email,      setEmail]      = useState('');
+  const [telefone,   setTelefone]   = useState('');
+  const [otpCode,    setOtpCode]    = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [userId,     setUserId]     = useState(null);
+  const [aceitouPol, setAceitouPol] = useState(false);
 
   const digits    = telefone.replace(/\D/g, '');
   const fullPhone = `+1${digits}`;
@@ -79,12 +81,29 @@ export default function AuthClienteScreen({ navigation }) {
             nome_completo_pendente: nome.trim().split(/\s+/).filter(Boolean).length < 3,
           })
           .eq('id', data.user.id);
+        setUserId(data.user.id);
       }
 
-      navigation.replace('MainCliente');
+      setAceitouPol(false);
+      setLoading(false);
+      setStep('politica');
     } catch (err) {
       Alert.alert('Erro ao verificar', err.message);
-    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAceitarPolitica = async () => {
+    if (!aceitouPol || !userId) return;
+    setLoading(true);
+    try {
+      await supabase
+        .from('profiles')
+        .update({ aceite_politica_cancelamento: new Date().toISOString() })
+        .eq('id', userId);
+      navigation.replace('MainCliente');
+    } catch (err) {
+      Alert.alert('Erro', err.message);
       setLoading(false);
     }
   };
@@ -169,6 +188,59 @@ export default function AuthClienteScreen({ navigation }) {
                 onPress={() => navigation.navigate('Login')}
               >
                 <Text style={styles.loginLinkText}>Já tenho conta</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'politica' && (
+            <>
+              <Text style={styles.title}>Antes de começar</Text>
+              <Text style={styles.subtitle}>Leia e aceite nossa política para continuar</Text>
+
+              <View style={styles.polCard}>
+                <Text style={styles.polSectionTitle}>Política de Cancelamento e Remarcação</Text>
+
+                <Text style={styles.polText}>
+                  <Text style={styles.polBold}>Cancelamento gratuito</Text>
+                  {'\n'}Cancelamentos com 4 horas ou mais de antecedência são sempre gratuitos.
+                </Text>
+
+                <Text style={styles.polText}>
+                  <Text style={styles.polBold}>Cancelamento tardio (menos de 4h)</Text>
+                  {'\n'}Sujeito a taxa de 20% do valor do serviço. Na primeira vez a taxa é dispensada como cortesia — você será avisada no momento. A partir do segundo cancelamento tardio a cobrança é automática.
+                </Text>
+
+                <Text style={styles.polText}>
+                  <Text style={styles.polBold}>Remarcação</Text>
+                  {'\n'}Remarcações com 4h ou mais de antecedência são gratuitas. Com menos de 4h seguem a mesma regra do cancelamento tardio.
+                </Text>
+
+                <Text style={styles.polText}>
+                  <Text style={styles.polBold}>Distribuição da taxa</Text>
+                  {'\n'}70% ao profissional · 30% à operação do AUREN.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.checkRow}
+                onPress={() => setAceitouPol(v => !v)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.checkbox, aceitouPol && styles.checkboxChecked]}>
+                  {aceitouPol && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkLabel}>Entendi e aceito a política de cancelamento</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, (!aceitouPol || loading) && { opacity: 0.45 }]}
+                onPress={handleAceitarPolitica}
+                disabled={!aceitouPol || loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Continuar</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -266,4 +338,31 @@ const styles = StyleSheet.create({
 
   loginLink:     { alignItems: 'center', paddingVertical: 10 },
   loginLinkText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },
+
+  polCard: {
+    backgroundColor: INPUT_BG, borderRadius: 16,
+    padding: 18, marginBottom: 20,
+  },
+  polSectionTitle: {
+    fontSize: 14, fontWeight: '700', color: '#A8235A',
+    marginBottom: 14, letterSpacing: 0.3,
+  },
+  polText: {
+    fontSize: 13, fontWeight: '400', color: '#C9A8B6',
+    lineHeight: 20, marginBottom: 12,
+  },
+  polBold: { fontWeight: '700', color: '#F5EDE8' },
+
+  checkRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginBottom: 20, gap: 12,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 2, borderColor: '#6B4A58',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: '#A8235A', borderColor: '#A8235A' },
+  checkmark:  { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  checkLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: '#C9A8B6', lineHeight: 20 },
 });

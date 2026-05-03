@@ -836,28 +836,100 @@ function ClienteHomeScreen({ navigation }) {
 function ClienteAgendaScreen() {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading,      setLoading]      = useState(true);
+  const [uid,          setUid]          = useState(null);
+  const [primeiraVez,  setPrimeiraVez]  = useState(true);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     const { data: authData } = await supabase.auth.getUser();
-    const uid = authData?.user?.id;
-    if (uid) setAgendamentos(await fetchAgendamentosCliente(uid));
+    const uidLocal = authData?.user?.id;
+    if (uidLocal) {
+      setUid(uidLocal);
+      const [ags, profRes] = await Promise.all([
+        fetchAgendamentosCliente(uidLocal),
+        supabase.from('profiles').select('primeira_vez_cancelamento').eq('id', uidLocal).single(),
+      ]);
+      setAgendamentos(ags);
+      setPrimeiraVez(profRes.data?.primeira_vez_cancelamento ?? true);
+    }
     setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { carregar(); }, [carregar]));
 
-  const cancelar = (id) => {
-    Alert.alert('Cancelar agendamento', 'Tem certeza que deseja cancelar?', [
-      { text: 'Não', style: 'cancel' },
-      {
-        text: 'Sim, cancelar', style: 'destructive',
-        onPress: async () => {
-          await supabase.from('agendamentos').update({ status: 'cancelado' }).eq('id', id);
-          carregar();
+  const cancelar = (ag) => {
+    const dataHora = new Date(ag.data_hora.slice(0, 19));
+    const horasRestantes = (dataHora - new Date()) / 3600000;
+
+    if (horasRestantes >= 4) {
+      Alert.alert('Cancelar agendamento', 'Tem certeza que deseja cancelar?', [
+        { text: 'Não', style: 'cancel' },
+        {
+          text: 'Sim, cancelar', style: 'destructive',
+          onPress: async () => {
+            await supabase.from('agendamentos').update({ status: 'cancelado' }).eq('id', ag.id);
+            carregar();
+          },
         },
-      },
-    ]);
+      ]);
+      return;
+    }
+
+    if (primeiraVez) {
+      Alert.alert(
+        'Cancelamento gratuito (1ª vez)',
+        'Este é seu cancelamento de cortesia por ser a primeira vez.\n\nEm cancelamentos futuros com menos de 4 horas de antecedência será cobrada uma taxa de 20% do valor do serviço.',
+        [
+          { text: 'Voltar', style: 'cancel' },
+          {
+            text: 'Cancelar mesmo assim', style: 'destructive',
+            onPress: async () => {
+              await Promise.all([
+                supabase.from('agendamentos').update({ status: 'cancelado' }).eq('id', ag.id),
+                supabase.from('profiles').update({ primeira_vez_cancelamento: false }).eq('id', uid),
+              ]);
+              setPrimeiraVez(false);
+              carregar();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    const valorServico   = parseFloat(ag.valor ?? 0);
+    const valorTaxa      = valorServico * 0.20;
+    const valorProf      = valorTaxa * 0.70;
+    const valorAuren     = valorTaxa * 0.30;
+
+    Alert.alert(
+      'Taxa de cancelamento',
+      `Cancelamentos com menos de 4 horas têm taxa de 20%.\n\nServiço: $${valorServico.toFixed(2)}\nTaxa: $${valorTaxa.toFixed(2)}\n\nDeseja confirmar o cancelamento?`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: `Confirmar ($${valorTaxa.toFixed(2)})`, style: 'destructive',
+          onPress: async () => {
+            await Promise.all([
+              supabase.from('agendamentos').update({ status: 'cancelado' }).eq('id', ag.id),
+              supabase.from('taxas_cancelamento').insert({
+                agendamento_id:    ag.id,
+                cliente_id:        uid,
+                profissional_id:   ag.profissional_id,
+                valor_servico:     valorServico,
+                valor_taxa:        valorTaxa,
+                valor_profissional:valorProf,
+                valor_auren:       valorAuren,
+                tipo:              'cancelamento',
+                primeira_vez:      false,
+                status:            'pendente',
+              }),
+            ]);
+            carregar();
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -888,10 +960,18 @@ function ClienteAgendaScreen() {
                 <Text style={styles.agendaData}>
                   {formatData(a.data_hora)}{'  ·  '}{formatHora(a.data_hora)}
                 </Text>
+                {podeCancel && (() => {
+                  const horaLimite = new Date(new Date(a.data_hora.slice(0, 19)).getTime() - 4 * 3600000);
+                  return horaLimite > new Date() ? (
+                    <Text style={styles.cancelamentoGratuito}>
+                      Cancelamento gratuito até {horaLimite.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </Text>
+                  ) : null;
+                })()}
                 {podeCancel && (
                   <TouchableOpacity
                     style={styles.cancelBtn}
-                    onPress={() => cancelar(a.id)}
+                    onPress={() => cancelar(a)}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.cancelBtnText}>Cancelar agendamento</Text>
@@ -1175,6 +1255,7 @@ const styles = StyleSheet.create({
   agendaData:  { fontSize: 13, fontWeight: '600', color: '#8A8A8E' },
   cancelBtn:   { marginTop: 14, borderWidth: 1, borderColor: '#EF4444', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
   cancelBtnText:{ fontSize: 13, fontWeight: '700', color: '#EF4444' },
+  cancelamentoGratuito: { fontSize: 11, color: '#666666', marginTop: 4 },
 
   // Perfil screen
   avatarCircle:{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#A8235A22', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 24 },
