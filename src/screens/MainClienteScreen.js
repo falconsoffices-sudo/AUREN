@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, TextInput,
+  ActivityIndicator, Alert, TextInput, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -55,6 +55,28 @@ function toMins(str) {
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
+
+function isSameDayLocal(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// dias: ['seg','ter',...] — 0=dom,1=seg,2=ter,3=qua,4=qui,5=sex,6=sab
+function isHorarioComercial(dataHora, horario) {
+  const DIA_MAP = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+  const diaKey  = DIA_MAP[dataHora.getDay()];
+  if (!(horario.dias ?? []).includes(diaKey)) return false;
+  const mins      = dataHora.getHours() * 60 + dataHora.getMinutes();
+  const inicio    = toMins(horario.inicio    ?? '08:00');
+  const fim       = toMins(horario.fim       ?? '17:00');
+  const almInicio = toMins(horario.almocoInicio ?? '12:00');
+  const almFim    = toMins(horario.almocoFim    ?? '13:00');
+  if (mins < inicio || mins >= fim) return false;
+  if (mins >= almInicio && mins < almFim) return false;
+  return true;
+}
+
+const DIA_CURTO_AM = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const MES_CURTO_AM = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 // Vincula o usuário logado a agendamentos via clientes.telefone == profiles.telefone
 async function fetchAgendamentosCliente(uid) {
@@ -171,6 +193,265 @@ function calcSlotsProf(agendamentos) {
   return slots;
 }
 
+// ── AgendamentoClienteModal ───────────────────────────────────────────────────
+// NOTA: Requer política RLS adicional no Supabase para permitir que a cliente
+// insira agendamentos. Rodar no SQL Editor:
+//   CREATE POLICY "agendamentos: cliente pode agendar"
+//     ON agendamentos FOR INSERT
+//     WITH CHECK (
+//       cliente_id IN (
+//         SELECT c.id FROM clientes c
+//         INNER JOIN profiles p ON p.telefone = c.telefone
+//         WHERE p.id = auth.uid()
+//       )
+//     );
+
+function AgendamentoClienteModal({ visible, profissionalId, profissionalNome, clienteUid, clienteTelefone, onClose }) {
+  const [dias14,          setDias14]          = useState([]);
+  const [diaSelecionado,  setDiaSelecionado]  = useState(null);
+  const [slots,           setSlots]           = useState([]);
+  const [slotSelecionado, setSlotSelecionado] = useState(null);
+  const [servicos,        setServicos]        = useState([]);
+  const [servicoSel,      setServicoSel]      = useState(null);
+  const [servicoOpen,     setServicoOpen]     = useState(false);
+  const [horarioProf,     setHorarioProf]     = useState(DEFAULT_HORARIO_PROF);
+  const [loadingSlots,    setLoadingSlots]    = useState(false);
+  const [saving,          setSaving]          = useState(false);
+
+  useEffect(() => {
+    if (!visible || !profissionalId) return;
+    setDiaSelecionado(null); setSlots([]); setSlotSelecionado(null);
+    setServicoSel(null); setServicoOpen(false);
+
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() + i); d.setHours(0, 0, 0, 0); return d;
+    });
+    setDias14(days);
+
+    Promise.all([
+      supabase.from('profiles').select('horario_atendimento').eq('id', profissionalId).single(),
+      supabase.from('servicos').select('id, nome, valor, duracao_minutos').eq('profissional_id', profissionalId).eq('ativo', true).order('nome'),
+    ]).then(([hRes, sRes]) => {
+      if (hRes.data?.horario_atendimento) setHorarioProf({ ...DEFAULT_HORARIO_PROF, ...hRes.data.horario_atendimento });
+      if (sRes.data) setServicos(sRes.data);
+    });
+  }, [visible, profissionalId]);
+
+  async function selecionarDia(dia) {
+    setDiaSelecionado(dia); setSlotSelecionado(null); setLoadingSlots(true);
+
+    const dayStr = `${dia.getFullYear()}-${pad(dia.getMonth()+1)}-${pad(dia.getDate())}`;
+    const { data: ags } = await supabase
+      .from('agendamentos')
+      .select('data_hora, servico:servicos(duracao_minutos)')
+      .eq('profissional_id', profissionalId)
+      .neq('status', 'cancelado')
+      .gte('data_hora', `${dayStr}T00:00:00`)
+      .lte('data_hora', `${dayStr}T23:59:59`);
+
+    const busyIntervals = (ags ?? []).map(a => {
+      const dt = new Date(a.data_hora);
+      const s  = dt.getHours() * 60 + dt.getMinutes();
+      return { s, e: s + (a.servico?.duracao_minutos ?? 60) };
+    });
+
+    const inicio    = toMins(horarioProf.inicio    ?? '08:00');
+    const fim       = toMins(horarioProf.fim       ?? '17:00');
+    const almInicio = toMins(horarioProf.almocoInicio ?? '12:00');
+    const almFim    = toMins(horarioProf.almocoFim    ?? '13:00');
+    const agora     = new Date();
+    const slotsArr  = [];
+
+    for (let m = inicio; m < fim; m += 60) {
+      if (m >= almInicio && m < almFim) continue;
+      const slotDate = new Date(dia);
+      slotDate.setHours(Math.floor(m / 60), m % 60, 0, 0);
+      if (slotDate <= agora) continue;
+      if (busyIntervals.some(b => m < b.e && m + 60 > b.s)) continue;
+      slotsArr.push({ hora: slotDate, comercial: isHorarioComercial(slotDate, horarioProf) });
+    }
+
+    setSlots(slotsArr); setLoadingSlots(false);
+  }
+
+  async function agendar() {
+    if (!slotSelecionado) { Alert.alert('Selecione um horário', 'Escolha um horário disponível.'); return; }
+    if (!servicoSel)      { Alert.alert('Selecione um serviço', 'Escolha o serviço desejado.'); return; }
+    setSaving(true);
+    try {
+      const { data: clRow } = await supabase
+        .from('clientes').select('id')
+        .eq('profissional_id', profissionalId).eq('telefone', clienteTelefone)
+        .maybeSingle();
+
+      const sh = slotSelecionado.hora;
+      const dataHoraStr = `${sh.getFullYear()}-${pad(sh.getMonth()+1)}-${pad(sh.getDate())}T${pad(sh.getHours())}:00:00`;
+      const status      = slotSelecionado.comercial ? 'confirmado' : 'pendente';
+
+      const { error } = await supabase.from('agendamentos').insert({
+        profissional_id: profissionalId,
+        cliente_id:      clRow?.id ?? null,
+        servico_id:      servicoSel.id,
+        data_hora:       dataHoraStr,
+        status,
+        valor:           servicoSel.valor ?? null,
+      });
+      if (error) throw error;
+
+      const horaFmt = sh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const dataFmt = sh.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (status === 'confirmado') {
+        console.log(`[PUSH → prof ${profissionalId}] Nova solicitação confirmada: ${dataFmt} ${horaFmt} — ${servicoSel.nome}`);
+        console.log(`[PUSH → cliente ${clienteUid}] Agendamento confirmado: ${dataFmt} ${horaFmt} — ${servicoSel.nome} com ${profissionalNome}`);
+      } else {
+        console.log(`[PUSH → prof ${profissionalId}] Solicitação pendente: ${dataFmt} ${horaFmt} — ${servicoSel.nome}`);
+      }
+
+      Alert.alert(
+        status === 'confirmado' ? 'Agendado!' : 'Solicitação enviada',
+        status === 'confirmado'
+          ? `Agendamento de ${servicoSel.nome} em ${dataFmt} às ${horaFmt} confirmado.`
+          : `Solicitação enviada para ${profissionalNome}. Você será notificada quando confirmar.`,
+        [{ text: 'OK', onPress: () => onClose(true) }]
+      );
+    } catch (err) {
+      Alert.alert('Erro ao agendar', err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => onClose(false)}>
+      <View style={am.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={() => onClose(false)} activeOpacity={1} />
+        <View style={am.sheet}>
+          <View style={am.handle} />
+          <Text style={am.profLabel}>{profissionalNome}</Text>
+          <Text style={am.sheetTitle}>Escolha o horário</Text>
+
+          <Text style={am.sectionLabel}>DATA</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={am.calRow} contentContainerStyle={{ paddingHorizontal: 4 }}>
+            {dias14.map((d, i) => {
+              const ativo = diaSelecionado && isSameDayLocal(d, diaSelecionado);
+              return (
+                <TouchableOpacity key={i} style={[am.diaItem, ativo && am.diaItemAtivo]} onPress={() => selecionarDia(d)} activeOpacity={0.75}>
+                  <Text style={[am.diaSem, ativo && am.diaTextoAtivo]}>{DIA_CURTO_AM[d.getDay()]}</Text>
+                  <Text style={[am.diaNum, ativo && am.diaTextoAtivo]}>{d.getDate()}</Text>
+                  <Text style={[am.diaMes, ativo && am.diaTextoAtivo]}>{MES_CURTO_AM[d.getMonth()]}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {diaSelecionado && (
+            <>
+              <Text style={am.sectionLabel}>HORÁRIOS DISPONÍVEIS</Text>
+              {loadingSlots ? (
+                <ActivityIndicator color="#A8235A" style={{ marginVertical: 16 }} />
+              ) : slots.length === 0 ? (
+                <Text style={am.semSlots}>Nenhum horário disponível neste dia.</Text>
+              ) : (
+                <ScrollView style={am.slotsScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  {slots.map((slot, i) => {
+                    const ativo = slotSelecionado?.hora.getTime() === slot.hora.getTime();
+                    return (
+                      <TouchableOpacity key={i} style={[am.slotItem, ativo && am.slotItemAtivo]} onPress={() => setSlotSelecionado(slot)} activeOpacity={0.8}>
+                        <Text style={[am.slotHora, ativo && am.slotHoraAtivo]}>
+                          {slot.hora.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                        </Text>
+                        <View style={[am.slotBadge, slot.comercial ? am.slotBadgeGreen : am.slotBadgeAmber]}>
+                          <Text style={[am.slotBadgeText, slot.comercial ? am.slotBadgeTextGreen : am.slotBadgeTextAmber]}>
+                            {slot.comercial ? 'Confirma na hora' : 'Sujeito a confirmação'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </>
+          )}
+
+          <Text style={am.sectionLabel}>SERVIÇO</Text>
+          <TouchableOpacity style={am.servicoField} onPress={() => setServicoOpen(o => !o)} activeOpacity={0.8}>
+            <Text style={servicoSel ? am.servicoFieldText : am.servicoFieldPlaceholder} numberOfLines={1}>
+              {servicoSel ? `${servicoSel.nome}  ·  $${parseFloat(servicoSel.valor ?? 0).toFixed(2)}` : 'Selecionar serviço...'}
+            </Text>
+            <Text style={am.servicoArrow}>{servicoOpen ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {servicoOpen && (
+            <View style={am.servicoList}>
+              {servicos.length === 0
+                ? <Text style={am.semSlots}>Nenhum serviço cadastrado.</Text>
+                : servicos.map((s, i) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[am.servicoItem, i < servicos.length - 1 && am.servicoItemBorder]}
+                    onPress={() => { setServicoSel(s); setServicoOpen(false); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={am.servicoItemNome}>{s.nome}</Text>
+                    <Text style={am.servicoItemValor}>${parseFloat(s.valor ?? 0).toFixed(2)}</Text>
+                  </TouchableOpacity>
+                ))
+              }
+            </View>
+          )}
+
+          <TouchableOpacity style={[am.agendarBtn, saving && { opacity: 0.7 }]} onPress={agendar} disabled={saving} activeOpacity={0.85}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={am.agendarBtnText}>Agendar</Text>}
+          </TouchableOpacity>
+          <View style={{ height: 24 }} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const am = StyleSheet.create({
+  backdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
+  sheet:      { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '90%' },
+  handle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#2A2A2A', alignSelf: 'center', marginBottom: 16 },
+  profLabel:  { fontSize: 11, fontWeight: '700', color: '#A8235A', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  sheetTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginBottom: 18 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#6B4A58', letterSpacing: 1.2, marginBottom: 8, marginTop: 6 },
+
+  calRow:      { marginHorizontal: -4, marginBottom: 4 },
+  diaItem:     { width: 56, alignItems: 'center', paddingVertical: 10, borderRadius: 14, marginHorizontal: 4, backgroundColor: '#1A1B1E' },
+  diaItemAtivo:{ backgroundColor: '#A8235A' },
+  diaSem:      { fontSize: 10, fontWeight: '600', color: '#6B4A58', marginBottom: 4 },
+  diaNum:      { fontSize: 18, fontWeight: '700', color: '#C9A8B6', marginBottom: 2 },
+  diaMes:      { fontSize: 9,  fontWeight: '500', color: '#6B4A58' },
+  diaTextoAtivo: { color: '#FFFFFF' },
+
+  slotsScroll:  { maxHeight: 190, marginBottom: 4 },
+  slotItem:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, backgroundColor: '#1A1B1E', borderRadius: 12, marginBottom: 8 },
+  slotItemAtivo:{ backgroundColor: 'rgba(168,35,90,0.12)', borderWidth: 1.5, borderColor: '#A8235A' },
+  slotHora:     { fontSize: 15, fontWeight: '600', color: '#C9A8B6' },
+  slotHoraAtivo:{ color: '#FFFFFF' },
+  slotBadge:          { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  slotBadgeGreen:     { backgroundColor: 'rgba(16,185,129,0.15)' },
+  slotBadgeAmber:     { backgroundColor: 'rgba(245,158,11,0.15)' },
+  slotBadgeText:      { fontSize: 10, fontWeight: '700' },
+  slotBadgeTextGreen: { color: '#10B981' },
+  slotBadgeTextAmber: { color: '#F59E0B' },
+  semSlots:     { fontSize: 13, color: '#6B4A58', textAlign: 'center', paddingVertical: 12 },
+
+  servicoField:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1A1B1E', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
+  servicoFieldText:       { fontSize: 15, color: '#FFFFFF', flex: 1 },
+  servicoFieldPlaceholder:{ fontSize: 15, color: '#6B4A58', flex: 1 },
+  servicoArrow:           { fontSize: 11, color: '#6B4A58', marginLeft: 8 },
+  servicoList:            { backgroundColor: '#1A1B1E', borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
+  servicoItem:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13 },
+  servicoItemBorder:      { borderBottomWidth: 1, borderBottomColor: '#2A2A2A' },
+  servicoItemNome:        { fontSize: 14, fontWeight: '500', color: '#F5EDE8', flex: 1 },
+  servicoItemValor:       { fontSize: 14, fontWeight: '700', color: '#C9A8B6' },
+
+  agendarBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  agendarBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+});
+
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
 function Card({ title, children }) {
@@ -207,6 +488,8 @@ function ClienteHomeScreen({ navigation }) {
   const [filaSet,        setFilaSet]        = useState(new Set());
   const [semAgendamentos, setSemAgendamentos] = useState(false);
   const [loading,        setLoading]        = useState(true);
+  const [agendModal,     setAgendModal]     = useState(false);
+  const [agendProf,      setAgendProf]      = useState(null);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -300,7 +583,7 @@ function ClienteHomeScreen({ navigation }) {
         if (clRow?.profissional_id) {
           const { data: profData } = await supabase
             .from('profiles')
-            .select('nome, cidade, estado')
+            .select('id, nome, cidade, estado')
             .eq('id', clRow.profissional_id)
             .single();
           if (active) setProfBoas(profData ?? null);
@@ -363,7 +646,10 @@ function ClienteHomeScreen({ navigation }) {
             )}
             <TouchableOpacity
               style={styles.boasVindasBtn}
-              onPress={() => { fecharBoasVindas(); navigation.navigate('Main', { screen: 'Agenda' }); }}
+              onPress={() => {
+                fecharBoasVindas();
+                if (profBoas?.id) { setAgendProf({ id: profBoas.id, nome: profBoas.nome }); setAgendModal(true); }
+              }}
               activeOpacity={0.85}
             >
               <Text style={styles.boasVindasBtnText}>Ver horários disponíveis</Text>
@@ -417,9 +703,18 @@ function ClienteHomeScreen({ navigation }) {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.profNome}>{p.nome}</Text>
                       {p.proximoSlot ? (
-                        <Text style={styles.proximoSlotText}>
-                          Próximo horário: {formatDiaSlot(p.proximoSlot)} às {formatHora(p.proximoSlot.toISOString())}
-                        </Text>
+                        <>
+                          <Text style={styles.proximoSlotText}>
+                            Próximo horário: {formatDiaSlot(p.proximoSlot)} às {formatHora(p.proximoSlot.toISOString())}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.agendarProfBtn}
+                            onPress={() => { setAgendProf({ id: p.id, nome: p.nome }); setAgendModal(true); }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.agendarProfBtnText}>Agendar</Text>
+                          </TouchableOpacity>
+                        </>
                       ) : (
                         <View>
                           <Text style={styles.agendaCheiaText}>Agenda cheia</Text>
@@ -463,22 +758,24 @@ function ClienteHomeScreen({ navigation }) {
                         ? <Text style={styles.conexaoCidade}>{c.conexao.cidade}</Text>
                         : null}
                       {c.proximoSlot ? (
-                        <Text style={styles.proximoSlotText}>
-                          Próximo horário: {formatDiaSlot(c.proximoSlot)} às {formatHora(c.proximoSlot.toISOString())}
-                        </Text>
+                        <>
+                          <Text style={styles.proximoSlotText}>
+                            Próximo horário: {formatDiaSlot(c.proximoSlot)} às {formatHora(c.proximoSlot.toISOString())}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.agendarProfBtn}
+                            onPress={() => { setAgendProf({ id: c.conexao.id, nome: c.conexao.nome }); setAgendModal(true); }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.agendarProfBtnText}>Agendar com {c.conexao?.nome?.split(' ')[0]}</Text>
+                          </TouchableOpacity>
+                        </>
                       ) : (
                         <Text style={styles.agendaCheiaText}>Agenda cheia</Text>
                       )}
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity
-                  style={styles.conexaoBtn}
-                  onPress={() => navigation.navigate('Main', { screen: 'Agenda' })}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.conexaoBtnText}>Agendar com conexão</Text>
-                </TouchableOpacity>
               </View>
             )}
 
@@ -504,6 +801,18 @@ function ClienteHomeScreen({ navigation }) {
         )}
 
       </ScrollView>
+
+      <AgendamentoClienteModal
+        visible={agendModal}
+        profissionalId={agendProf?.id}
+        profissionalNome={agendProf?.nome ?? ''}
+        clienteUid={uid}
+        clienteTelefone={telefone}
+        onClose={(agendado) => {
+          setAgendModal(false);
+          setAgendProf(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -806,6 +1115,10 @@ const styles = StyleSheet.create({
   agendaCheiaText: { fontSize: 12, fontWeight: '500', color: '#F59E0B', marginTop: 2 },
   avisarText:      { fontSize: 12, fontWeight: '600', color: '#A8235A', marginTop: 4 },
   naFilaText:      { fontSize: 12, fontWeight: '400', color: '#8A8A8E', marginTop: 4 },
+
+  // Agendar por profissional/conexão
+  agendarProfBtn:     { marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#A8235A' },
+  agendarProfBtnText: { fontSize: 12, fontWeight: '700', color: '#A8235A' },
 
   // Aviso telefone divergente
   avisoText:        { fontSize: 13, fontWeight: '400', color: '#C9A8B6', lineHeight: 20, marginBottom: 10 },

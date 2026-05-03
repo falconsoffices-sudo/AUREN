@@ -28,14 +28,14 @@ const MONTHS     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 const STATUS_DISPLAY_LIGHT = {
-  pendente:   { label: 'Pendente',   bg: '#EFF6FF', color: '#2563EB' },
+  pendente:   { label: 'Aguardando', bg: '#FEF3C7', color: '#D97706' },
   confirmado: { label: 'Confirmada', bg: '#FEF9C3', color: '#92400E' },
   finalizado: { label: 'Finalizado', bg: '#F0FDF4', color: '#15803D' },
   cancelado:  { label: 'Cancelado',  bg: '#FEF2F2', color: '#DC2626' },
 };
 
 const STATUS_DISPLAY_DARK = {
-  pendente:   { label: 'Pendente',   bg: '#1E2D4A', color: '#60A5FA' },
+  pendente:   { label: 'Aguardando', bg: '#2D1E07', color: '#F59E0B' },
   confirmado: { label: 'Confirmada', bg: '#2D2508', color: '#FBBF24' },
   finalizado: { label: 'Finalizado', bg: '#0A2218', color: '#4ade80' },
   cancelado:  { label: 'Cancelado',  bg: '#3B1212', color: '#F87171' },
@@ -740,6 +740,97 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
   );
 }
 
+// ─── Solicitacao Modal ────────────────────────────────────────────────────────
+
+function SolicitacaoModal({ visible, agendamento, onClose, onSaved, onEditar }) {
+  const [saving, setSaving] = useState(false);
+  if (!agendamento) return null;
+
+  const dataFmt = new Date(agendamento.data_hora).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const horaFmt = formatTimeDisplay(agendamento.data_hora);
+
+  async function aceitar() {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('agendamentos').update({ status: 'confirmado' }).eq('id', agendamento.id);
+      if (error) throw error;
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function recusar() {
+    Alert.alert('Recusar solicitação', 'Deseja recusar este agendamento?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Recusar', style: 'destructive',
+        onPress: async () => {
+          setSaving(true);
+          try {
+            const { error } = await supabase.from('agendamentos').update({ status: 'cancelado' }).eq('id', agendamento.id);
+            if (error) throw error;
+            onSaved();
+          } catch (err) {
+            Alert.alert('Erro', err.message);
+          } finally {
+            setSaving(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={modal.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={modal.sheet}>
+          <View style={modal.handle} />
+          <View style={sol.badge}><Text style={sol.badgeText}>AGUARDANDO CONFIRMAÇÃO</Text></View>
+          <Text style={modal.title}>Solicitação de Agendamento</Text>
+          <View style={sol.infoCard}>
+            <Text style={sol.infoCliente}>{agendamento.clientes?.nome ?? '—'}</Text>
+            <Text style={sol.infoServico}>{agendamento.servicos?.nome ?? 'Serviço'}</Text>
+            <Text style={sol.infoData}>{dataFmt} · {horaFmt}</Text>
+            {agendamento.valor != null && (
+              <Text style={sol.infoValor}>${parseFloat(agendamento.valor).toFixed(2)}</Text>
+            )}
+          </View>
+          <TouchableOpacity style={[sol.aceitarBtn, saving && { opacity: 0.65 }]} onPress={aceitar} disabled={saving} activeOpacity={0.85}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={sol.aceitarBtnText}>Aceitar agendamento</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={[sol.recusarBtn, saving && { opacity: 0.65 }]} onPress={recusar} disabled={saving} activeOpacity={0.85}>
+            <Text style={sol.recusarBtnText}>Recusar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={sol.editarBtn} onPress={onEditar} activeOpacity={0.75}>
+            <Text style={sol.editarBtnText}>Editar detalhes</Text>
+          </TouchableOpacity>
+          <View style={{ height: 24 }} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const sol = StyleSheet.create({
+  badge:          { backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignSelf: 'flex-start', marginBottom: 12 },
+  badgeText:      { fontSize: 10, fontWeight: '700', color: '#F59E0B', letterSpacing: 1 },
+  infoCard:       { backgroundColor: '#1A1B1E', borderRadius: 14, padding: 16, marginBottom: 20 },
+  infoCliente:    { fontSize: 18, fontWeight: '700', color: '#F5EDE8', marginBottom: 4 },
+  infoServico:    { fontSize: 14, fontWeight: '400', color: '#C9A8B6', marginBottom: 6 },
+  infoData:       { fontSize: 13, fontWeight: '600', color: '#8A8A8E' },
+  infoValor:      { fontSize: 20, fontWeight: '800', color: '#F5EDE8', marginTop: 8 },
+  aceitarBtn:     { height: 52, borderRadius: 14, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  aceitarBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  recusarBtn:     { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#F87171' },
+  recusarBtnText: { fontSize: 16, fontWeight: '700', color: '#F87171' },
+  editarBtn:      { alignItems: 'center', paddingVertical: 12 },
+  editarBtnText:  { fontSize: 14, fontWeight: '500', color: '#8A8A8E' },
+});
+
 // ─── Appointment Card ─────────────────────────────────────────────────────────
 
 function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress }) {
@@ -800,11 +891,13 @@ export default function AgendaScreen() {
   const [selected,        setSelected]        = useState(TODAY);
   const [agendamentos,    setAgendamentos]    = useState([]);
   const [loading,         setLoading]         = useState(false);
-  const [modalVisible,    setModalVisible]    = useState(false);
-  const [editAgendamento, setEditAgendamento] = useState(null);
-  const [editVisible,     setEditVisible]     = useState(false);
-  const [userId,            setUserId]            = useState(null);
-  const [licencaExpiracao,  setLicencaExpiracao]  = useState(null);
+  const [modalVisible,         setModalVisible]         = useState(false);
+  const [editAgendamento,      setEditAgendamento]      = useState(null);
+  const [editVisible,          setEditVisible]          = useState(false);
+  const [solicitacaoVisible,   setSolicitacaoVisible]   = useState(false);
+  const [solicitacaoAgend,     setSolicitacaoAgend]     = useState(null);
+  const [userId,               setUserId]               = useState(null);
+  const [licencaExpiracao,     setLicencaExpiracao]     = useState(null);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
   const monthLabel = `${MONTHS[selected.getMonth()]} ${selected.getFullYear()}`;
@@ -850,8 +943,15 @@ export default function AgendaScreen() {
     if (userId) fetchAgendamentos(userId, selected);
   }, [userId, selected]);
 
-  const openEdit = (a) => { setEditAgendamento(a); setEditVisible(true); };
-  const closeEdit = () => { setEditVisible(false); setEditAgendamento(null); };
+  const openEdit = (a) => {
+    if (a.status === 'pendente') {
+      setSolicitacaoAgend(a); setSolicitacaoVisible(true);
+    } else {
+      setEditAgendamento(a); setEditVisible(true);
+    }
+  };
+  const closeEdit    = () => { setEditVisible(false); setEditAgendamento(null); };
+  const closeSolicit = () => { setSolicitacaoVisible(false); setSolicitacaoAgend(null); };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -937,6 +1037,22 @@ export default function AgendaScreen() {
           closeEdit();
           fetchAgendamentos(userId, selected);
           calcularNivel(userId).catch(() => {});
+        }}
+      />
+
+      <SolicitacaoModal
+        visible={solicitacaoVisible}
+        agendamento={solicitacaoAgend}
+        onClose={closeSolicit}
+        onSaved={() => {
+          closeSolicit();
+          fetchAgendamentos(userId, selected);
+          calcularNivel(userId).catch(() => {});
+        }}
+        onEditar={() => {
+          const a = solicitacaoAgend;
+          closeSolicit();
+          setEditAgendamento(a); setEditVisible(true);
         }}
       />
 
