@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,12 +34,23 @@ function formatPhone(raw) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+function initials(nome) {
+  const parts = nome.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const EMPTY_ROW = () => ({ nome: '', fone: '', tipo: 'profissional' });
+
+function isComplete(row) {
+  return row.nome.trim().length > 0 && row.fone.trim().length > 0;
+}
 
 // ─── VendaModal ───────────────────────────────────────────────────────────────
 
 export default function VendaModal({ visible, onClose, planName }) {
-  const [rows, setRows] = useState(() => Array.from({ length: 5 }, EMPTY_ROW));
+  const [rows, setRows] = useState([EMPTY_ROW()]);
   const [saving, setSaving] = useState(false);
   const [carregandoContatos, setCarregandoContatos] = useState(false);
   const [contatoModal, setContatoModal] = useState(false);
@@ -47,8 +58,17 @@ export default function VendaModal({ visible, onClose, planName }) {
   const [contatoQuery, setContatoQuery] = useState('');
   const [selecionados, setSelecionados] = useState(new Set());
 
+  // Accordion: when the last row becomes complete, append a new empty row
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const last = rows[rows.length - 1];
+    if (isComplete(last)) {
+      setRows(r => [...r, EMPTY_ROW()]);
+    }
+  }, [rows]);
+
   function reset() {
-    setRows(Array.from({ length: 5 }, EMPTY_ROW));
+    setRows([EMPTY_ROW()]);
     setSaving(false);
     setCarregandoContatos(false);
     setContatoModal(false);
@@ -59,19 +79,24 @@ export default function VendaModal({ visible, onClose, planName }) {
 
   function handleClose() { reset(); onClose(false); }
 
-  function addRow() {
-    if (rows.length >= 20) return;
-    setRows(r => [...r, EMPTY_ROW()]);
-  }
-
   function updateRow(i, field, val) {
     setRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row));
+  }
+
+  function removeRow(i) {
+    setRows(r => {
+      const next = r.filter((_, idx) => idx !== i);
+      if (next.length === 0 || isComplete(next[next.length - 1])) {
+        return [...next, EMPTY_ROW()];
+      }
+      return next;
+    });
   }
 
   function toggleContato(id) {
     setSelecionados(prev => {
       const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else if (next.size < 20) { next.add(id); }
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   }
@@ -109,26 +134,21 @@ export default function VendaModal({ visible, onClose, planName }) {
       tipo: 'profissional',
     }));
     setRows(prev => {
-      const merged = [...prev];
-      let insertIdx = 0;
-      for (const nr of novos) {
-        while (insertIdx < merged.length && (merged[insertIdx].nome.trim() || merged[insertIdx].fone.trim())) {
-          insertIdx++;
-        }
-        if (insertIdx < merged.length) {
-          merged[insertIdx] = nr;
-          insertIdx++;
-        } else {
-          merged.push(nr);
-        }
-      }
-      return merged;
+      // Replace the trailing empty row with imported contacts + new empty at end
+      const withoutTrailing = isComplete(prev[prev.length - 1])
+        ? prev
+        : prev.slice(0, prev.length - 1);
+      return [...withoutTrailing, ...novos, EMPTY_ROW()];
     });
     setContatoModal(false);
   }
 
+  const activeIdx = rows.length - 1;
+  const activeRow = rows[activeIdx];
+  const hasValidRows = rows.some(isComplete);
+
   async function enviar() {
-    const validas = rows.filter(r => r.nome.trim() && r.fone.trim());
+    const validas = rows.filter(isComplete);
     if (validas.length === 0) {
       Alert.alert('Atenção', 'Preencha pelo menos um nome e telefone.');
       return;
@@ -196,55 +216,68 @@ export default function VendaModal({ visible, onClose, planName }) {
                   : <Text style={vstyles.importBtnText}>Importar da agenda</Text>}
               </TouchableOpacity>
 
-              {rows.map((row, i) => (
-                <View key={i} style={vstyles.rowBlock}>
-                  <Text style={vstyles.rowNum}>INDICAÇÃO {i + 1}</Text>
-                  <TextInput
-                    style={vstyles.input}
-                    placeholder="Nome"
-                    placeholderTextColor="#C9A8B6"
-                    value={row.nome}
-                    onChangeText={v => updateRow(i, 'nome', v)}
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                  />
-                  <TextInput
-                    style={vstyles.input}
-                    placeholder="Telefone"
-                    placeholderTextColor="#C9A8B6"
-                    value={row.fone}
-                    onChangeText={v => updateRow(i, 'fone', v)}
-                    keyboardType="phone-pad"
-                    returnKeyType="done"
-                  />
-                  <View style={vstyles.tipoRow}>
-                    {[
-                      { key: 'profissional', label: 'Profissional' },
-                      { key: 'cliente',      label: 'Cliente' },
-                    ].map(t => (
-                      <TouchableOpacity
-                        key={t.key}
-                        style={[vstyles.tipoBtn, row.tipo === t.key && vstyles.tipoBtnActive]}
-                        onPress={() => updateRow(i, 'tipo', t.key)}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={[vstyles.tipoBtnText, row.tipo === t.key && vstyles.tipoBtnTextActive]}>
-                          {t.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+              {/* ── Completed rows (compact cards) ── */}
+              {rows.slice(0, rows.length - 1).map((row, i) => (
+                isComplete(row) ? (
+                  <View key={i} style={vstyles.compactCard}>
+                    <View style={vstyles.avatar}>
+                      <Text style={vstyles.avatarText}>{initials(row.nome)}</Text>
+                    </View>
+                    <View style={vstyles.compactInfo}>
+                      <Text style={vstyles.compactName} numberOfLines={1}>{row.nome}</Text>
+                      <Text style={vstyles.compactTipo}>{row.tipo === 'profissional' ? 'Profissional' : 'Cliente'}</Text>
+                    </View>
+                    <TouchableOpacity style={vstyles.removeBtn} onPress={() => removeRow(i)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={vstyles.removeBtnText}>✕</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                ) : null
               ))}
 
-              <TouchableOpacity style={vstyles.addBtn} onPress={addRow} activeOpacity={0.75}>
-                <Text style={vstyles.addBtnText}>+ Indicar mais</Text>
-              </TouchableOpacity>
+              {/* ── Active (empty) row ── */}
+              <View style={vstyles.rowBlock}>
+                <Text style={vstyles.rowNum}>INDICAÇÃO {rows.filter(isComplete).length + 1}</Text>
+                <TextInput
+                  style={vstyles.input}
+                  placeholder="Nome"
+                  placeholderTextColor="#C9A8B6"
+                  value={activeRow.nome}
+                  onChangeText={v => updateRow(activeIdx, 'nome', v)}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+                <TextInput
+                  style={vstyles.input}
+                  placeholder="Telefone"
+                  placeholderTextColor="#C9A8B6"
+                  value={activeRow.fone}
+                  onChangeText={v => updateRow(activeIdx, 'fone', formatPhone(v))}
+                  keyboardType="phone-pad"
+                  returnKeyType="done"
+                />
+                <View style={vstyles.tipoRow}>
+                  {[
+                    { key: 'profissional', label: 'Profissional' },
+                    { key: 'cliente',      label: 'Cliente' },
+                  ].map(t => (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[vstyles.tipoBtn, activeRow.tipo === t.key && vstyles.tipoBtnActive]}
+                      onPress={() => updateRow(activeIdx, 'tipo', t.key)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[vstyles.tipoBtnText, activeRow.tipo === t.key && vstyles.tipoBtnTextActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
               <TouchableOpacity
-                style={[vstyles.sendBtn, saving && { opacity: 0.65 }]}
+                style={[vstyles.sendBtn, !hasValidRows && vstyles.sendBtnDisabled]}
                 onPress={enviar}
-                disabled={saving}
+                disabled={saving || !hasValidRows}
                 activeOpacity={0.85}
               >
                 {saving
@@ -335,6 +368,25 @@ const vstyles = StyleSheet.create({
   importBtn:     { borderWidth: 1, borderColor: '#A8235A', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 22, height: 46, justifyContent: 'center' },
   importBtnText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },
 
+  // Compact card for completed rows
+  compactCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1A1B1E', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 8, gap: 12,
+  },
+  avatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText:  { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  compactInfo: { flex: 1 },
+  compactName: { fontSize: 14, fontWeight: '600', color: '#F5EDE8' },
+  compactTipo: { fontSize: 11, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
+  removeBtn:     { padding: 4 },
+  removeBtnText: { fontSize: 16, fontWeight: '600', color: '#8A8A8E' },
+
   rowBlock: { marginBottom: 18 },
   rowNum:   { fontSize: 10, fontWeight: '700', color: '#A8235A', letterSpacing: 1.2, marginBottom: 8 },
   input: {
@@ -348,11 +400,9 @@ const vstyles = StyleSheet.create({
   tipoBtnText:       { fontSize: 13, fontWeight: '600', color: '#C9A8B6' },
   tipoBtnTextActive: { color: '#FFFFFF' },
 
-  addBtn:     { borderWidth: 1, borderColor: '#A8235A', borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginBottom: 14 },
-  addBtnText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },
-
-  sendBtn:     { backgroundColor: '#A8235A', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  sendBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  sendBtn:         { backgroundColor: '#A8235A', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  sendBtnDisabled: { backgroundColor: '#5A1030', opacity: 0.5 },
+  sendBtnText:     { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 
   skipBtn:     { alignItems: 'center', paddingVertical: 12 },
   skipBtnText: { fontSize: 14, fontWeight: '500', color: '#8A8A8E' },

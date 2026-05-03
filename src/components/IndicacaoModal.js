@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -23,7 +23,18 @@ function formatPhone(raw) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+function initials(nome) {
+  const parts = nome.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const EMPTY = () => ({ nome: '', fone: '', tipo: 'profissional' });
+
+function isComplete(row) {
+  return row.nome.trim().length > 0 && row.fone.trim().length > 0;
+}
 
 export default function IndicacaoModal({ visible, onClose, momento, title, subtitle, showImport }) {
   const [rows, setRows] = useState([EMPTY()]);
@@ -33,6 +44,15 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
   const [todosContatos,      setTodosContatos]      = useState([]);
   const [contatoQuery,       setContatoQuery]       = useState('');
   const [carregandoContatos, setCarregandoContatos] = useState(false);
+
+  // Accordion: when the last row becomes complete, append a new empty row
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const last = rows[rows.length - 1];
+    if (isComplete(last)) {
+      setRows(r => [...r, EMPTY()]);
+    }
+  }, [rows]);
 
   function reset() {
     setRows([EMPTY()]);
@@ -73,17 +93,28 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
     setContatoModal(false);
   }
 
-  function addRow() {
-    if (rows.length >= 5) return;
-    setRows(r => [...r, EMPTY()]);
-  }
-
   function updateRow(i, field, val) {
     setRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row));
   }
 
+  function removeRow(i) {
+    setRows(r => {
+      const next = r.filter((_, idx) => idx !== i);
+      // Ensure there's always at least one empty row at the end
+      if (next.length === 0 || isComplete(next[next.length - 1])) {
+        return [...next, EMPTY()];
+      }
+      return next;
+    });
+  }
+
+  const completedRows = rows.slice(0, rows.length - 1).filter(isComplete);
+  const activeRow = rows[rows.length - 1];
+  const activeIdx = rows.length - 1;
+  const hasValidRows = rows.some(isComplete);
+
   async function enviar() {
-    const validas = rows.filter(r => r.nome.trim() && r.fone.trim());
+    const validas = rows.filter(isComplete);
     if (validas.length === 0) {
       Alert.alert('Atenção', 'Preencha pelo menos um nome e telefone.');
       return;
@@ -132,69 +163,78 @@ export default function IndicacaoModal({ visible, onClose, momento, title, subti
             <Text style={s.title}>{title}</Text>
             {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {rows.map((row, i) => (
-                <View key={i} style={s.rowBlock}>
-                  {rows.length > 1 && (
-                    <Text style={s.rowNum}>INDICAÇÃO {i + 1}</Text>
-                  )}
-                  <TouchableOpacity
-                    style={[s.importBtn, carregandoContatos && contatoRowIdx === i && { opacity: 0.6 }]}
-                    onPress={() => importarParaLinha(i)}
-                    disabled={carregandoContatos}
-                    activeOpacity={0.8}
-                  >
-                    {carregandoContatos && contatoRowIdx === i
-                      ? <ActivityIndicator color="#A8235A" size="small" />
-                      : <Text style={s.importBtnText}>Importar da agenda</Text>}
-                  </TouchableOpacity>
-                  <TextInput
-                    style={s.input}
-                    placeholder="Nome"
-                    placeholderTextColor="#C9A8B6"
-                    value={row.nome}
-                    onChangeText={v => updateRow(i, 'nome', v)}
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                  />
-                  <TextInput
-                    style={s.input}
-                    placeholder="Telefone"
-                    placeholderTextColor="#C9A8B6"
-                    value={row.fone}
-                    onChangeText={v => updateRow(i, 'fone', v)}
-                    keyboardType="phone-pad"
-                    returnKeyType="done"
-                  />
-                  <View style={s.tipoRow}>
-                    {[
-                      { key: 'profissional', label: 'Profissional' },
-                      { key: 'cliente',      label: 'Cliente' },
-                    ].map(t => (
-                      <TouchableOpacity
-                        key={t.key}
-                        style={[s.tipoBtn, row.tipo === t.key && s.tipoBtnActive]}
-                        onPress={() => updateRow(i, 'tipo', t.key)}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={[s.tipoBtnText, row.tipo === t.key && s.tipoBtnTextActive]}>
-                          {t.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+
+              {/* ── Completed rows (compact cards) ── */}
+              {rows.slice(0, rows.length - 1).map((row, i) => (
+                isComplete(row) ? (
+                  <View key={i} style={s.compactCard}>
+                    <View style={s.avatar}>
+                      <Text style={s.avatarText}>{initials(row.nome)}</Text>
+                    </View>
+                    <View style={s.compactInfo}>
+                      <Text style={s.compactName} numberOfLines={1}>{row.nome}</Text>
+                      <Text style={s.compactTipo}>{row.tipo === 'profissional' ? 'Profissional' : 'Cliente'}</Text>
+                    </View>
+                    <TouchableOpacity style={s.removeBtn} onPress={() => removeRow(i)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={s.removeBtnText}>✕</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                ) : null
               ))}
 
-              {rows.length < 5 && (
-                <TouchableOpacity style={s.addBtn} onPress={addRow} activeOpacity={0.75}>
-                  <Text style={s.addBtnText}>+ Indicar mais</Text>
+              {/* ── Active (empty) row ── */}
+              <View style={s.rowBlock}>
+                <TouchableOpacity
+                  style={[s.importBtn, carregandoContatos && contatoRowIdx === activeIdx && { opacity: 0.6 }]}
+                  onPress={() => importarParaLinha(activeIdx)}
+                  disabled={carregandoContatos}
+                  activeOpacity={0.8}
+                >
+                  {carregandoContatos && contatoRowIdx === activeIdx
+                    ? <ActivityIndicator color="#A8235A" size="small" />
+                    : <Text style={s.importBtnText}>Importar da agenda</Text>}
                 </TouchableOpacity>
-              )}
+                <TextInput
+                  style={s.input}
+                  placeholder="Nome"
+                  placeholderTextColor="#C9A8B6"
+                  value={activeRow.nome}
+                  onChangeText={v => updateRow(activeIdx, 'nome', v)}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+                <TextInput
+                  style={s.input}
+                  placeholder="Telefone"
+                  placeholderTextColor="#C9A8B6"
+                  value={activeRow.fone}
+                  onChangeText={v => updateRow(activeIdx, 'fone', formatPhone(v))}
+                  keyboardType="phone-pad"
+                  returnKeyType="done"
+                />
+                <View style={s.tipoRow}>
+                  {[
+                    { key: 'profissional', label: 'Profissional' },
+                    { key: 'cliente',      label: 'Cliente' },
+                  ].map(t => (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[s.tipoBtn, activeRow.tipo === t.key && s.tipoBtnActive]}
+                      onPress={() => updateRow(activeIdx, 'tipo', t.key)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.tipoBtnText, activeRow.tipo === t.key && s.tipoBtnTextActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
               <TouchableOpacity
-                style={[s.sendBtn, saving && { opacity: 0.65 }]}
+                style={[s.sendBtn, !hasValidRows && s.sendBtnDisabled]}
                 onPress={enviar}
-                disabled={saving}
+                disabled={saving || !hasValidRows}
                 activeOpacity={0.85}
               >
                 {saving
@@ -263,8 +303,26 @@ const s = StyleSheet.create({
   title:    { fontSize: 20, fontWeight: '700', color: '#F5EDE8', marginBottom: 6 },
   subtitle: { fontSize: 13, fontWeight: '400', color: '#C9A8B6', marginBottom: 18, lineHeight: 18 },
 
+  // Compact card for completed rows
+  compactCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1A1B1E', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 8, gap: 12,
+  },
+  avatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#A8235A',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  compactInfo: { flex: 1 },
+  compactName: { fontSize: 14, fontWeight: '600', color: '#F5EDE8' },
+  compactTipo: { fontSize: 11, fontWeight: '400', color: '#C9A8B6', marginTop: 2 },
+  removeBtn:     { padding: 4 },
+  removeBtnText: { fontSize: 16, fontWeight: '600', color: '#8A8A8E' },
+
   rowBlock: { marginBottom: 18 },
-  rowNum:   { fontSize: 10, fontWeight: '700', color: '#A8235A', letterSpacing: 1.2, marginBottom: 8 },
 
   input: {
     backgroundColor: '#1A1B1E', borderRadius: 12,
@@ -278,11 +336,9 @@ const s = StyleSheet.create({
   tipoBtnText:       { fontSize: 13, fontWeight: '600', color: '#C9A8B6' },
   tipoBtnTextActive: { color: '#FFFFFF' },
 
-  addBtn:     { borderWidth: 1, borderColor: '#A8235A', borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginBottom: 14 },
-  addBtnText: { fontSize: 14, fontWeight: '600', color: '#A8235A' },
-
-  sendBtn:     { backgroundColor: '#A8235A', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  sendBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  sendBtn:         { backgroundColor: '#A8235A', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  sendBtnDisabled: { backgroundColor: '#5A1030', opacity: 0.5 },
+  sendBtnText:     { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 
   skipBtn:     { alignItems: 'center', paddingVertical: 12 },
   skipBtnText: { fontSize: 14, fontWeight: '500', color: '#8A8A8E' },
