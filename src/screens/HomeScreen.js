@@ -99,6 +99,23 @@ function getWeeklyChart(rows) {
   return { labels, values, mondayOffset };
 }
 
+function getDailyChartMes(rows) {
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const todayDay = today.getDate();
+  const statusFat = ['finalizado', 'confirmado', 'pendente'];
+  const labels = [], values = [];
+  for (let d = 1; d <= todayDay; d++) {
+    const ds = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(d)}`;
+    const sum = (rows ?? [])
+      .filter(r => r.data_hora?.startsWith(ds) && statusFat.includes(r.status))
+      .reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
+    labels.push(d % 5 === 0 || d === todayDay ? String(d) : '');
+    values.push(Math.round(sum));
+  }
+  return { labels, values };
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }) {
@@ -238,7 +255,10 @@ export default function HomeScreen({ navigation }) {
   const [indicacoesDoMes,   setIndicacoesDoMes]   = useState(null);
   const [hojeModal,         setHojeModal]         = useState(false);
   const [fatModal,          setFatModal]          = useState(false);
+  const [mesFatModal,       setMesFatModal]       = useState(false);
   const [agendSemana,       setAgendSemana]       = useState([]);
+  const [agendMes,          setAgendMes]          = useState([]);
+  const [prevMesFat,        setPrevMesFat]        = useState(0);
 
   // Modal — Seu dia de cuidado
   const [diaCuidadoModal,  setDiaCuidadoModal]  = useState(false);
@@ -256,7 +276,14 @@ export default function HomeScreen({ navigation }) {
 
     const { hoje, semanaInicio, semanaFim, mesInicio, mesFim } = getDateRanges();
 
-    const [profileRes, agendSemanaRes, agendMesRes, allApptsRes, indRes] = await Promise.all([
+    const padPM = n => String(n).padStart(2, '0');
+    const nowPM = new Date();
+    const prevMo     = new Date(nowPM.getFullYear(), nowPM.getMonth() - 1, 1);
+    const prevMoLast = new Date(nowPM.getFullYear(), nowPM.getMonth(), 0);
+    const prevMesInicio = `${prevMo.getFullYear()}-${padPM(prevMo.getMonth() + 1)}-01T00:00:00`;
+    const prevMesFimStr = `${prevMoLast.getFullYear()}-${padPM(prevMoLast.getMonth() + 1)}-${padPM(prevMoLast.getDate())}T23:59:59`;
+
+    const [profileRes, agendSemanaRes, agendMesRes, allApptsRes, indRes, prevMesRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein, endereco_comercial, cidade, estado, ultimo_dia_cuidado')
@@ -275,7 +302,7 @@ export default function HomeScreen({ navigation }) {
       // Faturamento do mês
       supabase
         .from('agendamentos')
-        .select('valor')
+        .select('valor, data_hora, status')
         .eq('profissional_id', uid)
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', mesInicio)
@@ -294,6 +321,15 @@ export default function HomeScreen({ navigation }) {
         .select('id', { count: 'exact', head: true })
         .eq('profissional_id', uid)
         .gte('created_at', mesInicio),
+
+      // Faturamento do mês anterior (comparativo)
+      supabase
+        .from('agendamentos')
+        .select('valor')
+        .eq('profissional_id', uid)
+        .in('status', ['finalizado', 'confirmado', 'pendente'])
+        .gte('data_hora', prevMesInicio)
+        .lte('data_hora', prevMesFimStr),
     ]);
 
     if (profileRes.data) {
@@ -367,6 +403,8 @@ export default function HomeScreen({ navigation }) {
     const soma = rows => rows.reduce((s, r) => s + Number(r.valor || 0), 0);
     setFaturamentoSemana(soma(semanaData.filter(a => statusFat.includes(a.status))));
     setFaturamentoMes(soma(agendMesRes.data ?? []));
+    setAgendMes(agendMesRes.data ?? []);
+    setPrevMesFat(soma(prevMesRes.data ?? []));
 
     // Clientes inativas: últ. agendamento > 45 dias atrás
     const limite45 = new Date();
@@ -661,20 +699,24 @@ export default function HomeScreen({ navigation }) {
               )}
 
               {/* Card: Faturamento */}
-              <TouchableOpacity style={styles.card} onPress={() => setFatModal(true)} activeOpacity={0.85}>
+              <View style={styles.card}>
                 <Text style={styles.cardLabel}>Faturamento</Text>
                 <View style={styles.statRow}>
-                  <StatColumn
-                    label="Esta semana"
-                    value={formatMoeda(faturamentoSemana)}
-                  />
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => setFatModal(true)} activeOpacity={0.75}>
+                    <StatColumn
+                      label="Esta semana"
+                      value={formatMoeda(faturamentoSemana)}
+                    />
+                  </TouchableOpacity>
                   <View style={styles.statDivider} />
-                  <StatColumn
-                    label="Este mês"
-                    value={formatMoeda(faturamentoMes)}
-                  />
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => setMesFatModal(true)} activeOpacity={0.75}>
+                    <StatColumn
+                      label="Este mês"
+                      value={formatMoeda(faturamentoMes)}
+                    />
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+              </View>
 
               {/* Card: Nível de gamificação */}
               <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Perfil', { screen: 'Gamificacao' })} activeOpacity={0.85}>
@@ -880,6 +922,70 @@ export default function HomeScreen({ navigation }) {
                     }}
                     style={{ borderRadius: 12 }}
                   />
+                  <Text style={styles.bsCompText}>{compText}</Text>
+                  <View style={{ height: 24 }} />
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: Faturamento do mês ── */}
+      <Modal visible={mesFatModal} transparent animationType="slide" onRequestClose={() => setMesFatModal(false)}>
+        <View style={styles.bsBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setMesFatModal(false)} activeOpacity={1} />
+          <View style={styles.bsSheet}>
+            <View style={styles.bsHandle} />
+            <Text style={styles.bsTitle}>Faturamento do mês</Text>
+            {(() => {
+              const mc = getDailyChartMes(agendMes);
+              const maxVal = mc.values.length > 0 ? Math.max(...mc.values) : 0;
+              const maxIdx = mc.values.findIndex(v => v === maxVal && v > 0);
+              const todayDay = new Date().getDate();
+              const compPct = prevMesFat > 0
+                ? Math.round(((faturamentoMes - prevMesFat) / prevMesFat) * 100)
+                : null;
+              const compText = mc.values.every(v => v === 0)
+                ? 'Sem faturamento este mês ainda.'
+                : maxIdx >= 0
+                ? `Melhor dia até agora: dia ${maxIdx + 1} · ${formatMoeda(maxVal)}.${compPct !== null ? `  ${compPct >= 0 ? '+' : ''}${compPct}% vs mês anterior.` : ''}`
+                : '';
+              const chartW = Math.max(Dimensions.get('window').width - 40, todayDay * 22);
+              return mc.values.length === 0 ? (
+                <Text style={styles.bsCompText}>Sem dados para este mês.</Text>
+              ) : (
+                <>
+                  <Text style={styles.bsChartTitle}>ESTE MÊS · {formatMoeda(faturamentoMes)}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <BarChart
+                      data={{
+                        labels: mc.labels,
+                        datasets: [{
+                          data: mc.values.map(v => v || 0.01),
+                          colors: mc.values.map((_, i) => i === maxIdx ? () => '#A8235A' : () => isDark ? '#3A2A2E' : '#E6D8CF'),
+                        }],
+                      }}
+                      width={chartW}
+                      height={160}
+                      fromZero
+                      withInnerLines={false}
+                      withCustomBarColorFromData
+                      flatColor
+                      chartConfig={{
+                        backgroundColor: 'transparent',
+                        backgroundGradientFrom: isDark ? '#0E0F11' : '#FFFFFF',
+                        backgroundGradientTo: isDark ? '#0E0F11' : '#FFFFFF',
+                        decimalPlaces: 0,
+                        color: () => isDark ? '#C9A8B6' : '#6B4A58',
+                        labelColor: () => isDark ? '#C9A8B6' : '#6B4A58',
+                        fillShadowGradientOpacity: 1,
+                        propsForLabels: { fontSize: 9 },
+                        paddingRight: 40,
+                      }}
+                      style={{ borderRadius: 12 }}
+                    />
+                  </ScrollView>
                   <Text style={styles.bsCompText}>{compText}</Text>
                   <View style={{ height: 24 }} />
                 </>
