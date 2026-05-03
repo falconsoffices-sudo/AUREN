@@ -48,6 +48,15 @@ const STATUS_OPTIONS = [
   { label: 'Cancelado',  value: 'cancelado'  },
 ];
 
+const METODOS_FIN = [
+  { key: 'zelle',    label: 'Zelle'    },
+  { key: 'cartao',   label: 'Cartão'   },
+  { key: 'dinheiro', label: 'Dinheiro' },
+  { key: 'cheque',   label: 'Cheque'   },
+  { key: 'venmo',    label: 'Venmo'    },
+  { key: 'cashapp',  label: 'CashApp'  },
+];
+
 const TIPO_OPTIONS = [
   { label: 'Comercial',   value: 'comercial'   },
   { label: 'Residencial', value: 'residencial' },
@@ -156,6 +165,13 @@ function buildDataHora(date, timeStr) {
 
 function normalize(str = '') {
   return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function isFinalizavel(a) {
+  if (a.status !== 'confirmado') return false;
+  const dur = a.servicos?.duracao_minutos ?? 60;
+  const end = new Date(new Date(a.data_hora).getTime() + dur * 60000);
+  return end < new Date();
 }
 
 // ─── Servico Picker Modal ─────────────────────────────────────────────────────
@@ -831,9 +847,176 @@ const sol = StyleSheet.create({
   editarBtnText:  { fontSize: 14, fontWeight: '500', color: '#8A8A8E' },
 });
 
+// ─── Finalizar Modal ─────────────────────────────────────────────────────────
+
+function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
+  const [step,    setStep]    = useState(1);
+  const [metodo,  setMetodo]  = useState('zelle');
+  const [valor,   setValor]   = useState('');
+  const [gorjeta, setGorjeta] = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  useEffect(() => {
+    if (visible && agendamento) {
+      setStep(1);
+      setMetodo('zelle');
+      setValor(agendamento.valor != null ? parseFloat(agendamento.valor).toFixed(2) : '');
+      setGorjeta('');
+      setSaving(false);
+    }
+  }, [visible, agendamento]);
+
+  async function handleConfirmar() {
+    setSaving(true);
+    try {
+      const valorNum   = parseFloat(valor.replace(',',   '.')) || 0;
+      const gorjetaNum = parseFloat(gorjeta.replace(',', '.')) || 0;
+      const now        = new Date().toISOString();
+
+      await supabase.from('agendamentos').update({ status: 'finalizado' }).eq('id', agendamento.id);
+
+      if (valorNum > 0) {
+        await supabase.from('financeiro').insert({
+          profissional_id:  userId,
+          valor:            valorNum,
+          metodo_pagamento: metodo,
+          tipo:             'receita',
+          categoria:        agendamento.servicos?.nome ?? 'Serviço',
+          cliente_id:       agendamento.cliente_id ?? null,
+          created_at:       now,
+        });
+      }
+
+      if (gorjetaNum > 0) {
+        await supabase.from('financeiro').insert({
+          profissional_id:  userId,
+          valor:            gorjetaNum,
+          metodo_pagamento: metodo,
+          tipo:             'receita',
+          categoria:        'gorjeta',
+          cliente_id:       agendamento.cliente_id ?? null,
+          created_at:       now,
+        });
+      }
+
+      if (agendamento.cliente_id) {
+        const { data: cData } = await supabase
+          .from('clientes')
+          .select('total_visitas')
+          .eq('id', agendamento.cliente_id)
+          .single();
+        await supabase
+          .from('clientes')
+          .update({ total_visitas: (cData?.total_visitas ?? 0) + 1 })
+          .eq('id', agendamento.cliente_id);
+      }
+
+      onSaved();
+    } catch (err) {
+      Alert.alert('Erro ao finalizar', err.message);
+      setSaving(false);
+    }
+  }
+
+  if (!agendamento) return null;
+  const nomeCliente = agendamento.clientes?.nome ?? '—';
+  const nomeServico = agendamento.servicos?.nome ?? 'Serviço';
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={finSheet.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={finSheet.sheet}>
+            <View style={finSheet.handle} />
+            {step === 1 ? (
+              <>
+                <Text style={finSheet.title}>Serviço concluído?</Text>
+                <View style={finSheet.infoCard}>
+                  <Text style={finSheet.infoCliente}>{nomeCliente}</Text>
+                  <Text style={finSheet.infoServico}>{nomeServico}</Text>
+                </View>
+                <TouchableOpacity style={finSheet.primaryBtn} onPress={() => setStep(2)} activeOpacity={0.85}>
+                  <Text style={finSheet.primaryBtnText}>Sim, finalizar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={finSheet.ghostBtn} onPress={onClose} activeOpacity={0.75}>
+                  <Text style={finSheet.ghostBtnText}>Ainda não</Text>
+                </TouchableOpacity>
+                <View style={{ height: 8 }} />
+              </>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <Text style={finSheet.title}>Registrar pagamento</Text>
+
+                <Text style={finSheet.label}>MÉTODO DE PAGAMENTO</Text>
+                <View style={finSheet.metodoGrid}>
+                  {METODOS_FIN.map(m => {
+                    const active = metodo === m.key;
+                    return (
+                      <TouchableOpacity
+                        key={m.key}
+                        style={[finSheet.metodoBtn, active && finSheet.metodoBtnActive]}
+                        onPress={() => setMetodo(m.key)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[finSheet.metodoBtnText, active && finSheet.metodoBtnTextActive]}>{m.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={finSheet.label}>VALOR (USD)</Text>
+                <View style={finSheet.prefixRow}>
+                  <View style={finSheet.prefix}><Text style={finSheet.prefixText}>$</Text></View>
+                  <TextInput
+                    style={[finSheet.input, { flex: 1, marginBottom: 0 }]}
+                    value={valor}
+                    onChangeText={setValor}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    placeholderTextColor="#C9A8B6"
+                  />
+                </View>
+
+                <Text style={finSheet.label}>GORJETA (OPCIONAL)</Text>
+                <View style={finSheet.prefixRow}>
+                  <View style={finSheet.prefix}><Text style={finSheet.prefixText}>$</Text></View>
+                  <TextInput
+                    style={[finSheet.input, { flex: 1, marginBottom: 0 }]}
+                    value={gorjeta}
+                    onChangeText={setGorjeta}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    placeholderTextColor="#C9A8B6"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[finSheet.primaryBtn, saving && { opacity: 0.7 }]}
+                  onPress={handleConfirmar}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                >
+                  {saving
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={finSheet.primaryBtnText}>Confirmar e finalizar</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={finSheet.ghostBtn} onPress={() => setStep(1)} activeOpacity={0.75} disabled={saving}>
+                  <Text style={finSheet.ghostBtnText}>← Voltar</Text>
+                </TouchableOpacity>
+                <View style={{ height: 16 }} />
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Appointment Card ─────────────────────────────────────────────────────────
 
-function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress }) {
+function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress, finalizavel }) {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const SD     = isDark ? STATUS_DISPLAY_DARK : STATUS_DISPLAY_LIGHT;
@@ -849,9 +1032,15 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
     >
       <View style={styles.apptTopRow}>
         <Text style={styles.apptTime}>{formatTimeDisplay(data_hora)}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: s.bg }]}>
-          <Text style={[styles.statusText, { color: s.color }]}>{s.label}</Text>
-        </View>
+        {finalizavel ? (
+          <View style={[styles.statusBadge, { backgroundColor: 'rgba(168,35,90,0.15)' }]}>
+            <Text style={[styles.statusText, { color: '#A8235A', fontWeight: '700' }]}>Finalizar</Text>
+          </View>
+        ) : (
+          <View style={[styles.statusBadge, { backgroundColor: s.bg }]}>
+            <Text style={[styles.statusText, { color: s.color }]}>{s.label}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.apptClientRow}>
         <View style={styles.avatar}>
@@ -898,6 +1087,8 @@ export default function AgendaScreen() {
   const [solicitacaoAgend,     setSolicitacaoAgend]     = useState(null);
   const [userId,               setUserId]               = useState(null);
   const [licencaExpiracao,     setLicencaExpiracao]     = useState(null);
+  const [finalizarVisible,     setFinalizarVisible]     = useState(false);
+  const [finalizarAgend,       setFinalizarAgend]       = useState(null);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
   const monthLabel = `${MONTHS[selected.getMonth()]} ${selected.getFullYear()}`;
@@ -988,7 +1179,20 @@ export default function AgendaScreen() {
         {loading ? (
           <ActivityIndicator color="#A8235A" style={{ marginTop: 40 }} />
         ) : agendamentos.length > 0 ? (
-          agendamentos.map(a => <AppointmentCard key={a.id} {...a} onPress={() => openEdit(a)} />)
+          agendamentos.map(a => {
+            const canFinalize = isFinalizavel(a);
+            return (
+              <AppointmentCard
+                key={a.id}
+                {...a}
+                finalizavel={canFinalize}
+                onPress={() => {
+                  if (canFinalize) { setFinalizarAgend(a); setFinalizarVisible(true); }
+                  else openEdit(a);
+                }}
+              />
+            );
+          })
         ) : (
           <View style={styles.emptyState}><Text style={styles.emptyText}>Nenhum agendamento para este dia.</Text></View>
         )}
@@ -1056,6 +1260,18 @@ export default function AgendaScreen() {
         }}
       />
 
+      <FinalizarModal
+        visible={finalizarVisible}
+        agendamento={finalizarAgend}
+        userId={userId}
+        onClose={() => setFinalizarVisible(false)}
+        onSaved={() => {
+          setFinalizarVisible(false);
+          fetchAgendamentos(userId, selected);
+          calcularNivel(userId).catch(() => {});
+        }}
+      />
+
     </SafeAreaView>
   );
 }
@@ -1114,6 +1330,32 @@ function makeStyles(isDark) {
     fabText: { fontSize: 30, fontWeight: '400', color: '#FFFFFF', lineHeight: 34 },
   });
 }
+
+// ─── Finalizar styles ────────────────────────────────────────────────────────
+
+const finSheet = StyleSheet.create({
+  backdrop:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet:           { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12 },
+  handle:          { width: 40, height: 4, borderRadius: 2, backgroundColor: '#2A2A2A', alignSelf: 'center', marginBottom: 20 },
+  title:           { fontSize: 20, fontWeight: '700', color: '#F5EDE8', marginBottom: 16 },
+  infoCard:        { backgroundColor: '#1A1B1E', borderRadius: 14, padding: 16, marginBottom: 20 },
+  infoCliente:     { fontSize: 17, fontWeight: '700', color: '#F5EDE8', marginBottom: 4 },
+  infoServico:     { fontSize: 14, fontWeight: '400', color: '#C9A8B6' },
+  label:           { fontSize: 10, fontWeight: '700', color: '#C9A8B6', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+  input:           { backgroundColor: '#1A1B1E', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#F5EDE8', marginBottom: 14 },
+  prefixRow:       { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  prefix:          { backgroundColor: '#1A1B1E', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, marginRight: 8 },
+  prefixText:      { fontSize: 15, fontWeight: '600', color: '#C9A8B6' },
+  metodoGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  metodoBtn:       { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#1A1B1E' },
+  metodoBtnActive: { backgroundColor: '#A8235A' },
+  metodoBtnText:       { fontSize: 13, fontWeight: '600', color: '#C9A8B6' },
+  metodoBtnTextActive: { color: '#FFFFFF' },
+  primaryBtn:     { height: 52, borderRadius: 14, backgroundColor: '#A8235A', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  ghostBtn:       { height: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  ghostBtnText:   { fontSize: 14, fontWeight: '500', color: '#C9A8B6' },
+});
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
 
