@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 
@@ -358,9 +359,12 @@ export default function AuthScreen({ navigation }) {
                       activeOpacity={0.8}
                       disabled={locked}
                     >
-                      <Text style={[styles.idiomaChipText, idioma === key && styles.idiomaChipTextActive]}>
-                        {locked ? `${label} 🔒` : label}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={[styles.idiomaChipText, idioma === key && styles.idiomaChipTextActive]}>
+                          {label}
+                        </Text>
+                        {locked && <Ionicons name="lock-closed" size={12} color="#8A8A8E" />}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}

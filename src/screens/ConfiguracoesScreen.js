@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -273,9 +274,12 @@ export default function ConfiguracoesScreen({ navigation }) {
                   activeOpacity={0.75}
                   disabled={locked}
                 >
-                  <Text style={[styles.fullToggleText, active && styles.fullToggleTextActive]}>
-                    {locked ? `${opt.label} 🔒` : opt.label}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={[styles.fullToggleText, active && styles.fullToggleTextActive]}>
+                      {opt.label}
+                    </Text>
+                    {locked && <Ionicons name="lock-closed" size={12} color="#8A8A8E" />}
+                  </View>
                 </TouchableOpacity>
               );
             })}
