@@ -250,7 +250,7 @@ function AgendamentoClienteModal({ visible, profissionalId, profissionalNome, cl
       .lte('data_hora', `${dayStr}T23:59:59`);
 
     const busyIntervals = (ags ?? []).map(a => {
-      const dt = new Date(a.data_hora);
+      const dt = new Date(a.data_hora.slice(0, 19)); // strip tz suffix — trata como hora local
       const s  = dt.getHours() * 60 + dt.getMinutes();
       return { s, e: s + (a.servico?.duracao_minutos ?? 60) };
     });
