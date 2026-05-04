@@ -158,7 +158,7 @@ function StatColumn({ label, value, meta }) {
 }
 
 function formatDataCard(dataHora) {
-  if (!dataHora) return '';
+  if (!dataHora) return { date: '', time: '' };
   const [datePart, timePart] = dataHora.split('T');
   const [y, m, d] = datePart.split('-').map(Number);
   const dow = new Date(y, m - 1, d).getDay();
@@ -167,14 +167,17 @@ function formatDataCard(dataHora) {
   const min = parseInt(mStr, 10) || 0;
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = (h % 12) || 12;
-  return `${DAYS_SHORT_H[dow]}, ${d} de ${MONTHS_SHORT_H[m - 1]} · ${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+  return {
+    date: `${DAYS_SHORT_H[dow]}, ${d} de ${MONTHS_SHORT_H[m - 1]}`,
+    time: `${h12}:${String(min).padStart(2, '0')} ${ampm}`,
+  };
 }
 
 function ProximoCard({ agendamento }) {
   const { isDark } = useTheme();
   const clienteNome  = agendamento.clientes?.nome ?? 'Cliente';
   const servicoNome  = agendamento.servicos?.nome ?? '—';
-  const dataFmt      = formatDataCard(agendamento.data_hora);
+  const { date, time } = formatDataCard(agendamento.data_hora);
   const badgeColor   = STATUS_BADGE_COLORS[agendamento.status] ?? '#8A8A8E';
   const badgeLabel   = STATUS_LABELS[agendamento.status] ?? agendamento.status;
   const tipo         = agendamento.tipo_endereco;
@@ -189,15 +192,19 @@ function ProximoCard({ agendamento }) {
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, marginRight: 10 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }} numberOfLines={1}>{clienteNome}</Text>
-          <Text style={{ fontSize: 12, color: subColor, marginTop: 2 }} numberOfLines={1}>{servicoNome}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-            <Text style={{ fontSize: 11, color: subColor }}>{dataFmt} · </Text>
-            <Ionicons name={iconNome} size={11} color={subColor} />
-            <Text style={{ fontSize: 11, color: subColor, marginLeft: 3 }}>{iconLabel}</Text>
+            <Text style={{ fontSize: 12, color: subColor }} numberOfLines={1}>{servicoNome}</Text>
+            <Text style={{ fontSize: 12, color: subColor }}> · </Text>
+            <Ionicons name={iconNome} size={12} color={subColor} />
+            <Text style={{ fontSize: 12, color: subColor, marginLeft: 3 }}>{iconLabel}</Text>
           </View>
+          <Text style={{ fontSize: 11, color: subColor, marginTop: 2 }}>{date}</Text>
         </View>
-        <View style={{ backgroundColor: badgeColor + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 2 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor }}>{badgeLabel}</Text>
+        <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ backgroundColor: badgeColor + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor }}>{badgeLabel}</Text>
+          </View>
+          <Text style={{ fontSize: 11, color: badgeColor, marginTop: 4 }}>{time}</Text>
         </View>
       </View>
     </View>
