@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -325,6 +327,7 @@ export default function MetasScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -396,6 +399,7 @@ export default function MetasScreen({ navigation }) {
         )}
 
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <CelebrationModal
         visible={celebrationVisible}
