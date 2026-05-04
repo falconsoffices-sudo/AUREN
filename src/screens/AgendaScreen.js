@@ -919,9 +919,10 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
       const now        = new Date().toISOString();
 
       await supabase.from('agendamentos').update({ status: 'finalizado' }).eq('id', agendamento.id);
+      console.log('[Finalizar] agendamento atualizado:', agendamento.id);
 
       if (valorNum > 0) {
-        await supabase.from('financeiro').insert({
+        const { data, error } = await supabase.from('financeiro').insert({
           profissional_id:  userId,
           valor:            valorNum,
           metodo_pagamento: metodo.toLowerCase(),
@@ -930,10 +931,11 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
           cliente_id:       agendamento.cliente_id ?? null,
           created_at:       now,
         });
+        console.log('[Finalizar] financeiro serviço:', { error, data });
       }
 
       if (gorjetaNum > 0) {
-        await supabase.from('financeiro').insert({
+        const { data, error } = await supabase.from('financeiro').insert({
           profissional_id:  userId,
           valor:            gorjetaNum,
           metodo_pagamento: metodo.toLowerCase(),
@@ -942,6 +944,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
           cliente_id:       agendamento.cliente_id ?? null,
           created_at:       now,
         });
+        console.log('[Finalizar] financeiro gorjeta:', { error, data });
       }
 
       if (agendamento.cliente_id) {
@@ -958,6 +961,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
 
       await AsyncStorage.setItem('auren:caixa_needs_refresh', 'true');
       DeviceEventEmitter.emit('auren:financeiro_atualizado');
+      console.log('[Finalizar] evento emitido');
       onSaved();
     } catch (err) {
       Alert.alert('Erro ao finalizar', err.message);
@@ -1138,7 +1142,7 @@ export default function AgendaScreen() {
   const [finalizarAgend,       setFinalizarAgend]       = useState(null);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
-  const monthLabel = `${MONTHS[selected.getMonth()]} ${selected.getFullYear()}`;
+  const monthLabel = `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`;
   const dayLabel   = `${DAYS_LONG[selected.getDay()]}, ${selected.getDate()} de ${MONTHS[selected.getMonth()]}`;
 
   const fetchAgendamentos = useCallback(async (uid, date) => {
