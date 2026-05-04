@@ -177,6 +177,23 @@ function normalize(str = '') {
   return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+function parseTimeInput(str) {
+  if (!str) return null;
+  let s = str.trim().toUpperCase().replace(/\s+/g, '');
+  let ampm = null;
+  if (s.endsWith('AM')) { ampm = 'AM'; s = s.slice(0, -2); }
+  else if (s.endsWith('PM')) { ampm = 'PM'; s = s.slice(0, -2); }
+  const parts = s.split(':');
+  let h = parseInt(parts[0]) || 0;
+  let m = parseInt(parts[1]) || 0;
+  if (!ampm) ampm = h >= 12 ? 'PM' : 'AM';
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  const h12 = (h % 12) || 12;
+  return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
 function isFinalizavel(a) {
   if (a.status !== 'confirmado') return false;
   const dur = a.servicos?.duracao_minutos ?? 60;
@@ -274,10 +291,10 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     return clientes.filter(c => normalize(c.nome).includes(q));
   }, [clientes, clienteSearch]);
 
-  const doSave = async () => {
+  const doSave = async (timeArg) => {
     setSaving(true);
     try {
-      const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), time));
+      const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), timeArg));
       const novoDuracao = selectedServico.duracao_minutos || 60;
       const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
 
@@ -312,7 +329,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         profissional_id: userId,
         cliente_id:      selectedCliente.id,
         servico_id:      selectedServico.id,
-        data_hora:       buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), time),
+        data_hora:       buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), timeArg),
         status:          'confirmado',
         valor:           selectedServico.valor ?? null,
         tipo_endereco:   tipoEndereco,
@@ -339,7 +356,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
           const templateText = templates.confirmacao || DEFAULT_CONFIRMACAO;
           const mensagem = applyTemplate(templateText, {
             nome:              selectedCliente.nome,
-            horario:           formatTimeDisplay(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), time)),
+            horario:           formatTimeDisplay(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), timeArg)),
             servico:           selectedServico.nome,
             nome_profissional: prof?.nome_completo ?? prof?.nome ?? '',
           });
@@ -404,7 +421,8 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const handleSave = async () => {
     if (!selectedCliente) { Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return; }
     if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
-    if (!/^(1[0-2]|0?[1-9]):[0-5][0-9]\s?(AM|PM)$/i.test(time.trim())) { Alert.alert('Horário inválido', 'Use o formato HH:MM AM/PM (ex: 2:30 PM)'); return; }
+    const parsedTime = parseTimeInput(time);
+    if (!parsedTime) { Alert.alert('Horário inválido', 'Tente: 2:30 PM ou 9 AM'); return; }
 
     let outsideHours = false;
     try {
@@ -417,7 +435,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
       const DEF = { dias: ['seg', 'ter', 'qua', 'qui', 'sex'], inicio: '08:00', fim: '17:00' };
       const h   = storedH ? { ...DEF, ...JSON.parse(storedH) } : DEF;
       const he  = storedE ? JSON.parse(storedE) : null;
-      const upper = time.trim().toUpperCase();
+      const upper = parsedTime.toUpperCase();
       const parts = upper.split(/\s+/);
       const [hStr, mStr] = (parts[0] || '0:0').split(':');
       let hh = parseInt(hStr, 10) || 0;
@@ -437,13 +455,13 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         'O horário está fora do seu horário de atendimento. Deseja continuar mesmo assim?',
         [
           { text: 'Corrigir', style: 'cancel' },
-          { text: 'Confirmar', onPress: doSave },
+          { text: 'Confirmar', onPress: () => doSave(parsedTime) },
         ]
       );
       return;
     }
 
-    doSave();
+    doSave(parsedTime);
   };
 
   const dateLabel = `${DAYS_SHORT[selectedDateLocal.getDay()]}, ${selectedDateLocal.getDate()} de ${MONTHS_SHORT[selectedDateLocal.getMonth()]}`;
@@ -611,9 +629,10 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
     if (!selectedCliente) { Alert.alert('Campo obrigatório', 'Selecione uma cliente.'); return; }
     if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
     if (dateStr.length < 10) { Alert.alert('Campo obrigatório', 'Informe a data no formato MM/DD/YYYY.'); return; }
-    if (!timeStr.trim()) { Alert.alert('Campo obrigatório', 'Informe o horário.'); return; }
+    const parsedTime = parseTimeInput(timeStr);
+    if (!parsedTime) { Alert.alert('Horário inválido', 'Tente: 2:30 PM ou 9 AM'); return; }
 
-    const novoInicio  = new Date(buildDataHoraFromInputs(dateStr, timeStr));
+    const novoInicio  = new Date(buildDataHoraFromInputs(dateStr, parsedTime));
     const novoDuracao = selectedServico.duracao_minutos || 60;
     const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
     const [_mm, _dd, _yyyy] = dateStr.split('/');
@@ -658,7 +677,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
           cliente_id:    selectedCliente.id,
           servico_id:    selectedServico.id,
           valor:         selectedServico.valor ?? null,
-          data_hora:     buildDataHoraFromInputs(dateStr, timeStr),
+          data_hora:     buildDataHoraFromInputs(dateStr, parsedTime),
           status,
           tipo_endereco: tipoEndereco,
           observacoes:   observacoes.trim() || null,
@@ -776,7 +795,7 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
               />
               <TextInput
                 style={modal.input}
-                placeholder="HH:MM AM/PM (ex: 02:30 PM)"
+                placeholder="Ex: 2:30 PM"
                 placeholderTextColor="#C9A8B6"
                 value={timeStr}
                 onChangeText={t => setTimeStr(t.replace(/[^0-9:aAmMpP ]/g, '').slice(0, 8))}
