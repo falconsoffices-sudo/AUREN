@@ -430,6 +430,9 @@ export default function CaixaScreen({ navigation }) {
   const [prevMesGanhos,   setPrevMesGanhos]   = useState(0);
   const [prevMesDespesas, setPrevMesDespesas] = useState(0);
   const [clienteNomes,    setClienteNomes]    = useState({});
+  const [gorjetasMes,   setGorjetasMes]   = useState(0);
+  const [gorjetasModal, setGorjetasModal] = useState(false);
+  const [gorjetasLista, setGorjetasLista] = useState([]);
 
   const carregarDados = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -573,6 +576,10 @@ export default function CaixaScreen({ navigation }) {
     setAgendSemana(semRes.data ?? []);
     setSeisMesData(seisMesesRes.data ?? []);
     setFinLista(finRes.data ?? []);
+    const mesPrefix = `${mesAtual.getFullYear()}-${String(mesAtual.getMonth() + 1).padStart(2, '0')}`;
+    const gorjetas  = (finRes.data ?? []).filter(r => r.categoria === 'gorjeta');
+    setGorjetasLista(gorjetas);
+    setGorjetasMes(gorjetas.filter(r => (r.created_at ?? '').startsWith(mesPrefix)).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0));
     const cIds = [...new Set((finRes.data ?? []).filter(r => r.cliente_id).map(r => r.cliente_id))];
     if (cIds.length > 0) {
       const { data: cNomesData } = await supabase.from('clientes').select('id, nome').in('id', cIds);
@@ -738,6 +745,17 @@ export default function CaixaScreen({ navigation }) {
             </View>
           ))}
         </View>
+
+        <TouchableOpacity style={styles.tipsCard} onPress={() => setGorjetasModal(true)} activeOpacity={0.85}>
+          <View style={styles.tipsTopRow}>
+            <View style={styles.tipsIndicator}>
+              <Text style={styles.tipsAbbr}>TI</Text>
+            </View>
+            <Text style={styles.tipsLabel}>TIPS (GORJETAS)</Text>
+          </View>
+          <Text style={styles.tipsValue}>{fmt(gorjetasMes)}</Text>
+          <Text style={styles.tipsSub}>este mês</Text>
+        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Metas</Text>
         <TouchableOpacity style={styles.metasCard} onPress={() => navigation.navigate('Perfil', { screen: 'Metas' })} activeOpacity={0.85}>
@@ -946,6 +964,38 @@ export default function CaixaScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* ── Modal: Tips ── */}
+      <Modal visible={gorjetasModal} transparent animationType="slide" onRequestClose={() => setGorjetasModal(false)}>
+        <View style={bss.backdrop}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setGorjetasModal(false)} activeOpacity={1} />
+          <View style={bss.sheet}>
+            <View style={bss.handle} />
+            <Text style={bss.title}>Tips · {fmt(gorjetasMes)}</Text>
+            {gorjetasLista.length === 0 ? (
+              <Text style={bss.empty}>Nenhuma gorjeta recebida ainda.</Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                {gorjetasLista.map((t, i) => {
+                  const d = new Date(t.created_at);
+                  const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+                  return (
+                    <View key={i} style={[bss.row, i > 0 && bss.rowBorder]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={bss.rowTitle}>{t.cliente_id ? (clienteNomes[t.cliente_id] ?? '—') : 'Cliente não identificado'}</Text>
+                        <Text style={bss.rowSub}>{t.metodo_pagamento ?? '—'}</Text>
+                      </View>
+                      <Text style={bss.rowSub}>{dtStr}</Text>
+                      <Text style={[bss.rowAccent, { color: '#F59E0B', marginLeft: 12 }]}>{fmt(t.valor)}</Text>
+                    </View>
+                  );
+                })}
+                <View style={{ height: 24 }} />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <EntradaManualModal
         visible={entradaModalVisible}
         onClose={() => setEntradaModalVisible(false)}
@@ -1031,6 +1081,14 @@ function makeStyles(isDark) {
     payAbbr:  { fontSize: 13, fontWeight: '800', letterSpacing: 0.4 },
     payLabel: { fontSize: 12, fontWeight: '400', color: sub, marginBottom: 4 },
     payValue: { fontSize: 18, fontWeight: '700', color: text },
+
+    tipsCard:      { backgroundColor: 'rgba(245,159,11,0.08)', borderRadius: 16, padding: 18, marginBottom: 28, borderWidth: 1, borderColor: 'rgba(245,159,11,0.25)' },
+    tipsTopRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    tipsIndicator: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(245,159,11,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+    tipsAbbr:      { fontSize: 13, fontWeight: '800', color: '#F59E0B' },
+    tipsLabel:     { fontSize: 10, fontWeight: '700', color: '#F59E0B', letterSpacing: 1.2 },
+    tipsValue:     { fontSize: 24, fontWeight: '800', color: '#F59E0B', marginBottom: 5 },
+    tipsSub:       { fontSize: 12, fontWeight: '400', color: '#F59E0B', opacity: 0.7 },
 
     metasCard: { backgroundColor: card, borderRadius: 16, padding: 20, marginBottom: 12 },
     metaItem:  { paddingVertical: 4 },
