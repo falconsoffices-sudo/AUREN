@@ -77,7 +77,7 @@ export default function OnboardingScreen({ navigation }) {
 
   // Step 2 — Clientes (multi)
   const [clientesRows,       setClientesRows]       = useState(Array.from({ length: 20 }, EMPTY_ROW));
-  const [mostrarMais,        setMostrarMais]        = useState(false);
+  const [quantosVisiveis,    setQuantosVisiveis]    = useState(3);
   const [usouImportacao,     setUsouImportacao]     = useState(false);
   const [carregandoContatos, setCarregandoContatos] = useState(false);
   const [contatoModal,       setContatoModal]       = useState(false);
@@ -86,7 +86,7 @@ export default function OnboardingScreen({ navigation }) {
   const [selecionados,       setSelecionados]       = useState([]);
 
   // Derived — step 2
-  const visivelRows   = mostrarMais ? clientesRows : clientesRows.slice(0, 10);
+  const visivelRows   = clientesRows.slice(0, quantosVisiveis);
   const podeConcluir  = visivelRows.some(r => r.nome.trim() && r.fone.trim());
 
   const contatosFiltrados = useMemo(() => {
@@ -204,7 +204,7 @@ export default function OnboardingScreen({ navigation }) {
     });
     while (novasRows.length < 20) novasRows.push(EMPTY_ROW());
     setClientesRows(novasRows);
-    if (selected.length > 10) setMostrarMais(true);
+    setQuantosVisiveis(Math.max(3, Math.min(selected.length, 20)));
     setUsouImportacao(true);
     setContatoModal(false);
   }
@@ -218,18 +218,7 @@ export default function OnboardingScreen({ navigation }) {
   }
 
   async function handleStep2() {
-    const parcial = visivelRows.find(r =>
-      (r.nome.trim() && !r.fone.trim()) || (!r.nome.trim() && r.fone.trim())
-    );
-    if (parcial) {
-      Alert.alert('Campo incompleto', 'Se iniciar um cadastro, preencha nome e telefone.');
-      return;
-    }
     const completos = visivelRows.filter(r => r.nome.trim() && r.fone.trim());
-    if (completos.length === 0) {
-      Alert.alert('Pelo menos uma cliente', 'Cadastre ao menos uma cliente para continuar.');
-      return;
-    }
     setLoading(true);
     try {
       const uid = await getUid();
@@ -540,16 +529,16 @@ export default function OnboardingScreen({ navigation }) {
                 </View>
               ))}
 
-              {!mostrarMais && (
-                <TouchableOpacity style={styles.addMaisBtn} onPress={() => setMostrarMais(true)} activeOpacity={0.8}>
-                  <Text style={styles.addMaisText}>+ Adicionar mais</Text>
+              {quantosVisiveis < 20 && (
+                <TouchableOpacity style={styles.addMaisBtn} onPress={() => setQuantosVisiveis(prev => Math.min(prev + 3, 20))} activeOpacity={0.8}>
+                  <Text style={styles.addMaisText}>+ Adicionar mais {Math.min(quantosVisiveis + 3, 20) - quantosVisiveis}</Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity
-                style={[styles.btn, { marginTop: 16 }, (!podeConcluir || loading) && styles.btnDisabled]}
+                style={[styles.btn, { marginTop: 16 }, loading && styles.btnDisabled]}
                 onPress={handleStep2}
-                disabled={!podeConcluir || loading}
+                disabled={loading}
                 activeOpacity={0.85}
               >
                 {loading
