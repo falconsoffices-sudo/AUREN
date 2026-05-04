@@ -122,7 +122,7 @@ export default function ConfiguracoesScreen({ navigation }) {
         if (data.modo_app === 'auto' || data.modo_app === 'dark' || data.modo_app === 'light') {
           setThemeMode(data.modo_app);
         }
-        setDataFechamento(data.data_fechamento != null ? String(data.data_fechamento) : '28');
+        setDataFechamento(data.data_fechamento != null ? String(Math.min(data.data_fechamento, 28)) : '28');
         setIdioma(data.idioma ?? 'pt');
       } else if (error && error.code !== 'PGRST116') {
         Alert.alert('Erro ao carregar', error.message);
@@ -157,8 +157,8 @@ export default function ConfiguracoesScreen({ navigation }) {
 
   const handleSave = async () => {
     const dia = parseInt(dataFechamento, 10);
-    if (!dia || dia < 1 || dia > 31) {
-      Alert.alert('Valor inválido', 'A data de fechamento deve ser entre 1 e 31.');
+    if (!dia || dia < 1 || dia > 28) {
+      Alert.alert('Valor inválido', 'O dia de fechamento deve ser entre 1 e 28.');
       return;
     }
     setSaving(true);
