@@ -1143,6 +1143,96 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
   );
 }
 
+// ─── Month Calendar Modal ────────────────────────────────────────────────────
+
+function MonthCalendarModal({ visible, userId, initialMonth, onClose, onDayPress }) {
+  const [calMonth, setCalMonth] = useState(() => new Date(initialMonth.getFullYear(), initialMonth.getMonth(), 1));
+  const [dotDays,  setDotDays]  = useState(new Set());
+  const [fetching, setFetching] = useState(false);
+
+  useEffect(() => {
+    if (visible) setCalMonth(new Date(initialMonth.getFullYear(), initialMonth.getMonth(), 1));
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !userId) return;
+    const yr  = calMonth.getFullYear();
+    const mo  = calMonth.getMonth();
+    const start = new Date(yr, mo, 1);
+    const end   = new Date(yr, mo + 1, 0, 23, 59, 59);
+    setFetching(true);
+    supabase
+      .from('agendamentos')
+      .select('data_hora')
+      .eq('profissional_id', userId)
+      .neq('status', 'cancelado')
+      .gte('data_hora', start.toISOString())
+      .lte('data_hora', end.toISOString())
+      .then(({ data }) => {
+        setDotDays(new Set((data || []).map(a => a.data_hora.slice(0, 10))));
+        setFetching(false);
+      });
+  }, [visible, calMonth, userId]);
+
+  const yr        = calMonth.getFullYear();
+  const mo        = calMonth.getMonth();
+  const firstDay  = new Date(yr, mo, 1).getDay();
+  const daysInMon = new Date(yr, mo + 1, 0).getDate();
+  const pad       = n => String(n).padStart(2, '0');
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMon; d++) cells.push(new Date(yr, mo, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={calStyle.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <View style={calStyle.sheet}>
+          <View style={calStyle.monthHeader}>
+            <TouchableOpacity onPress={() => setCalMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={calStyle.navArrow}>‹</Text>
+            </TouchableOpacity>
+            <Text style={calStyle.monthTitle}>{MONTHS[mo]} {yr}</Text>
+            <TouchableOpacity onPress={() => setCalMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={calStyle.navArrow}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={calStyle.dayHeaderRow}>
+            {DAYS_SHORT.map(d => <Text key={d} style={calStyle.dayHeader}>{d}</Text>)}
+          </View>
+
+          {weeks.map((week, wi) => (
+            <View key={wi} style={calStyle.weekRow}>
+              {week.map((day, di) => {
+                if (!day) return <View key={di} style={calStyle.dayCell} />;
+                const dayStr  = `${yr}-${pad(mo + 1)}-${pad(day.getDate())}`;
+                const hasDot  = dotDays.has(dayStr);
+                const isToday = isSameDay(day, TODAY);
+                return (
+                  <TouchableOpacity key={di} style={calStyle.dayCell} onPress={() => onDayPress(day)} activeOpacity={0.7}>
+                    <View style={[calStyle.dayNumWrap, isToday && calStyle.dayNumWrapToday]}>
+                      <Text style={[calStyle.dayNum, isToday && calStyle.dayNumToday]}>{day.getDate()}</Text>
+                    </View>
+                    {hasDot && <View style={calStyle.dot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+
+          {fetching && <ActivityIndicator color="#A8235A" style={{ marginVertical: 8 }} />}
+          <View style={{ height: 20 }} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Appointment Card ─────────────────────────────────────────────────────────
 
 function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress, finalizavel }) {
@@ -1218,6 +1308,7 @@ export default function AgendaScreen() {
   const [licencaExpiracao,     setLicencaExpiracao]     = useState(null);
   const [finalizarVisible,     setFinalizarVisible]     = useState(false);
   const [finalizarAgend,       setFinalizarAgend]       = useState(null);
+  const [calendarVisible,      setCalendarVisible]      = useState(false);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
   const monthLabel = `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`;
@@ -1263,6 +1354,15 @@ export default function AgendaScreen() {
     if (userId) fetchAgendamentos(userId, selected);
   }, [userId, selected]);
 
+  const handleCalendarDayPress = (day) => {
+    const targetSun = new Date(day); targetSun.setDate(day.getDate() - day.getDay());
+    const todaySun  = new Date(TODAY); todaySun.setDate(TODAY.getDate() - TODAY.getDay());
+    const diff = Math.round((targetSun - todaySun) / (7 * 86400000));
+    setWeekOffset(diff);
+    setSelected(day);
+    setCalendarVisible(false);
+  };
+
   const openEdit = (a) => {
     if (a.status === 'pendente') {
       setSolicitacaoAgend(a); setSolicitacaoVisible(true);
@@ -1278,7 +1378,9 @@ export default function AgendaScreen() {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Agenda</Text>
-        <Text style={styles.headerMonth}>{monthLabel}</Text>
+        <TouchableOpacity onPress={() => setCalendarVisible(true)} activeOpacity={0.7}>
+          <Text style={styles.headerMonth}>{monthLabel} ▾</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.weekRow}>
@@ -1399,6 +1501,14 @@ export default function AgendaScreen() {
           fetchAgendamentos(userId, selected);
           calcularNivel(userId).catch(() => {});
         }}
+      />
+
+      <MonthCalendarModal
+        visible={calendarVisible}
+        userId={userId}
+        initialMonth={weekDays[0]}
+        onClose={() => setCalendarVisible(false)}
+        onDayPress={handleCalendarDayPress}
       />
 
     </SafeAreaView>
@@ -1551,4 +1661,23 @@ const modal = StyleSheet.create({
   pickerItemMeta:         { fontSize: 12, color: '#C9A8B6', marginTop: 2 },
   pickerItemValor:        { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginLeft: 12 },
   closeBtn:               { position: 'absolute', top: 16, right: 16, zIndex: 10 },
+});
+
+// ─── Calendar Modal styles ────────────────────────────────────────────────────
+
+const calStyle = StyleSheet.create({
+  backdrop:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet:           { backgroundColor: '#0E0F11', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 20 },
+  monthHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  navArrow:        { fontSize: 28, fontWeight: '400', color: '#F5EDE8', paddingHorizontal: 8 },
+  monthTitle:      { fontSize: 17, fontWeight: '700', color: '#F5EDE8' },
+  dayHeaderRow:    { flexDirection: 'row', marginBottom: 8 },
+  dayHeader:       { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: '#8A8A8E', letterSpacing: 0.3 },
+  weekRow:         { flexDirection: 'row', marginBottom: 4 },
+  dayCell:         { flex: 1, alignItems: 'center', paddingVertical: 6 },
+  dayNumWrap:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  dayNumWrapToday: { backgroundColor: '#A8235A' },
+  dayNum:          { fontSize: 14, fontWeight: '500', color: '#F5EDE8' },
+  dayNumToday:     { color: '#FFFFFF', fontWeight: '700' },
+  dot:             { width: 5, height: 5, borderRadius: 3, backgroundColor: '#A8235A', marginTop: 2 },
 });
