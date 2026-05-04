@@ -256,7 +256,7 @@ function EntradaManualModal({ visible, onClose, onSaved }) {
       const { error } = await supabase.from('financeiro').insert({
         profissional_id:  uid,
         valor:            valorNum,
-        metodo_pagamento: metodo,
+        metodo_pagamento: metodo.toLowerCase(),
         tipo:             'receita',
         categoria:        descricao.trim() || 'entrada_manual',
         cliente_id:       selectedCliente?.id ?? null,
@@ -564,7 +564,7 @@ export default function CaixaScreen({ navigation }) {
 
     const byMethod = {};
     for (const row of finRes.data ?? []) {
-      const key = row.metodo_pagamento ?? 'outro';
+      const key = (row.metodo_pagamento ?? 'outro').toLowerCase();
       byMethod[key] = (byMethod[key] || 0) + (parseFloat(row.valor) || 0);
     }
     setPagamentos(byMethod);

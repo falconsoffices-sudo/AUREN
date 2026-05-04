@@ -923,7 +923,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
         await supabase.from('financeiro').insert({
           profissional_id:  userId,
           valor:            valorNum,
-          metodo_pagamento: metodo,
+          metodo_pagamento: metodo.toLowerCase(),
           tipo:             'receita',
           categoria:        agendamento.servicos?.nome ?? 'Serviço',
           cliente_id:       agendamento.cliente_id ?? null,
@@ -935,7 +935,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
         await supabase.from('financeiro').insert({
           profissional_id:  userId,
           valor:            gorjetaNum,
-          metodo_pagamento: metodo,
+          metodo_pagamento: metodo.toLowerCase(),
           tipo:             'receita',
           categoria:        'gorjeta',
           cliente_id:       agendamento.cliente_id ?? null,
