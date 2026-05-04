@@ -527,20 +527,23 @@ function EditClientModal({ visible, cliente, onClose, onSaved }) {
 
   const handleDelete = () => {
     Alert.alert(
-      'Excluir cliente',
-      `Tem certeza que deseja excluir ${cliente.nome}? Esta ação não pode ser desfeita.`,
+      'Arquivar cliente',
+      `Deseja arquivar ${cliente.nome}? Você poderá restaurá-la em até 30 dias em Perfil → Clientes Arquivadas.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Excluir', style: 'destructive',
+          text: 'Arquivar', style: 'destructive',
           onPress: async () => {
             setDeleting(true);
             try {
-              const { error } = await supabase.from('clientes').delete().eq('id', cliente.id);
+              const { error } = await supabase
+                .from('clientes')
+                .update({ ativa: false, arquivada_em: new Date().toISOString() })
+                .eq('id', cliente.id);
               if (error) throw error;
               onSaved();
             } catch (err) {
-              Alert.alert('Erro ao excluir', err.message);
+              Alert.alert('Erro ao arquivar', err.message);
               setDeleting(false);
             }
           },
@@ -709,6 +712,7 @@ export default function ClientesScreen() {
       .from('clientes')
       .select('*')
       .eq('profissional_id', id)
+      .eq('ativa', true)
       .order('nome');
     if (!error && data) setClientes(data);
   }, [userId]);

@@ -45,6 +45,7 @@ const MENU_SECTIONS = [
       { label: 'Meus Serviços' },
       { label: 'Licença Profissional' },
       { label: 'EIN' },
+      { label: 'Clientes Arquivadas' },
     ],
   },
   {
@@ -309,6 +310,7 @@ export default function PerfilScreen({ navigation }) {
       case 'Presentear com AUREN':     return () => navigation.navigate('Presentear');
       case 'Licença Profissional':     return () => navigation.navigate('Licenca');
       case 'EIN':                      return () => navigation.navigate('MeusDados');
+      case 'Clientes Arquivadas':      return () => navigation.navigate('ClientesArquivadas');
       case 'Ver Planos':               return () => navigation.navigate('Plans');
       case 'Sair': return () => Alert.alert(
         'Sair',
