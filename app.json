@@ -32,7 +32,13 @@
     },
     "plugins": [
       "expo-font",
-      ["expo-contacts", {"contactsPermission": "O AUREN precisa acessar seus contatos para importar clientes."}]
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "O AUREN precisa acessar seus contatos para importar clientes."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {
