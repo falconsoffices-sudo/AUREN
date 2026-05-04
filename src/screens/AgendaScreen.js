@@ -21,6 +21,7 @@ import { sendSMS, applyTemplate } from '../lib/sms';
 import { calcularNivel } from '../lib/gamificacao';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1375,6 +1376,12 @@ export default function AgendaScreen() {
   useEffect(() => {
     if (userId) fetchAgendamentos(userId, selected);
   }, [userId, selected]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setWeekOffset(0);
+    }, [])
+  );
 
   const handleCalendarDayPress = (day) => {
     const targetSun = new Date(day); targetSun.setDate(day.getDate() - day.getDay());
