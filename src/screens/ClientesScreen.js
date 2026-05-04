@@ -366,6 +366,20 @@ function AddClientModal({ visible, onClose, onSaved }) {
 
       const foneDb = telefone ? `+1${telefone.replace(/\D/g, '')}` : null;
 
+      if (foneDb) {
+        const { data: existing } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('profissional_id', userId)
+          .eq('telefone', foneDb)
+          .maybeSingle();
+        if (existing) {
+          Alert.alert('Cliente duplicada', 'Já existe uma cliente com este telefone cadastrada.');
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.from('clientes').insert({
         profissional_id:  userId,
         nome:             nome.trim(),
