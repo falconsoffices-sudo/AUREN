@@ -189,13 +189,12 @@ function ProximoCard({ agendamento }) {
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, marginRight: 10 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }} numberOfLines={1}>{clienteNome}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
-            <Text style={{ fontSize: 12, color: subColor }} numberOfLines={1}>{servicoNome}</Text>
-            <Text style={{ fontSize: 12, color: subColor }}> · </Text>
-            <Ionicons name={iconNome} size={12} color={subColor} />
-            <Text style={{ fontSize: 12, color: subColor, marginLeft: 3 }}>{iconLabel}</Text>
+          <Text style={{ fontSize: 12, color: subColor, marginTop: 2 }} numberOfLines={1}>{servicoNome}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <Text style={{ fontSize: 11, color: subColor }}>{dataFmt} · </Text>
+            <Ionicons name={iconNome} size={11} color={subColor} />
+            <Text style={{ fontSize: 11, color: subColor, marginLeft: 3 }}>{iconLabel}</Text>
           </View>
-          <Text style={{ fontSize: 12, color: subColor, marginTop: 3 }}>{dataFmt}</Text>
         </View>
         <View style={{ backgroundColor: badgeColor + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 2 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor }}>{badgeLabel}</Text>
