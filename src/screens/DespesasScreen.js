@@ -497,7 +497,7 @@ function DespesaCard({ categoria, valor, descricao, data_despesa, created_at, re
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-export default function DespesasScreen({ navigation }) {
+export default function DespesasScreen({ navigation, route }) {
   const [despesas,          setDespesas]          = useState([]);
   const [loading,           setLoading]           = useState(true);
   const [addVisible,        setAddVisible]        = useState(false);
@@ -650,7 +650,13 @@ export default function DespesasScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={() => route?.params?.voltarPara === 'Caixa'
+            ? navigation.navigate('Main', { screen: 'Caixa' })
+            : navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Despesas</Text>

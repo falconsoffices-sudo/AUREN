@@ -162,7 +162,7 @@ function CelebrationModal({ visible, marco, onClose }) {
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-export default function MetasScreen({ navigation }) {
+export default function MetasScreen({ navigation, route }) {
   const [loading,        setLoading]        = useState(true);
   const [saving,         setSaving]         = useState(false);
   const [editing,        setEditing]        = useState(false);
@@ -310,7 +310,13 @@ export default function MetasScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={() => route?.params?.voltarPara === 'Caixa'
+            ? navigation.navigate('Main', { screen: 'Caixa' })
+            : navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Metas e Objetivos</Text>

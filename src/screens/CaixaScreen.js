@@ -722,7 +722,7 @@ export default function CaixaScreen({ navigation }) {
         </View>
 
         <View style={styles.statsRow}>
-          <TouchableOpacity style={[styles.statCard, { flex: 1 }]} onPress={() => navigation.navigate('Perfil', { screen: 'Despesas' })} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.statCard, { flex: 1 }]} onPress={() => navigation.navigate('Perfil', { screen: 'Despesas', params: { voltarPara: 'Caixa' } })} activeOpacity={0.85}>
             <Text style={styles.statLabel}>DESPESAS DO MÊS</Text>
             <Text style={[styles.statValue, styles.valueRed]}>{fmt(despesasMes)}</Text>
           </TouchableOpacity>
@@ -764,7 +764,7 @@ export default function CaixaScreen({ navigation }) {
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Metas</Text>
-        <TouchableOpacity style={styles.metasCard} onPress={() => navigation.navigate('Perfil', { screen: 'Metas' })} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.metasCard} onPress={() => navigation.navigate('Perfil', { screen: 'Metas', params: { voltarPara: 'Caixa' } })} activeOpacity={0.85}>
           <MetaBar
             label="Meta mensal"
             current={ganhosMes}
