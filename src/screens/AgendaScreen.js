@@ -20,6 +20,7 @@ import { scheduleNotification } from '../lib/notifications';
 import { sendSMS, applyTemplate } from '../lib/sms';
 import { calcularNivel } from '../lib/gamificacao';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -190,6 +191,9 @@ function ServicoPickerModal({ visible, servicos, loadingServicos, onSelect, onCl
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
         <View style={[modal.sheet, { maxHeight: '70%' }]}>
           <View style={modal.handle} />
+          <TouchableOpacity style={modal.closeBtn} onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={24} color="#8A8A8E" />
+          </TouchableOpacity>
           <Text style={modal.title}>Selecionar Serviço</Text>
           {loadingServicos ? (
             <ActivityIndicator color="#A8235A" style={{ marginBottom: 20 }} />
@@ -445,6 +449,9 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={modal.sheet}>
             <View style={modal.handle} />
+            <TouchableOpacity style={modal.closeBtn} onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={24} color="#8A8A8E" />
+            </TouchableOpacity>
             <Text style={modal.title}>Novo Agendamento</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={modal.sectionLabel}>CLIENTE</Text>
@@ -683,6 +690,9 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={modal.sheet}>
             <View style={modal.handle} />
+            <TouchableOpacity style={modal.closeBtn} onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={24} color="#8A8A8E" />
+            </TouchableOpacity>
             <Text style={modal.title}>Editar Agendamento</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -850,6 +860,9 @@ function SolicitacaoModal({ visible, agendamento, onClose, onSaved, onEditar }) 
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
         <View style={modal.sheet}>
           <View style={modal.handle} />
+          <TouchableOpacity style={modal.closeBtn} onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={24} color="#8A8A8E" />
+          </TouchableOpacity>
           <View style={sol.badge}><Text style={sol.badgeText}>AGUARDANDO CONFIRMAÇÃO</Text></View>
           <Text style={modal.title}>Solicitação de Agendamento</Text>
           <View style={sol.infoCard}>
@@ -982,6 +995,9 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={finSheet.sheet}>
             <View style={finSheet.handle} />
+            <TouchableOpacity style={finSheet.closeBtn} onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={24} color="#8A8A8E" />
+            </TouchableOpacity>
             {step === 1 ? (
               <>
                 <Text style={finSheet.title}>Serviço concluído?</Text>
@@ -1429,6 +1445,7 @@ const finSheet = StyleSheet.create({
   primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
   ghostBtn:       { height: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   ghostBtnText:   { fontSize: 14, fontWeight: '500', color: '#C9A8B6' },
+  closeBtn:       { position: 'absolute', top: 16, right: 16, zIndex: 10 },
 });
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
@@ -1494,4 +1511,5 @@ const modal = StyleSheet.create({
   pickerItemNome:         { fontSize: 15, fontWeight: '600', color: '#F5EDE8' },
   pickerItemMeta:         { fontSize: 12, color: '#C9A8B6', marginTop: 2 },
   pickerItemValor:        { fontSize: 16, fontWeight: '700', color: '#F5EDE8', marginLeft: 12 },
+  closeBtn:               { position: 'absolute', top: 16, right: 16, zIndex: 10 },
 });
