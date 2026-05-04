@@ -11,7 +11,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
@@ -177,6 +179,8 @@ export default function PerfilScreen({ navigation }) {
   const [diasConta,       setDiasConta]       = useState(null);
   const [cidadeEstado,      setCidadeEstado]      = useState('');
   const [nivelGamificacao,  setNivelGamificacao]  = useState(1);
+  const [agendaStatusText,  setAgendaStatusText]  = useState('');
+  const [agendaStatusColor, setAgendaStatusColor] = useState(colors.cream);
 
   useEffect(() => {
     (async () => {
@@ -212,6 +216,53 @@ export default function PerfilScreen({ navigation }) {
       }
     })();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          const uid = authData?.user?.id;
+          if (!uid) return;
+
+          const now  = new Date();
+          const pad  = n => String(n).padStart(2, '0');
+          const hoje = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+          const dayStart = `${hoje}T00:00:00`;
+          const dayEnd   = `${hoje}T23:59:59`;
+
+          const storedH = await AsyncStorage.getItem('auren:horario_atendimento');
+          if (!storedH) {
+            setAgendaStatusText('Configure sua agenda');
+            setAgendaStatusColor('#F59E0B');
+            return;
+          }
+
+          const { data: appts } = await supabase
+            .from('agendamentos')
+            .select('id, status')
+            .eq('profissional_id', uid)
+            .neq('status', 'cancelado')
+            .gte('data_hora', dayStart)
+            .lte('data_hora', dayEnd);
+
+          const total = (appts ?? []).length;
+          const slots = Math.max(0, 4 - total);
+
+          if (slots === 0) {
+            setAgendaStatusText('Agenda Cheia');
+            setAgendaStatusColor('#A8235A');
+          } else {
+            setAgendaStatusText(`${slots} horário${slots === 1 ? '' : 's'} livre${slots === 1 ? '' : 's'} hoje`);
+            setAgendaStatusColor('#22C55E');
+          }
+        } catch (_) {
+          setAgendaStatusText('');
+          setAgendaStatusColor(colors.cream);
+        }
+      })();
+    }, [])
+  );
 
   // ── Photo upload ────────────────────────────────────────────────────────────
 
@@ -393,7 +444,14 @@ export default function PerfilScreen({ navigation }) {
             >
               <Text style={styles.levelBadgeText}>NÍVEL {nivelGamificacao}</Text>
             </TouchableOpacity>
-            <Text style={styles.agendaStatus}>Agenda Cheia</Text>
+            {agendaStatusText ? (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Main', { screen: 'Agenda' })}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.agendaStatus, { color: agendaStatusColor }]}>{agendaStatusText}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
 
