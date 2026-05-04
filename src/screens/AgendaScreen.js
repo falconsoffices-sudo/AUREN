@@ -1320,7 +1320,7 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-export default function AgendaScreen() {
+export default function AgendaScreen({ navigation, route }) {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const [weekOffset,      setWeekOffset]      = useState(0);
@@ -1391,8 +1391,20 @@ export default function AgendaScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setWeekOffset(0);
-    }, [])
+      const dataInicial = route?.params?.dataInicial;
+      if (dataInicial) {
+        const [y, m, d] = dataInicial.split('-').map(Number);
+        const target    = new Date(y, m - 1, d);
+        const targetSun = new Date(target); targetSun.setDate(target.getDate() - target.getDay());
+        const todaySun  = new Date(TODAY);  todaySun.setDate(TODAY.getDate() - TODAY.getDay());
+        const diff      = Math.round((targetSun - todaySun) / (7 * 86400000));
+        setWeekOffset(diff);
+        setSelected(target);
+        navigation.setParams({ dataInicial: undefined });
+      } else {
+        setWeekOffset(0);
+      }
+    }, [route?.params?.dataInicial, navigation])
   );
 
   const handleCalendarDayPress = (day) => {

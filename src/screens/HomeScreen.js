@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
@@ -37,6 +38,24 @@ const STATUS_COLORS = {
   finalizado: '#6B7280',
   cancelado:  '#EF4444',
 };
+
+const STATUS_PRIORIDADE = { confirmado: 1, pendente: 2, em_aberto: 3, finalizado: 4, cancelado: 5 };
+const STATUS_BADGE_COLORS = {
+  confirmado: '#22C55E',
+  pendente:   '#F59E0B',
+  em_aberto:  '#8A8A8E',
+  finalizado: '#A8235A',
+  cancelado:  '#EF4444',
+};
+const STATUS_LABELS = {
+  confirmado: 'Confirmado',
+  pendente:   'Pendente',
+  em_aberto:  'Em Aberto',
+  finalizado: 'Finalizado',
+  cancelado:  'Cancelado',
+};
+const DAYS_SHORT_H   = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const MONTHS_SHORT_H = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,25 +157,50 @@ function StatColumn({ label, value, meta }) {
   );
 }
 
-function AgendamentoRow({ agendamento, showDivider }) {
+function formatDataCard(dataHora) {
+  if (!dataHora) return '';
+  const [datePart, timePart] = dataHora.split('T');
+  const [y, m, d] = datePart.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  const [hStr, mStr] = (timePart || '00:00').split(':');
+  let h = parseInt(hStr, 10) || 0;
+  const min = parseInt(mStr, 10) || 0;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = (h % 12) || 12;
+  return `${DAYS_SHORT_H[dow]}, ${d} de ${MONTHS_SHORT_H[m - 1]} · ${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+}
+
+function ProximoCard({ agendamento }) {
   const { isDark } = useTheme();
-  const clienteNome = agendamento.clientes?.nome ?? 'Cliente';
-  const servicoNome = agendamento.servicos?.nome ?? '—';
-  const hora        = formatHora(agendamento.data_hora);
-  const dotColor    = STATUS_COLORS[agendamento.status] ?? '#6B7280';
+  const clienteNome  = agendamento.clientes?.nome ?? 'Cliente';
+  const servicoNome  = agendamento.servicos?.nome ?? '—';
+  const dataFmt      = formatDataCard(agendamento.data_hora);
+  const badgeColor   = STATUS_BADGE_COLORS[agendamento.status] ?? '#8A8A8E';
+  const badgeLabel   = STATUS_LABELS[agendamento.status] ?? agendamento.status;
+  const tipo         = agendamento.tipo_endereco;
+  const iconNome     = tipo === 'domicilio' ? 'home-outline' : tipo === 'externo' ? 'car-outline' : 'business-outline';
+  const iconLabel    = tipo === 'domicilio' ? 'Domicílio' : tipo === 'externo' ? 'Externo' : 'Salão';
+  const textColor    = isDark ? '#F5EDE8' : '#1A0A14';
+  const subColor     = isDark ? '#C9A8B6' : '#6B4A58';
+  const divColor     = isDark ? '#2A2A2A' : '#E6D8CF';
 
   return (
-    <>
-      {showDivider && <View style={{ height: 1, backgroundColor: isDark ? '#2A2A2A' : '#E6D8CF' }} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, marginRight: 12, flexShrink: 0, backgroundColor: dotColor }} />
+    <View style={{ borderTopWidth: 1, borderTopColor: divColor, paddingTop: 12, paddingBottom: 4, marginTop: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, marginRight: 10 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#F5EDE8' : '#1A0A14' }} numberOfLines={1}>{clienteNome}</Text>
-          <Text style={{ fontSize: 12, fontWeight: '400', color: isDark ? '#C9A8B6' : '#6B4A58', marginTop: 2 }} numberOfLines={1}>{servicoNome}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }} numberOfLines={1}>{clienteNome}</Text>
+          <Text style={{ fontSize: 12, color: subColor, marginTop: 2 }} numberOfLines={1}>{servicoNome}</Text>
+          <Text style={{ fontSize: 12, color: subColor, marginTop: 4 }}>{dataFmt}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Ionicons name={iconNome} size={12} color={subColor} />
+            <Text style={{ fontSize: 11, color: subColor, marginLeft: 4 }}>{iconLabel}</Text>
+          </View>
         </View>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: '#A8235A', flexShrink: 0 }}>{hora}</Text>
+        <View style={{ backgroundColor: badgeColor + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 2 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor }}>{badgeLabel}</Text>
+        </View>
       </View>
-    </>
+    </View>
   );
 }
 
@@ -242,6 +286,7 @@ export default function HomeScreen({ navigation }) {
   const [primeiroNome,      setPrimeiroNome]      = useState('');
   const [nivelGamificacao,  setNivelGamificacao]  = useState(1);
   const [agendamentosHoje,  setAgendamentosHoje]  = useState([]);
+  const [proximosAgend,     setProximosAgend]     = useState([]);
   const [faturamentoSemana, setFaturamentoSemana] = useState(0);
   const [faturamentoMes,    setFaturamentoMes]    = useState(0);
   const [diasTrial,         setDiasTrial]         = useState(null);
@@ -283,7 +328,10 @@ export default function HomeScreen({ navigation }) {
     const prevMesInicio = `${prevMo.getFullYear()}-${padPM(prevMo.getMonth() + 1)}-01T00:00:00`;
     const prevMesFimStr = `${prevMoLast.getFullYear()}-${padPM(prevMoLast.getMonth() + 1)}-${padPM(prevMoLast.getDate())}T23:59:59`;
 
-    const [profileRes, agendSemanaRes, agendMesRes, allApptsRes, indRes, prevMesRes] = await Promise.all([
+    const proxSete = new Date(nowPM); proxSete.setDate(nowPM.getDate() + 7);
+    const proxSeteStr = `${proxSete.getFullYear()}-${padPM(proxSete.getMonth() + 1)}-${padPM(proxSete.getDate())}`;
+
+    const [profileRes, agendSemanaRes, agendMesRes, allApptsRes, indRes, prevMesRes, proximosRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('nome, nivel_gamificacao, created_at, licenca_expiracao, nome_completo_pendente, ein, endereco_comercial, cidade, estado, ultimo_dia_cuidado')
@@ -330,6 +378,16 @@ export default function HomeScreen({ navigation }) {
         .in('status', ['finalizado', 'confirmado', 'pendente'])
         .gte('data_hora', prevMesInicio)
         .lte('data_hora', prevMesFimStr),
+
+      // Próximos 7 dias para o card de próximos agendamentos
+      supabase
+        .from('agendamentos')
+        .select('id, data_hora, status, tipo_endereco, clientes(nome), servicos(nome)')
+        .eq('profissional_id', uid)
+        .neq('status', 'cancelado')
+        .gte('data_hora', `${hoje}T00:00:00`)
+        .lte('data_hora', `${proxSeteStr}T23:59:59`)
+        .order('data_hora'),
     ]);
 
     if (profileRes.data) {
@@ -399,6 +457,14 @@ export default function HomeScreen({ navigation }) {
 
     const hojeAgend = semanaData.filter(a => a.data_hora.startsWith(hoje));
     setAgendamentosHoje(hojeAgend);
+
+    const sortedProximos = (proximosRes.data ?? []).sort((a, b) => {
+      const pa = STATUS_PRIORIDADE[a.status] ?? 99;
+      const pb = STATUS_PRIORIDADE[b.status] ?? 99;
+      if (pa !== pb) return pa - pb;
+      return a.data_hora < b.data_hora ? -1 : 1;
+    });
+    setProximosAgend(sortedProximos);
 
     const soma = rows => rows.reduce((s, r) => s + Number(r.valor || 0), 0);
     setFaturamentoSemana(soma(semanaData.filter(a => statusFat.includes(a.status))));
@@ -522,11 +588,8 @@ export default function HomeScreen({ navigation }) {
   const totalAtendimentos = ativos.length;
   const valorPrevisto     = ativos.reduce((s, a) => s + Number(a.valor ?? a.servicos?.valor ?? 0), 0);
 
-  const proximosDois = agendamentosHoje
-    .filter(a => a.status === 'pendente' || a.status === 'confirmado')
-    .slice(0, 2);
-
-  const proximaCliente = proximosDois[0]?.clientes?.nome ?? null;
+  const proximosTres   = proximosAgend.slice(0, 3);
+  const proximaCliente = proximosTres[0]?.clientes?.nome ?? null;
 
   const nivelLabel    = NIVEL_LABELS[nivelGamificacao] ?? `Nível ${nivelGamificacao}`;
   const nivelProgress = Math.min(nivelGamificacao * 20, 100);
@@ -686,15 +749,28 @@ export default function HomeScreen({ navigation }) {
                 </Text>
               </TouchableOpacity>
 
-              {/* Próximos 2 agendamentos */}
-              {proximosDois.length > 0 && (
+              {/* Próximos agendamentos (7 dias) */}
+              {proximosTres.length > 0 && (
                 <View style={styles.card}>
                   <Text style={styles.cardLabel}>Próximos agendamentos</Text>
-                  {proximosDois.map((a, idx) => (
-                    <TouchableOpacity key={a.id} onPress={() => navigation.navigate('Agenda')} activeOpacity={0.75}>
-                      <AgendamentoRow agendamento={a} showDivider={idx > 0} />
+                  {proximosTres.map(a => (
+                    <TouchableOpacity
+                      key={a.id}
+                      onPress={() => navigation.navigate('Agenda', { dataInicial: a.data_hora.split('T')[0] })}
+                      activeOpacity={0.8}
+                    >
+                      <ProximoCard agendamento={a} />
                     </TouchableOpacity>
                   ))}
+                  {proximosAgend.length > 3 && (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('Agenda')}
+                      style={{ paddingVertical: 12, alignItems: 'center' }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#A8235A' }}>Ver todos na Agenda</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
