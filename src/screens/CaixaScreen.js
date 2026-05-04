@@ -605,8 +605,12 @@ export default function CaixaScreen({ navigation }) {
 
   useEffect(() => {
     const ch = supabase
-      .channel('caixa_financeiro')
+      .channel('caixa_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'financeiro' },
+        () => { carregarDados(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamentos' },
+        () => { carregarDados(); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agendamentos' },
         () => { carregarDados(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
