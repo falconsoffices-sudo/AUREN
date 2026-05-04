@@ -47,6 +47,28 @@ function ToggleRow({ label, options, value, onChange }) {
   );
 }
 
+function ViewRow({ label, value, hint }) {
+  return (
+    <View style={styles.row}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+      </View>
+      <Text style={styles.viewValue}>{value}</Text>
+    </View>
+  );
+}
+
+function hhmm12(str) {
+  if (!str) return str;
+  const [hStr, mStr] = (str || '0:0').split(':');
+  let h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = (h % 12) || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 const NOTIF_OPTIONS = [
@@ -97,6 +119,7 @@ export default function ConfiguracoesScreen({ navigation }) {
   const [loading,          setLoading]          = useState(true);
   const [saving,           setSaving]           = useState(false);
   const [userId,           setUserId]           = useState(null);
+  const [editando,         setEditando]         = useState(false);
 
   const [notificacoes,      setNotificacoes]      = useState('on');
   const [dataFechamento,    setDataFechamento]    = useState('28');
@@ -177,12 +200,31 @@ export default function ConfiguracoesScreen({ navigation }) {
         });
       if (error) throw error;
       Alert.alert('Salvo!', 'Configurações atualizadas.');
+      setEditando(false);
     } catch (err) {
       Alert.alert('Erro ao salvar', err.message);
     } finally {
       setSaving(false);
     }
   };
+
+  // ── View-mode computed labels ──────────────────────────────────────────────
+  const diasLabel = DIAS_SEMANA
+    .filter(d => horario.dias.includes(d.value))
+    .map(d => d.label)
+    .join(', ') || 'Nenhum';
+
+  const horarioLabel =
+    `${hhmm12(horario.inicio)} às ${hhmm12(horario.almocoInicio)}` +
+    ` · Pausa ${hhmm12(horario.almocoInicio)} às ${hhmm12(horario.almocoFim)}` +
+    ` · até ${hhmm12(horario.fim)}`;
+
+  const especialLabel = horarioEspecial.ativo
+    ? `${(horarioEspecial.dias ?? [])
+        .map(v => DIAS_SEMANA.find(d => d.value === v)?.label)
+        .filter(Boolean)
+        .join(', ')} · ${hhmm12(horarioEspecial.inicio)} às ${hhmm12(horarioEspecial.fim)}`
+    : 'Inativo';
 
   if (loading) {
     return (
@@ -202,7 +244,15 @@ export default function ConfiguracoesScreen({ navigation }) {
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Configurações</Text>
-        <View style={styles.headerRight} />
+        {editando ? (
+          <TouchableOpacity onPress={() => setEditando(false)} style={styles.headerRight} activeOpacity={0.7}>
+            <Text style={styles.headerAction}>Cancelar</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => setEditando(true)} style={styles.headerRight} activeOpacity={0.7}>
+            <Text style={styles.headerAction}>Editar</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -211,202 +261,132 @@ export default function ConfiguracoesScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
 
+        {/* ── PREFERÊNCIAS ─────────────────────────────────────────────────── */}
         <SectionTitle label="PREFERÊNCIAS" />
         <View style={styles.card}>
-          <ToggleRow
-            label="Notificações"
-            options={NOTIF_OPTIONS}
-            value={notificacoes}
-            onChange={setNotificacoes}
-          />
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Aparência</Text>
-          </View>
-          <View style={styles.aparenciaRow}>
-            {APARENCIA_OPTIONS.map(opt => {
-              const active = themeMode === opt.value;
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.aparenciaBtn, active && styles.aparenciaBtnActive]}
-                  onPress={() => setThemeMode(opt.value)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.aparenciaText, active && styles.aparenciaTextActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {editando ? (
+            <>
+              <ToggleRow
+                label="Notificações"
+                options={NOTIF_OPTIONS}
+                value={notificacoes}
+                onChange={setNotificacoes}
+              />
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>Aparência</Text>
+              </View>
+              <View style={styles.aparenciaRow}>
+                {APARENCIA_OPTIONS.map(opt => {
+                  const active = themeMode === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.aparenciaBtn, active && styles.aparenciaBtnActive]}
+                      onPress={() => setThemeMode(opt.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.aparenciaText, active && styles.aparenciaTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <>
+              <ViewRow
+                label="Notificações"
+                value={notificacoes === 'on' ? 'Ativado' : 'Desativado'}
+              />
+              <View style={styles.divider} />
+              <ViewRow
+                label="Aparência"
+                value={{ auto: 'Automático', light: 'Diurno', dark: 'Noturno' }[themeMode] ?? 'Automático'}
+              />
+            </>
+          )}
         </View>
 
+        {/* ── FINANCEIRO ───────────────────────────────────────────────────── */}
         <SectionTitle label="FINANCEIRO" />
         <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Fechamento mensal</Text>
-              <Text style={styles.rowHint}>Dia do mês para fechar o caixa</Text>
+          {editando ? (
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>Fechamento mensal</Text>
+                <Text style={styles.rowHint}>Dia do mês para fechar o caixa</Text>
+              </View>
+              <TextInput
+                style={styles.numInput}
+                value={dataFechamento}
+                onChangeText={t => setDataFechamento(t.replace(/\D/g,'').slice(0,2))}
+                keyboardType="number-pad"
+                maxLength={2}
+                returnKeyType="done"
+              />
             </View>
-            <TextInput
-              style={styles.numInput}
-              value={dataFechamento}
-              onChangeText={t => setDataFechamento(t.replace(/\D/g,'').slice(0,2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              returnKeyType="done"
+          ) : (
+            <ViewRow
+              label="Fechamento mensal"
+              value={`Dia ${dataFechamento}`}
+              hint="Dia do mês para fechar o caixa"
             />
-          </View>
+          )}
         </View>
 
+        {/* ── IDIOMA ───────────────────────────────────────────────────────── */}
         <SectionTitle label="IDIOMA" />
         <View style={styles.card}>
-          <View style={styles.fullToggleRow}>
-            {IDIOMA_OPTIONS.map(opt => {
-              const active = idioma === opt.value;
-              const locked = opt.value !== 'pt';
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.fullToggleBtn, active && styles.fullToggleBtnActive, locked && { opacity: 0.4 }]}
-                  onPress={() => setIdioma(opt.value)}
-                  activeOpacity={0.75}
-                  disabled={locked}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={[styles.fullToggleText, active && styles.fullToggleTextActive]}>
-                      {opt.label}
-                    </Text>
-                    {locked && <Ionicons name="lock-closed" size={12} color="#8A8A8E" />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <SectionTitle label="HORÁRIO DE ATENDIMENTO" />
-
-        {/* Grupo: Horários recomendados */}
-        <Text style={styles.subSectionTitle}>Horários recomendados</Text>
-        <View style={styles.card}>
-          <View style={{ paddingVertical: 14 }}>
-            <Text style={styles.rowLabel}>Dias de atendimento</Text>
-            <View style={styles.daysRow}>
-              {DIAS_SEMANA.map(d => {
-                const active = horario.dias.includes(d.value);
+          {editando ? (
+            <View style={styles.fullToggleRow}>
+              {IDIOMA_OPTIONS.map(opt => {
+                const active = idioma === opt.value;
+                const locked = opt.value !== 'pt';
                 return (
                   <TouchableOpacity
-                    key={d.value}
-                    style={[styles.dayBtn, active && styles.dayBtnActive]}
-                    onPress={() => toggleDia(d.value)}
+                    key={opt.value}
+                    style={[styles.fullToggleBtn, active && styles.fullToggleBtnActive, locked && { opacity: 0.4 }]}
+                    onPress={() => setIdioma(opt.value)}
                     activeOpacity={0.75}
+                    disabled={locked}
                   >
-                    <Text style={[styles.dayBtnText, active && styles.dayBtnTextActive]}>{d.label}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={[styles.fullToggleText, active && styles.fullToggleTextActive]}>
+                        {opt.label}
+                      </Text>
+                      {locked && <Ionicons name="lock-closed" size={12} color="#8A8A8E" />}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Manhã início</Text>
-              <Text style={styles.rowHint}>Recomendado: 8AM</Text>
-            </View>
-            <TextInput
-              style={styles.numInput}
-              value={horario.inicio}
-              onChangeText={t => setHorario(h => ({ ...h, inicio: t }))}
-              placeholder="08:00"
-              placeholderTextColor={colors.gray}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
+          ) : (
+            <ViewRow
+              label="Idioma"
+              value={{ pt: 'PT-BR', es: 'ES-LATAM', en: 'EN-US' }[idioma] ?? 'PT-BR'}
             />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Pausa início</Text>
-              <Text style={styles.rowHint}>Recomendado: 12PM</Text>
-            </View>
-            <TextInput
-              style={styles.numInput}
-              value={horario.almocoInicio}
-              onChangeText={t => setHorario(h => ({ ...h, almocoInicio: t }))}
-              placeholder="12:00"
-              placeholderTextColor={colors.gray}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Pausa fim</Text>
-              <Text style={styles.rowHint}>Recomendado: 1PM</Text>
-            </View>
-            <TextInput
-              style={styles.numInput}
-              value={horario.almocoFim}
-              onChangeText={t => setHorario(h => ({ ...h, almocoFim: t }))}
-              placeholder="13:00"
-              placeholderTextColor={colors.gray}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Tarde fim</Text>
-              <Text style={styles.rowHint}>Recomendado: 5PM</Text>
-            </View>
-            <TextInput
-              style={styles.numInput}
-              value={horario.fim}
-              onChangeText={t => setHorario(h => ({ ...h, fim: t }))}
-              placeholder="17:00"
-              placeholderTextColor={colors.gray}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-            />
-          </View>
+          )}
         </View>
 
-        {/* Grupo: Horários especiais */}
-        <Text style={styles.subSectionTitle}>Horários especiais</Text>
+        {/* ── HORÁRIO DE ATENDIMENTO ───────────────────────────────────────── */}
+        <SectionTitle label="HORÁRIO DE ATENDIMENTO" />
+
+        <Text style={styles.subSectionTitle}>Horários recomendados</Text>
         <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Bloco adicional</Text>
-              <Text style={styles.rowHint}>Ex: Sáb-Dom, 9:00 AM às 6:00 PM</Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.toggleBtn, horarioEspecial.ativo && styles.toggleBtnActive]}
-              onPress={() => setHorarioEspecial(h => ({ ...h, ativo: !h.ativo }))}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.toggleText, horarioEspecial.ativo && styles.toggleTextActive]}>
-                {horarioEspecial.ativo ? 'Ativo' : 'Inativo'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          {horarioEspecial.ativo && (
+          {editando ? (
             <>
-              <View style={styles.divider} />
               <View style={{ paddingVertical: 14 }}>
-                <Text style={styles.rowLabel}>Dias</Text>
-                <Text style={styles.rowHint}>Dias com horário especial</Text>
+                <Text style={styles.rowLabel}>Dias de atendimento</Text>
                 <View style={styles.daysRow}>
                   {DIAS_SEMANA.map(d => {
-                    const active = (horarioEspecial.dias ?? []).includes(d.value);
+                    const active = horario.dias.includes(d.value);
                     return (
                       <TouchableOpacity
                         key={d.value}
                         style={[styles.dayBtn, active && styles.dayBtnActive]}
-                        onPress={() => toggleDiaEspecial(d.value)}
+                        onPress={() => toggleDia(d.value)}
                         activeOpacity={0.75}
                       >
                         <Text style={[styles.dayBtnText, active && styles.dayBtnTextActive]}>{d.label}</Text>
@@ -417,12 +397,15 @@ export default function ConfiguracoesScreen({ navigation }) {
               </View>
               <View style={styles.divider} />
               <View style={styles.row}>
-                <Text style={styles.rowLabel}>Início</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Manhã início</Text>
+                  <Text style={styles.rowHint}>Recomendado: 8AM</Text>
+                </View>
                 <TextInput
                   style={styles.numInput}
-                  value={horarioEspecial.inicio}
-                  onChangeText={t => setHorarioEspecial(h => ({ ...h, inicio: t }))}
-                  placeholder="09:00"
+                  value={horario.inicio}
+                  onChangeText={t => setHorario(h => ({ ...h, inicio: t }))}
+                  placeholder="08:00"
                   placeholderTextColor={colors.gray}
                   keyboardType="numbers-and-punctuation"
                   maxLength={5}
@@ -430,32 +413,154 @@ export default function ConfiguracoesScreen({ navigation }) {
               </View>
               <View style={styles.divider} />
               <View style={styles.row}>
-                <Text style={styles.rowLabel}>Fim</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Pausa início</Text>
+                  <Text style={styles.rowHint}>Recomendado: 12PM</Text>
+                </View>
                 <TextInput
                   style={styles.numInput}
-                  value={horarioEspecial.fim}
-                  onChangeText={t => setHorarioEspecial(h => ({ ...h, fim: t }))}
-                  placeholder="18:00"
+                  value={horario.almocoInicio}
+                  onChangeText={t => setHorario(h => ({ ...h, almocoInicio: t }))}
+                  placeholder="12:00"
+                  placeholderTextColor={colors.gray}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Pausa fim</Text>
+                  <Text style={styles.rowHint}>Recomendado: 1PM</Text>
+                </View>
+                <TextInput
+                  style={styles.numInput}
+                  value={horario.almocoFim}
+                  onChangeText={t => setHorario(h => ({ ...h, almocoFim: t }))}
+                  placeholder="13:00"
+                  placeholderTextColor={colors.gray}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Tarde fim</Text>
+                  <Text style={styles.rowHint}>Recomendado: 5PM</Text>
+                </View>
+                <TextInput
+                  style={styles.numInput}
+                  value={horario.fim}
+                  onChangeText={t => setHorario(h => ({ ...h, fim: t }))}
+                  placeholder="17:00"
                   placeholderTextColor={colors.gray}
                   keyboardType="numbers-and-punctuation"
                   maxLength={5}
                 />
               </View>
             </>
+          ) : (
+            <>
+              <ViewRow label="Dias" value={diasLabel} />
+              <View style={styles.divider} />
+              <ViewRow label="Horário" value={horarioLabel} />
+            </>
           )}
         </View>
 
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.85}
-        >
-          {saving
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.saveBtnText}>Salvar</Text>
-          }
-        </TouchableOpacity>
+        <Text style={styles.subSectionTitle}>Horários especiais</Text>
+        <View style={styles.card}>
+          {editando ? (
+            <>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Bloco adicional</Text>
+                  <Text style={styles.rowHint}>Ex: Sáb-Dom, 9:00 AM às 6:00 PM</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, horarioEspecial.ativo && styles.toggleBtnActive]}
+                  onPress={() => setHorarioEspecial(h => ({ ...h, ativo: !h.ativo }))}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.toggleText, horarioEspecial.ativo && styles.toggleTextActive]}>
+                    {horarioEspecial.ativo ? 'Ativo' : 'Inativo'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {horarioEspecial.ativo && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={{ paddingVertical: 14 }}>
+                    <Text style={styles.rowLabel}>Dias</Text>
+                    <Text style={styles.rowHint}>Dias com horário especial</Text>
+                    <View style={styles.daysRow}>
+                      {DIAS_SEMANA.map(d => {
+                        const active = (horarioEspecial.dias ?? []).includes(d.value);
+                        return (
+                          <TouchableOpacity
+                            key={d.value}
+                            style={[styles.dayBtn, active && styles.dayBtnActive]}
+                            onPress={() => toggleDiaEspecial(d.value)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.dayBtnText, active && styles.dayBtnTextActive]}>{d.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Início</Text>
+                    <TextInput
+                      style={styles.numInput}
+                      value={horarioEspecial.inicio}
+                      onChangeText={t => setHorarioEspecial(h => ({ ...h, inicio: t }))}
+                      placeholder="09:00"
+                      placeholderTextColor={colors.gray}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Fim</Text>
+                    <TextInput
+                      style={styles.numInput}
+                      value={horarioEspecial.fim}
+                      onChangeText={t => setHorarioEspecial(h => ({ ...h, fim: t }))}
+                      placeholder="18:00"
+                      placeholderTextColor={colors.gray}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                  </View>
+                </>
+              )}
+            </>
+          ) : (
+            <ViewRow
+              label="Bloco adicional"
+              value={especialLabel}
+              hint="Ex: Sáb-Dom, 9:00 AM às 6:00 PM"
+            />
+          )}
+        </View>
+
+        {editando && (
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.saveBtnText}>Salvar</Text>
+            }
+          </TouchableOpacity>
+        )}
 
         <View style={styles.linksCard}>
           <TouchableOpacity
@@ -523,16 +628,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 20, marginBottom: 24,
   },
-  backBtn:     { width: 32, alignItems: 'center' },
-  backArrow:   { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white },
-  headerRight: { width: 32 },
+  backBtn:      { width: 32, alignItems: 'center' },
+  backArrow:    { fontSize: 32, color: colors.white, lineHeight: 34, marginTop: -4 },
+  headerTitle:  { fontSize: 20, fontWeight: '700', color: colors.white },
+  headerRight:  { width: 72, alignItems: 'flex-end' },
+  headerAction: { fontSize: 15, fontWeight: '600', color: colors.primary },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
 
   sectionTitle: {
     fontSize: 11, fontWeight: '700', color: colors.gray,
     letterSpacing: 1.2, marginBottom: 10, marginTop: 4,
+  },
+
+  subSectionTitle: {
+    fontSize: 12, fontWeight: '600', color: colors.gray,
+    marginBottom: 8, marginTop: -8,
   },
 
   card: {
@@ -547,6 +658,11 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: 15, fontWeight: '500', color: colors.white },
   rowHint:  { fontSize: 11, fontWeight: '400', color: colors.gray, marginTop: 2 },
+
+  viewValue: {
+    fontSize: 13, fontWeight: '500', color: colors.gray,
+    textAlign: 'right', marginLeft: 12, flexShrink: 1,
+  },
 
   toggleGroup: { flexDirection: 'row', gap: 6 },
   toggleBtn: {
