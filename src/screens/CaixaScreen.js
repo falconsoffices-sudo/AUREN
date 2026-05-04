@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
   Dimensions,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -621,6 +622,11 @@ export default function CaixaScreen({ navigation }) {
         () => { carregarDados(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+  }, [carregarDados]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('auren:financeiro_atualizado', () => { carregarDados(); });
+    return () => { sub.remove(); };
   }, [carregarDados]);
 
   const monthName = MONTHS[new Date().getMonth()];

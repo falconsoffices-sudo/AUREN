@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
@@ -956,6 +957,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
       }
 
       await AsyncStorage.setItem('auren:caixa_needs_refresh', 'true');
+      DeviceEventEmitter.emit('auren:financeiro_atualizado');
       onSaved();
     } catch (err) {
       Alert.alert('Erro ao finalizar', err.message);
