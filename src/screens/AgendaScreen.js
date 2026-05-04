@@ -987,7 +987,6 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
       const now        = new Date().toISOString();
 
       await supabase.from('agendamentos').update({ status: 'finalizado' }).eq('id', agendamento.id);
-      console.log('[Finalizar] agendamento atualizado:', agendamento.id);
 
       if (valorNum > 0) {
         const { data, error } = await supabase.from('financeiro').insert({
@@ -999,7 +998,6 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
           cliente_id:       agendamento.cliente_id ?? null,
           created_at:       now,
         });
-        console.log('[Finalizar] financeiro serviço:', { error, data });
       }
 
       if (gorjetaNum > 0) {
@@ -1012,7 +1010,6 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
           cliente_id:       agendamento.cliente_id ?? null,
           created_at:       now,
         });
-        console.log('[Finalizar] financeiro gorjeta:', { error, data });
       }
 
       if (agendamento.cliente_id) {
@@ -1029,7 +1026,6 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
 
       await AsyncStorage.setItem('auren:caixa_needs_refresh', 'true');
       DeviceEventEmitter.emit('auren:financeiro_atualizado');
-      console.log('[Finalizar] evento emitido');
       onSaved();
     } catch (err) {
       Alert.alert('Erro ao finalizar', err.message);
