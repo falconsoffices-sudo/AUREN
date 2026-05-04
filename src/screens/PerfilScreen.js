@@ -175,7 +175,8 @@ export default function PerfilScreen({ navigation }) {
   const [uploadingPhoto,  setUploadingPhoto]  = useState(false);
   const [plano,           setPlano]           = useState(null);
   const [diasConta,       setDiasConta]       = useState(null);
-  const [cidadeEstado,    setCidadeEstado]    = useState('');
+  const [cidadeEstado,      setCidadeEstado]      = useState('');
+  const [nivelGamificacao,  setNivelGamificacao]  = useState(1);
 
   useEffect(() => {
     (async () => {
@@ -185,13 +186,14 @@ export default function PerfilScreen({ navigation }) {
       setUserId(uid);
       const { data } = await supabase
         .from('profiles')
-        .select('nome, foto_url, plano, created_at, endereco_comercial, cidade, estado')
+        .select('nome, foto_url, plano, created_at, endereco_comercial, cidade, estado, nivel_gamificacao')
         .eq('id', uid)
         .single();
       if (data) {
         setNome(data.nome ?? '');
         setFotoUrl(data.foto_url ?? null);
         setPlano(data.plano ?? 'trial');
+        setNivelGamificacao(data.nivel_gamificacao ?? 1);
         if (data.created_at) {
           const dias = Math.floor((Date.now() - new Date(data.created_at).getTime()) / 86400000);
           setDiasConta(dias);
@@ -384,9 +386,13 @@ export default function PerfilScreen({ navigation }) {
           <Text style={styles.profileSub}>{cidadeEstado || ''}</Text>
 
           <View style={styles.levelRow}>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>NÍVEL 3</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.levelBadge}
+              onPress={() => navigation.navigate('Gamificacao')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.levelBadgeText}>NÍVEL {nivelGamificacao}</Text>
+            </TouchableOpacity>
             <Text style={styles.agendaStatus}>Agenda Cheia</Text>
           </View>
         </View>
