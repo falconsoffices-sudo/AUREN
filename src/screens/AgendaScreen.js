@@ -895,16 +895,18 @@ const sol = StyleSheet.create({
 // ─── Finalizar Modal ─────────────────────────────────────────────────────────
 
 function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
-  const [step,    setStep]    = useState(1);
-  const [metodo,  setMetodo]  = useState('zelle');
-  const [valor,   setValor]   = useState('');
-  const [gorjeta, setGorjeta] = useState('');
-  const [saving,  setSaving]  = useState(false);
+  const [step,          setStep]          = useState(1);
+  const [metodo,        setMetodo]        = useState('zelle');
+  const [metodoGorjeta, setMetodoGorjeta] = useState('dinheiro');
+  const [valor,         setValor]         = useState('');
+  const [gorjeta,       setGorjeta]       = useState('');
+  const [saving,        setSaving]        = useState(false);
 
   useEffect(() => {
     if (visible && agendamento) {
       setStep(1);
       setMetodo('zelle');
+      setMetodoGorjeta('dinheiro');
       setValor(agendamento.valor != null ? parseFloat(agendamento.valor).toFixed(2) : '');
       setGorjeta('');
       setSaving(false);
@@ -938,7 +940,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
         const { data, error } = await supabase.from('financeiro').insert({
           profissional_id:  userId,
           valor:            gorjetaNum,
-          metodo_pagamento: metodo.toLowerCase(),
+          metodo_pagamento: metodoGorjeta.toLowerCase(),
           tipo:             'receita',
           categoria:        'gorjeta',
           cliente_id:       agendamento.cliente_id ?? null,
@@ -1041,6 +1043,27 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
                     placeholderTextColor="#C9A8B6"
                   />
                 </View>
+
+                {gorjeta.trim() !== '' && (
+                  <>
+                    <Text style={[finSheet.label, { marginTop: 16 }]}>MÉTODO DA GORJETA</Text>
+                    <View style={finSheet.metodoGrid}>
+                      {METODOS_FIN.map(m => {
+                        const active = metodoGorjeta === m.key;
+                        return (
+                          <TouchableOpacity
+                            key={m.key}
+                            style={[finSheet.metodoBtn, active && finSheet.metodoBtnActive]}
+                            onPress={() => setMetodoGorjeta(m.key)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[finSheet.metodoBtnText, active && finSheet.metodoBtnTextActive]}>{m.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
 
                 <TouchableOpacity
                   style={[finSheet.primaryBtn, saving && { opacity: 0.7 }]}
