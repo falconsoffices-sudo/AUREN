@@ -18,6 +18,7 @@ import * as Contacts from 'expo-contacts';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import colors from '../constants/colors';
+import { Ionicons } from '@expo/vector-icons';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -509,6 +510,7 @@ function EditClientModal({ visible, cliente, onClose, onSaved }) {
   const [servicoOutro,  setServicoOutro]  = useState('');
   const [observacoes,   setObservacoes]   = useState('');
   const [saving,        setSaving]        = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
 
   useEffect(() => {
     if (cliente) {
@@ -522,6 +524,30 @@ function EditClientModal({ visible, cliente, onClose, onSaved }) {
       setObservacoes(cliente.observacoes ?? '');
     }
   }, [cliente]);
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Excluir cliente',
+      `Tem certeza que deseja excluir ${cliente.nome}? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir', style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const { error } = await supabase.from('clientes').delete().eq('id', cliente.id);
+              if (error) throw error;
+              onSaved();
+            } catch (err) {
+              Alert.alert('Erro ao excluir', err.message);
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSave = async () => {
     if (!nome.trim()) {
@@ -563,7 +589,14 @@ function EditClientModal({ visible, cliente, onClose, onSaved }) {
               contentContainerStyle={{ paddingBottom: 40 }}
             >
               <View style={modal.handle} />
-              <Text style={modal.title}>Editar Cliente</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <Text style={[modal.title, { marginBottom: 0 }]}>Editar Cliente</Text>
+                <TouchableOpacity onPress={handleDelete} disabled={deleting} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  {deleting
+                    ? <ActivityIndicator size="small" color="#F87171" />
+                    : <Ionicons name="trash-outline" size={22} color="#F87171" />}
+                </TouchableOpacity>
+              </View>
 
               <TextInput
                 style={modal.input}
