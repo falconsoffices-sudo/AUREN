@@ -208,6 +208,17 @@ function isHorarioEspecial(dataHora, he) {
   return apptMins >= tMins(he.inicio) && apptMins < tMins(he.fim);
 }
 
+function isoToMinutes(isoStr) {
+  if (!isoStr) return 0;
+  const t = isoStr.split('T')[1] || '00:00:00';
+  const [h, m] = t.split(':');
+  return parseInt(h) * 60 + parseInt(m);
+}
+
+function isoToDatePrefix(isoStr) {
+  return (isoStr || '').split('T')[0];
+}
+
 function isFinalizavel(a) {
   if (a.status !== 'confirmado') return false;
   const dur = a.servicos?.duracao_minutos ?? 60;
@@ -308,31 +319,32 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const doSave = async (timeArg) => {
     setSaving(true);
     try {
-      const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), timeArg));
-      const novoDuracao = selectedServico.duracao_minutos || 60;
-      const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
-
-      const dayStart = new Date(selectedDateLocal); dayStart.setHours(0,  0,  0,   0);
-      const dayEnd   = new Date(selectedDateLocal); dayEnd.setHours(23, 59, 59, 999);
+      const yyyy = selectedDateLocal.getFullYear();
+      const mm = String(selectedDateLocal.getMonth() + 1).padStart(2, '0');
+      const dd = String(selectedDateLocal.getDate()).padStart(2, '0');
+      const dayPrefix = `${yyyy}-${mm}-${dd}`;
+      const dayStartStr = `${dayPrefix}T00:00:00`;
+      const dayEndStr = `${dayPrefix}T23:59:59`;
 
       const { data: existentes } = await supabase
         .from('agendamentos')
         .select('data_hora, servicos(duracao_minutos)')
         .eq('profissional_id', userId)
         .neq('status', 'cancelado')
-        .gte('data_hora', dayStart.toISOString())
-        .lte('data_hora', dayEnd.toISOString());
+        .gte('data_hora', dayStartStr)
+        .lte('data_hora', dayEndStr);
+
+      const novoInicioMin = isoToMinutes(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), timeArg));
+      const novoDuracaoMin = selectedServico.duracao_minutos || 60;
+      const novoFimMin = novoInicioMin + novoDuracaoMin;
 
       if (existentes) {
         for (const a of existentes) {
-          const existenteInicio  = new Date(a.data_hora);
-          const existenteDuracao = a.servicos?.duracao_minutos || 60;
-          const existenteFim     = new Date(existenteInicio.getTime() + existenteDuracao * 60 * 1000);
-          if (novoInicio < existenteFim && novoFim > existenteInicio) {
-            Alert.alert(
-              'Horário indisponível',
-              `Você já tem um agendamento às ${formatTimeDisplay(a.data_hora)} neste horário.`
-            );
+          const existenteInicioMin = isoToMinutes(a.data_hora);
+          const existenteDuracaoMin = a.servicos?.duracao_minutos || 60;
+          const existenteFimMin = existenteInicioMin + existenteDuracaoMin;
+          if (novoInicioMin < existenteFimMin && novoFimMin > existenteInicioMin) {
+            Alert.alert('Horário indisponível', `Você já tem um agendamento às ${formatTimeDisplay(a.data_hora)} neste horário.`);
             setSaving(false);
             return;
           }
@@ -646,30 +658,34 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
     const parsedTime = parseTimeInput(timeStr);
     if (!parsedTime) { Alert.alert('Horário inválido', 'Tente: 2:30 PM ou 9 AM'); return; }
 
-    const novoInicio  = new Date(buildDataHoraFromInputs(dateStr, parsedTime));
-    const novoDuracao = selectedServico.duracao_minutos || 60;
-    const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
     const [_mm, _dd, _yyyy] = dateStr.split('/');
-    const dayStart = new Date(`${_yyyy}-${_mm}-${_dd}T00:00:00`);
-    const dayEnd   = new Date(`${_yyyy}-${_mm}-${_dd}T23:59:59`);
+    const dayStartStr = `${_yyyy}-${_mm}-${_dd}T00:00:00`;
+    const dayEndStr   = `${_yyyy}-${_mm}-${_dd}T23:59:59`;
     const { data: existentes } = await supabase
       .from('agendamentos')
       .select('data_hora, servicos(duracao_minutos), clientes(nome)')
       .eq('profissional_id', userId)
       .neq('status', 'cancelado')
       .neq('id', agendamento.id)
-      .gte('data_hora', dayStart.toISOString())
-      .lte('data_hora', dayEnd.toISOString());
+      .gte('data_hora', dayStartStr)
+      .lte('data_hora', dayEndStr);
+
+    const novoInicioMin  = isoToMinutes(buildDataHoraFromInputs(dateStr, parsedTime));
+    const novoDuracaoMin = selectedServico.duracao_minutos || 60;
+    const novoFimMin     = novoInicioMin + novoDuracaoMin;
+
     if (existentes) {
       for (const a of existentes) {
-        const existenteInicio  = new Date(a.data_hora);
-        const existenteDuracao = a.servicos?.duracao_minutos || 60;
-        const existenteFim     = new Date(existenteInicio.getTime() + existenteDuracao * 60 * 1000);
-        if (novoInicio < existenteFim && novoFim > existenteInicio) {
-          const proxDate = new Date(existenteFim.getTime() + 10 * 60 * 1000);
-          const pad      = n => String(n).padStart(2, '0');
-          const proxIso  = `${proxDate.getFullYear()}-${pad(proxDate.getMonth()+1)}-${pad(proxDate.getDate())}T${pad(proxDate.getHours())}:${pad(proxDate.getMinutes())}:00`;
-          const proxFmt  = formatTimeDisplay(proxIso);
+        const existenteInicioMin  = isoToMinutes(a.data_hora);
+        const existenteDuracaoMin = a.servicos?.duracao_minutos || 60;
+        const existenteFimMin     = existenteInicioMin + existenteDuracaoMin + 10;
+        if (novoInicioMin < existenteFimMin && novoFimMin > existenteInicioMin) {
+          const proxMin  = existenteFimMin;
+          const proxH    = Math.floor(proxMin / 60);
+          const proxM    = proxMin % 60;
+          const proxH12  = (proxH % 12) || 12;
+          const proxAmpm = proxH >= 12 ? 'PM' : 'AM';
+          const proxFmt  = `${String(proxH12).padStart(2,'0')}:${String(proxM).padStart(2,'0')} ${proxAmpm}`;
           Alert.alert(
             'Horário ocupado',
             `Você já tem ${a.clientes?.nome ?? 'uma cliente'} agendada neste horário. Próximo horário disponível: ${proxFmt}. Deseja marcar para este horário?`,
