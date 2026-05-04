@@ -6,7 +6,7 @@
     "description": "Gestão completa para profissionais de manicure",
     "orientation": "portrait",
     "icon": "./assets/images/emblema.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/emblema.png",

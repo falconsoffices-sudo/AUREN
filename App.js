@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image, StyleSheet, Animated } from 'react-native';
+import { Image, StyleSheet, Animated, StatusBar } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NavigationContainer, DarkTheme, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -93,6 +93,7 @@ function AppContent() {
   return (
     <SafeAreaProvider>
       <NavigationContainer theme={isDark ? customDarkTheme : undefined}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Welcome"           component={WelcomeScreen}            />
           <Stack.Screen name="Auth"             component={AuthScreen}               />
