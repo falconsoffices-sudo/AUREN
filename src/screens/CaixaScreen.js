@@ -595,7 +595,12 @@ export default function CaixaScreen({ navigation }) {
   }, []);
 
   useFocusEffect(
-    useCallback(() => { carregarDados(); }, [carregarDados])
+    useCallback(() => {
+      AsyncStorage.getItem('auren:caixa_needs_refresh').then(val => {
+        if (val === 'true') AsyncStorage.removeItem('auren:caixa_needs_refresh').catch(() => {});
+      }).catch(() => {});
+      carregarDados();
+    }, [carregarDados])
   );
 
   useEffect(() => {

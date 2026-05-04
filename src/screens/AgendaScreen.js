@@ -914,6 +914,7 @@ function FinalizarModal({ visible, agendamento, userId, onClose, onSaved }) {
           .eq('id', agendamento.cliente_id);
       }
 
+      await AsyncStorage.setItem('auren:caixa_needs_refresh', 'true');
       onSaved();
     } catch (err) {
       Alert.alert('Erro ao finalizar', err.message);
