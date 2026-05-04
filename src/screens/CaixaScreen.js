@@ -580,7 +580,7 @@ export default function CaixaScreen({ navigation }) {
     const mesPrefix = `${mesAtual.getFullYear()}-${String(mesAtual.getMonth() + 1).padStart(2, '0')}`;
     const gorjetas  = (finRes.data ?? []).filter(r => r.categoria === 'gorjeta');
     setGorjetasLista(gorjetas);
-    setGorjetasMes(gorjetas.filter(r => (r.created_at ?? '').startsWith(mesPrefix)).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0));
+    setGorjetasMes(gorjetas.filter(r => r.created_at?.slice(0, 7) === mesPrefix).reduce((s, r) => s + (parseFloat(r.valor) || 0), 0));
     const cIds = [...new Set((finRes.data ?? []).filter(r => r.cliente_id).map(r => r.cliente_id))];
     if (cIds.length > 0) {
       const { data: cNomesData } = await supabase.from('clientes').select('id, nome').in('id', cIds);
