@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
@@ -355,7 +356,7 @@ export default function PerfilScreen({ navigation }) {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={() => navigation.navigate('Configuracoes')}
           >
-            <GearIcon />
+            <Ionicons name="settings-outline" size={24} color="#8A8A8E" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -542,28 +543,6 @@ export default function PerfilScreen({ navigation }) {
 
 // ─── Gear Icon ────────────────────────────────────────────────────────────────
 
-function GearIcon() {
-  return (
-    <View style={gearSt.outer}>
-      <View style={gearSt.inner} />
-      <View style={[gearSt.spoke, gearSt.spokeV]} />
-      <View style={[gearSt.spoke, gearSt.spokeH]} />
-      <View style={[gearSt.spoke, gearSt.spokeDL]} />
-      <View style={[gearSt.spoke, gearSt.spokeDR]} />
-    </View>
-  );
-}
-
-const GEAR = '#555555';
-const gearSt = StyleSheet.create({
-  outer:   { width: 22, height: 22, borderRadius: 11, borderWidth: 3, borderColor: GEAR, alignItems: 'center', justifyContent: 'center' },
-  inner:   { width: 8, height: 8, borderRadius: 4, backgroundColor: GEAR },
-  spoke:   { position: 'absolute', width: 3, height: 22, backgroundColor: GEAR, borderRadius: 1 },
-  spokeV:  { transform: [{ rotate: '0deg'   }] },
-  spokeH:  { transform: [{ rotate: '90deg'  }] },
-  spokeDL: { transform: [{ rotate: '45deg'  }] },
-  spokeDR: { transform: [{ rotate: '-45deg' }] },
-});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
