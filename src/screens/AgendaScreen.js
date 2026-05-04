@@ -194,6 +194,19 @@ function parseTimeInput(str) {
   return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
+function isHorarioEspecial(dataHora, he) {
+  if (!he?.ativo || !dataHora) return false;
+  const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+  const [datePart, timePart] = dataHora.split('T');
+  const d      = new Date(datePart + 'T12:00:00');
+  const dayKey = weekDayMap[d.getDay()];
+  if (!(he.dias ?? []).includes(dayKey)) return false;
+  const [hStr, mStr] = (timePart || '').split(':');
+  const apptMins = (parseInt(hStr, 10) || 0) * 60 + (parseInt(mStr, 10) || 0);
+  const tMins    = s => { const [a, b] = (s || '0:0').split(':').map(Number); return a * 60 + b; };
+  return apptMins >= tMins(he.inicio) && apptMins < tMins(he.fim);
+}
+
 function isFinalizavel(a) {
   if (a.status !== 'confirmado') return false;
   const dur = a.servicos?.duracao_minutos ?? 60;
@@ -1235,17 +1248,18 @@ function MonthCalendarModal({ visible, userId, initialMonth, onClose, onDayPress
 
 // ─── Appointment Card ─────────────────────────────────────────────────────────
 
-function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress, finalizavel }) {
+function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, status, valor, tipo_endereco, onPress, finalizavel, horarioEspecial }) {
   const { isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(isDark), [isDark]);
-  const SD     = isDark ? STATUS_DISPLAY_DARK : STATUS_DISPLAY_LIGHT;
-  const s      = SD[status] ?? SD.confirmado;
-  const isNext = status === 'confirmado';
-  const name   = cliente?.nome ?? '—';
+  const styles    = useMemo(() => makeStyles(isDark), [isDark]);
+  const SD        = isDark ? STATUS_DISPLAY_DARK : STATUS_DISPLAY_LIGHT;
+  const s         = SD[status] ?? SD.confirmado;
+  const isNext    = status === 'confirmado';
+  const name      = cliente?.nome ?? '—';
+  const isEspecial = isHorarioEspecial(data_hora, horarioEspecial);
 
   return (
     <TouchableOpacity
-      style={[styles.apptCard, isNext && styles.apptCardHighlight]}
+      style={[styles.apptCard, isNext && styles.apptCardHighlight, isEspecial && styles.apptCardEspecial]}
       onPress={onPress}
       activeOpacity={0.75}
     >
@@ -1276,6 +1290,7 @@ function AppointmentCard({ data_hora, clientes: cliente, servicos: servico, stat
             {servico?.nome ?? '—'}
             {servico?.duracao_minutos ? ` · ${formatDuration(servico.duracao_minutos)}` : ''}
           </Text>
+          {isEspecial && <Text style={styles.especialTag}>Horário especial</Text>}
           {tipo_endereco && (
             <Text style={styles.locationTag}>📍 {TIPO_LABELS[tipo_endereco] ?? tipo_endereco}</Text>
           )}
@@ -1309,6 +1324,7 @@ export default function AgendaScreen() {
   const [finalizarVisible,     setFinalizarVisible]     = useState(false);
   const [finalizarAgend,       setFinalizarAgend]       = useState(null);
   const [calendarVisible,      setCalendarVisible]      = useState(false);
+  const [horarioEspecial,      setHorarioEspecial]      = useState(null);
 
   const weekDays   = getWeekDays(TODAY, weekOffset);
   const monthLabel = `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`;
@@ -1333,6 +1349,12 @@ export default function AgendaScreen() {
       .order('data_hora');
     if (!error && data) setAgendamentos(data);
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem('auren:horario_especial').then(stored => {
+      if (stored) { try { setHorarioEspecial(JSON.parse(stored)); } catch (_) {} }
+    });
   }, []);
 
   useEffect(() => {
@@ -1417,6 +1439,7 @@ export default function AgendaScreen() {
                 key={a.id}
                 {...a}
                 finalizavel={canFinalize}
+                horarioEspecial={horarioEspecial}
                 onPress={() => {
                   if (canFinalize) { setFinalizarAgend(a); setFinalizarVisible(true); }
                   else openEdit(a);
@@ -1548,6 +1571,8 @@ function makeStyles(isDark) {
     scroll:        { paddingHorizontal: 20, paddingBottom: 110 },
     apptCard:           { backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 10, ...CARD_SHADOW },
     apptCardHighlight:  { borderWidth: 1, borderColor: 'rgba(168,35,90,0.35)' },
+    apptCardEspecial:   { borderLeftWidth: 3, borderLeftColor: '#F59E0B' },
+    especialTag:        { fontSize: 10, fontWeight: '600', color: '#F59E0B', marginTop: 3 },
     apptTopRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     apptTime:           { fontSize: 12, fontWeight: '600', color: sub, letterSpacing: 0.3 },
     statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
