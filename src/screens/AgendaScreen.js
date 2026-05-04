@@ -94,12 +94,15 @@ function getInitials(name = '') {
 }
 
 function formatTimeDisplay(isoStr) {
-  const d = new Date(isoStr);
-  const h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, '0');
+  if (!isoStr) return '';
+  const [, timePart] = isoStr.split('T');
+  if (!timePart) return '';
+  const [hStr, mStr] = timePart.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
   const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12  = (h % 12) || 12;
-  return `${h12}:${m} ${ampm}`;
+  const h12 = (h % 12) || 12;
+  return `${h12}:${m.toString().padStart(2,'0')} ${ampm}`;
 }
 
 function formatDuration(mins) {
