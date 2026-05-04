@@ -135,11 +135,14 @@ function isoToDateStr(isoStr) {
 
 // ISO → "HH:MM AM/PM"
 function isoToTimeAMPM(isoStr) {
-  const d = new Date(isoStr);
-  const h   = d.getHours();
-  const m   = String(d.getMinutes()).padStart(2, '0');
+  if (!isoStr) return '';
+  const timePart = isoStr.split('T')[1] || '';
+  const [hStr, mStr] = timePart.split(':');
+  const h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = (h % 12) || 12;
-  return `${String(h12).padStart(2,'0')}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
+  return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
 }
 
 // "MM/DD/YYYY" + "HH:MM AM/PM" (or "HH:MM") → string local sem conversão UTC
