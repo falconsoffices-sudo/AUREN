@@ -21,13 +21,15 @@ import { sendSMS, applyTemplate } from '../lib/sms';
 import { calcularNivel } from '../lib/gamificacao';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const DAYS_LONG  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-const MONTHS     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MONTHS       = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 const STATUS_DISPLAY_LIGHT = {
   pendente:   { label: 'Aguardando', bg: '#FEF3C7', color: '#D97706' },
@@ -238,17 +240,21 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const [time,            setTime]            = useState('');
   const [tipoEndereco,    setTipoEndereco]    = useState('comercial');
   const [observacoes,     setObservacoes]     = useState('');
-  const [saving,          setSaving]          = useState(false);
+  const [saving,            setSaving]            = useState(false);
+  const [selectedDateLocal, setSelectedDateLocal] = useState(selectedDate);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
 
   const reset = () => {
     setClienteSearch(''); setClientes([]); setSelectedCliente(null);
     setServicos([]);      setSelectedServico(null); setPickerVisible(false);
     setTime('');          setTipoEndereco('comercial'); setObservacoes('');
+    setSelectedDateLocal(selectedDate); setDatePickerVisible(false);
   };
   const handleClose = () => { reset(); onClose(); };
 
   useEffect(() => {
     if (!visible || !userId) return;
+    setSelectedDateLocal(selectedDate);
     setLoadingClientes(true);
     setLoadingServicos(true);
     Promise.all([
@@ -271,12 +277,12 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
   const doSave = async () => {
     setSaving(true);
     try {
-      const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time));
+      const novoInicio  = new Date(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), time));
       const novoDuracao = selectedServico.duracao_minutos || 60;
       const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
 
-      const dayStart = new Date(selectedDate); dayStart.setHours(0,  0,  0,   0);
-      const dayEnd   = new Date(selectedDate); dayEnd.setHours(23, 59, 59, 999);
+      const dayStart = new Date(selectedDateLocal); dayStart.setHours(0,  0,  0,   0);
+      const dayEnd   = new Date(selectedDateLocal); dayEnd.setHours(23, 59, 59, 999);
 
       const { data: existentes } = await supabase
         .from('agendamentos')
@@ -306,7 +312,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
         profissional_id: userId,
         cliente_id:      selectedCliente.id,
         servico_id:      selectedServico.id,
-        data_hora:       buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time),
+        data_hora:       buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), time),
         status:          'confirmado',
         valor:           selectedServico.valor ?? null,
         tipo_endereco:   tipoEndereco,
@@ -333,7 +339,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
           const templateText = templates.confirmacao || DEFAULT_CONFIRMACAO;
           const mensagem = applyTemplate(templateText, {
             nome:              selectedCliente.nome,
-            horario:           formatTimeDisplay(buildDataHoraFromInputs(isoToDateStr(selectedDate.toISOString()), time)),
+            horario:           formatTimeDisplay(buildDataHoraFromInputs(isoToDateStr(selectedDateLocal.toISOString()), time)),
             servico:           selectedServico.nome,
             nome_profissional: prof?.nome_completo ?? prof?.nome ?? '',
           });
@@ -403,7 +409,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     let outsideHours = false;
     try {
       const weekDayMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-      const dayKey     = weekDayMap[selectedDate.getDay()];
+      const dayKey     = weekDayMap[selectedDateLocal.getDay()];
       const [storedH, storedE] = await Promise.all([
         AsyncStorage.getItem('auren:horario_atendimento'),
         AsyncStorage.getItem('auren:horario_especial'),
@@ -440,7 +446,7 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
     doSave();
   };
 
-  const dateLabel = `${DAYS_LONG[selectedDate.getDay()]}, ${selectedDate.getDate()} de ${MONTHS[selectedDate.getMonth()]}`;
+  const dateLabel = `${DAYS_SHORT[selectedDateLocal.getDay()]}, ${selectedDateLocal.getDate()} de ${MONTHS_SHORT[selectedDateLocal.getMonth()]}`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
@@ -500,8 +506,22 @@ function AddAgendamentoModal({ visible, onClose, onSaved, selectedDate, userId }
               />
 
               <Text style={modal.sectionLabel}>DATA E HORA</Text>
-              <View style={modal.dateBox}><Text style={modal.dateText}>{dateLabel}</Text></View>
-              <TextInput style={modal.input} placeholder="HH:MM AM/PM (ex: 2:30 PM)" placeholderTextColor="#C9A8B6" value={time} onChangeText={t => setTime(t.replace(/[^0-9:aAmMpP ]/g, '').slice(0, 8))} keyboardType="default" autoCapitalize="characters" maxLength={8} />
+              <TouchableOpacity style={modal.dateBox} onPress={() => setDatePickerVisible(true)} activeOpacity={0.7}>
+                <Text style={modal.dateText}>{dateLabel}</Text>
+                <Ionicons name="calendar-outline" size={18} color="#C9A8B6" />
+              </TouchableOpacity>
+              {datePickerVisible && (
+                <DateTimePicker
+                  value={selectedDateLocal}
+                  mode="date"
+                  display="default"
+                  onChange={(event, date) => {
+                    setDatePickerVisible(false);
+                    if (date) setSelectedDateLocal(date);
+                  }}
+                />
+              )}
+              <TextInput style={modal.input} placeholder="Ex: 2:30 PM" placeholderTextColor="#C9A8B6" value={time} onChangeText={t => setTime(t.replace(/[^0-9:aAmMpP ]/g, '').slice(0, 8))} keyboardType="default" autoCapitalize="characters" maxLength={8} />
 
               <Text style={modal.sectionLabel}>LOCAL DE ATENDIMENTO</Text>
               <View style={modal.tipoRow}>
@@ -1482,7 +1502,7 @@ const modal = StyleSheet.create({
   servicoValor:       { fontSize: 16, fontWeight: '700', color: '#C9A8B6', marginLeft: 8 },
   servicoValorSel:    { color: '#F5EDE8' },
 
-  dateBox:  { backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
+  dateBox:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: INPUT_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
   dateText: { fontSize: 14, fontWeight: '500', color: '#C9A8B6' },
 
   statusRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
