@@ -581,6 +581,44 @@ function EditAgendamentoModal({ visible, agendamento, userId, onClose, onSaved }
     if (!selectedServico) { Alert.alert('Campo obrigatório', 'Selecione um serviço.'); return; }
     if (dateStr.length < 10) { Alert.alert('Campo obrigatório', 'Informe a data no formato MM/DD/YYYY.'); return; }
     if (!timeStr.trim()) { Alert.alert('Campo obrigatório', 'Informe o horário.'); return; }
+
+    const novoInicio  = new Date(buildDataHoraFromInputs(dateStr, timeStr));
+    const novoDuracao = selectedServico.duracao_minutos || 60;
+    const novoFim     = new Date(novoInicio.getTime() + novoDuracao * 60 * 1000);
+    const [_mm, _dd, _yyyy] = dateStr.split('/');
+    const dayStart = new Date(`${_yyyy}-${_mm}-${_dd}T00:00:00`);
+    const dayEnd   = new Date(`${_yyyy}-${_mm}-${_dd}T23:59:59`);
+    const { data: existentes } = await supabase
+      .from('agendamentos')
+      .select('data_hora, servicos(duracao_minutos), clientes(nome)')
+      .eq('profissional_id', userId)
+      .neq('status', 'cancelado')
+      .neq('id', agendamento.id)
+      .gte('data_hora', dayStart.toISOString())
+      .lte('data_hora', dayEnd.toISOString());
+    if (existentes) {
+      for (const a of existentes) {
+        const existenteInicio  = new Date(a.data_hora);
+        const existenteDuracao = a.servicos?.duracao_minutos || 60;
+        const existenteFim     = new Date(existenteInicio.getTime() + existenteDuracao * 60 * 1000);
+        if (novoInicio < existenteFim && novoFim > existenteInicio) {
+          const proxDate = new Date(existenteFim.getTime() + 10 * 60 * 1000);
+          const pad      = n => String(n).padStart(2, '0');
+          const proxIso  = `${proxDate.getFullYear()}-${pad(proxDate.getMonth()+1)}-${pad(proxDate.getDate())}T${pad(proxDate.getHours())}:${pad(proxDate.getMinutes())}:00`;
+          const proxFmt  = formatTimeDisplay(proxIso);
+          Alert.alert(
+            'Horário ocupado',
+            `Você já tem ${a.clientes?.nome ?? 'uma cliente'} agendada neste horário. Próximo horário disponível: ${proxFmt}. Deseja marcar para este horário?`,
+            [
+              { text: 'Escolher outro horário', style: 'cancel' },
+              { text: 'Sim', onPress: () => setTimeStr(proxFmt) },
+            ]
+          );
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
