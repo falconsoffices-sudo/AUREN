@@ -185,16 +185,17 @@ function ProximoCard({ agendamento }) {
   const divColor     = isDark ? '#2A2A2A' : '#E6D8CF';
 
   return (
-    <View style={{ borderTopWidth: 1, borderTopColor: divColor, paddingTop: 12, paddingBottom: 4, marginTop: 4 }}>
+    <View style={{ borderTopWidth: 1, borderTopColor: divColor, paddingTop: 12, paddingBottom: 4, marginTop: 4, marginBottom: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, marginRight: 10 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }} numberOfLines={1}>{clienteNome}</Text>
-          <Text style={{ fontSize: 12, color: subColor, marginTop: 2 }} numberOfLines={1}>{servicoNome}</Text>
-          <Text style={{ fontSize: 12, color: subColor, marginTop: 4 }}>{dataFmt}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+            <Text style={{ fontSize: 12, color: subColor }} numberOfLines={1}>{servicoNome}</Text>
+            <Text style={{ fontSize: 12, color: subColor }}> · </Text>
             <Ionicons name={iconNome} size={12} color={subColor} />
-            <Text style={{ fontSize: 11, color: subColor, marginLeft: 4 }}>{iconLabel}</Text>
+            <Text style={{ fontSize: 12, color: subColor, marginLeft: 3 }}>{iconLabel}</Text>
           </View>
+          <Text style={{ fontSize: 12, color: subColor, marginTop: 3 }}>{dataFmt}</Text>
         </View>
         <View style={{ backgroundColor: badgeColor + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 2 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor }}>{badgeLabel}</Text>
@@ -588,7 +589,7 @@ export default function HomeScreen({ navigation }) {
   const totalAtendimentos = ativos.length;
   const valorPrevisto     = ativos.reduce((s, a) => s + Number(a.valor ?? a.servicos?.valor ?? 0), 0);
 
-  const proximosTres   = proximosAgend.slice(0, 3);
+  const proximosTres   = proximosAgend.slice(0, 2);
   const proximaCliente = proximosTres[0]?.clientes?.nome ?? null;
 
   const nivelLabel    = NIVEL_LABELS[nivelGamificacao] ?? `Nível ${nivelGamificacao}`;
